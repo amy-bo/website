@@ -30,10 +30,6 @@ pnpm-debug.log*
 .claude/
 .vscode/*.local.json
 
-# Legacy checkouts kept only during migration (deleted after)
-/pages/
-/website/
-/ideas/
 
 # vibe runtime files
 .vibe/
