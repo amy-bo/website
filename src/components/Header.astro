@@ -106,10 +106,17 @@ const shouldRenderSearch =
             style="display: none;"
         >
             {
-                links.flatMap((link) => [link, ...(link.sub ?? []).filter((s) => !s.link.startsWith('http'))]).map((link) => (
-                    <div class="site_link px-4 py-2">
-                        <a href={link.link}>{link.text}</a>
-                    </div>
+                links.map((link) => (
+                    <>
+                        <div class="site_link mobile-parent">
+                            <a href={link.link}>{link.text}</a>
+                        </div>
+                        {(link.sub ?? []).map((sublink) => (
+                            <div class="site_link mobile-child">
+                                <a href={sublink.link}>{sublink.text}</a>
+                            </div>
+                        ))}
+                    </>
                 ))
             }
         </nav>
@@ -172,6 +179,22 @@ const shouldRenderSearch =
         }
         .dropdown-menu a:hover {
             background-color: var(--sl-color-gray-6);
+        }
+        .mobile-menu {
+            padding-block: 0.5rem;
+        }
+        .mobile-parent {
+            padding: 0.6rem 1rem 0.2rem;
+        }
+        .mobile-parent a {
+            font-weight: 600;
+        }
+        .mobile-child {
+            padding: 0.2rem 1rem 0.2rem 2.25rem;
+        }
+        .mobile-child a::before {
+            content: "\2013\00a0";
+            color: var(--sl-color-gray-3);
         }
 
         .right-group,
