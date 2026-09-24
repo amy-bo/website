@@ -5,7 +5,7 @@ import forestImage from "../assets/free-forest.jpg";
 
 const PAGE_TITLE_ID = "_top";
 const { data } = Astro.locals.starlightRoute.entry;
-const { title = data.title, tagline, image, actions = [] } = data.hero || {};
+const { title = data.title, tagline, actions = [] } = data.hero || {};
 
 const forestBackground = await getImage({ src: forestImage });
 

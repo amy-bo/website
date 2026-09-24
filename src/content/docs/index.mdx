@@ -1,6 +1,9 @@
 ---
 title: SUSTAINABLE PROTEIN FOR ALL
 description: AMYBO is a not-for-profit for sustainable protein.
+source: amy
+hugoPath: /
+provenance: Hero, tagline and cards by Amy (forest photo by Ozark Drones on Unsplash). The event banner is new. The video and the sections below the cards come from the Hugo homepage.
 template: splash
 hero:
   tagline: We exist to drive forward the protein revolution with the open source community.
@@ -13,20 +16,25 @@ footer: true
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
-import { LinkButton } from "@astrojs/starlight/components";
+import { LinkButton, Aside } from "@astrojs/starlight/components";
+import YouTube from '../../components/YouTube.astro';
+
+<Aside type="tip" title="AMYBO get-together, London – Friday 13 November 2026">
+Lab tours, talks and the pub at the Bezos Centre for Sustainable Protein, Imperial College White City. Free, in person or remote. [Find out more and register](/events/2026-11-13-london/).
+</Aside>
 
 <CardGrid stagger>
     <Card title="EXPERIMENTING IN THE OPEN" icon="rocket">
         We support and share open source experimentation for sustainable protein. 
         <div class="card-actions">
-            <LinkButton href="/collaborate/community_experiments" variant="primary">Take a look at our experiments</LinkButton>
+            <LinkButton href="/experiments/community_experiments/" variant="primary">Take a look at our experiments</LinkButton>
             <LinkButton href="https://forum.amybo.org/" variant="secondary">Join our community forum</LinkButton>
         </div>
     </Card>
     <Card title="TAKE ACTION" icon="add-document">
         Collaborate with us via our community forum, experimentation or funding.
         <div class="card-actions">
-            <LinkButton href="/collaborate/volunteer" variant="primary">Volunteer</LinkButton>
+            <LinkButton href="/collaborate/volunteer/" variant="primary">Volunteer</LinkButton>
         </div>
     </Card>
     <Card title="STAY IN THE LOOP" icon="youtube">
@@ -36,3 +44,33 @@ import { LinkButton } from "@astrojs/starlight/components";
         </div>
     </Card>
 </CardGrid>
+
+{/* From the Hugo homepage (source: hugo) */}
+
+## Open Source Protein
+
+Welcome to AMYBO: a non-profit open source protein fermentation community
+
+[Learn More](/docs/)
+
+[Discuss](https://forum.amybo.org/)
+
+<YouTube id="CfzGvK5tgiQ" title="New Year New Culture" />
+
+AMYBO is all about letting people grow their own nutritious, delicious and affordable protein...
+
+### We need your help
+
+We need biotechnologists, chefs, coders, creatives, engineers, enthusiasts, environmentalists, makers, medics, microbiologists, nutritionists, others.
+
+### [Contributions welcome!](https://github.com/amy-bo)
+
+All these pages are editable, so please [add more, fix what's wrong, or just get in touch](/docs/contribution-guidelines/).
+
+### [Subscribe on Youtube](https://www.youtube.com/@AMYBO)
+
+We aim to resume posting fortnightly videos as soon as funding permits.
+
+## Let's democratise food
+
+<p class="photo-credit">Header photo by <a href="https://unsplash.com/@ozarkdrones?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash">Ozark Drones</a> on <a href="https://unsplash.com/photos/birds-eye-view-photo-of-trees-jeV-LUEyJoE?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash">Unsplash</a>.</p>

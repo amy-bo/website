@@ -18,3 +18,7 @@
 .card-actions > * {
   margin: 0.25rem 0.5rem 0.25rem 0;
 }
+.photo-credit {
+  font-size: var(--sl-text-xs);
+  color: var(--sl-color-gray-3);
+}

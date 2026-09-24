@@ -28,7 +28,10 @@ const shouldRenderSearch =
         <button
             class="md:hidden p-2 rounded focus:outline-none focus:ring"
             @click="open = !open"
-            aria-label="Open site links menu"
+            aria-label="Site links menu"
+            aria-controls="mobile-site-links"
+            :aria-expanded="open.toString()"
+            aria-expanded="false"
         >
             <!-- Hamburger icon -->
             <svg
@@ -59,11 +62,13 @@ const shouldRenderSearch =
                                 class="site_link"
                                 @click={`open${idx} = !open${idx}`}
                                 aria-haspopup="true"
+                                aria-expanded="false"
+                                {...{ ':aria-expanded': `open${idx}.toString()` }}
                             >
                                 {link.text}
                             </button>
                             <div
-                                class="dropdown-menu absolute left-0 mt-2 w-40 bg-white border rounded shadow-lg z-50"
+                                class="dropdown-menu absolute left-0 mt-2 w-48 border rounded shadow-lg z-50"
                                 x-show={`open${idx}`}
                                 @click.away={`open${idx} = false`}
                                 x-transition
@@ -73,7 +78,7 @@ const shouldRenderSearch =
                                     <div class="site_link">
                                         <a
                                             href={sublink.link}
-                                            class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                            class="block px-4 py-2 text-sm"
                                             tabindex="0"
                                         >
                                             {sublink.text}
@@ -91,20 +96,23 @@ const shouldRenderSearch =
             }
         </div>
         <!-- Dropdown menu for mobile -->
-        <div
-            class="absolute top-full left-0 w-full bg-white shadow-md z-50 flex flex-col md:hidden"
+        <nav
+            id="mobile-site-links"
+            aria-label="Site links"
+            class="mobile-menu absolute top-full left-0 w-full shadow-md z-50 flex flex-col md:hidden"
             x-show="open"
             @click.away="open = false"
             x-transition
+            style="display: none;"
         >
             {
-                links.map((link) => (
-                    <div class="site_link">
+                links.flatMap((link) => [link, ...(link.sub ?? []).filter((s) => !s.link.startsWith('http'))]).map((link) => (
+                    <div class="site_link px-4 py-2">
                         <a href={link.link}>{link.text}</a>
                     </div>
                 ))
             }
-        </div>
+        </nav>
         <div class="sl-flex social-icons">
             <SocialIcons />
         </div>
@@ -155,6 +163,15 @@ const shouldRenderSearch =
         .site_link button:hover {
             color: var(--sl-color-accent);
             text-decoration: underline;
+        }
+
+        .dropdown-menu,
+        .mobile-menu {
+            background-color: var(--sl-color-bg-nav);
+            border-color: var(--sl-color-hairline-light);
+        }
+        .dropdown-menu a:hover {
+            background-color: var(--sl-color-gray-6);
         }
 
         .right-group,

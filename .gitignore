@@ -41,3 +41,6 @@ pnpm-debug.log*
 .vibe-allow-ssh
 .vibe-allow-op
 .vibe-allow-codex
+
+# Local content-guard allowlist
+.vibe-content-allow

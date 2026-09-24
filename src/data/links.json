@@ -6,53 +6,39 @@
     },
     {
         "id": 2,
-        "text": "Collaborate Now",
-        "link": "/collaborate/",
-        "sub": [
-            {
-                "text": "AMYBO forum",
-                "link": "https://forum.amybo.org/"
-            },
-            {
-                "text": "Pioreactors",
-                "link": "/collaborate/pioreactor/"
-            },
-                        {
-                "text": "Volunteer",
-                "link": "/collaborate/volunteer/"
-            },
-                        {
-                "text": "Amybo Youtube",
-                "link": "https://www.youtube.com/@amybo"
-            }
-            
-        ]
+        "text": "Events",
+        "link": "/events/2026-11-13-london/"
     },
     {
         "id": 3,
-        "text": "Open Experiments",
-        "link": "/experiments/",
+        "text": "Collaborate Now",
+        "link": "/collaborate/volunteer/",
         "sub": [
-            {
-                "text": "Community experiments",
-                "link": "/experiments/community_experiments/"
-            },
-            {
-                "text": "Experimental protocols",
-                "link": "/experiments/protocols/"
-            },
-            {
-                "text": "Submit an experiment",
-                "link": "/experiments/submit/"
-            },
-            {
-                "text": "Hardware",
-                "link": "/experiments/hardware/"
-            }
+            { "text": "AMYBO forum", "link": "https://forum.amybo.org/" },
+            { "text": "Pioreactors", "link": "/collaborate/pioreactor/" },
+            { "text": "Volunteer", "link": "/collaborate/volunteer/" },
+            { "text": "Fund us", "link": "/collaborate/fund_us/" },
+            { "text": "AMYBO YouTube", "link": "https://www.youtube.com/@AMYBO" }
         ]
     },
     {
         "id": 4,
+        "text": "Open Experiments",
+        "link": "/experiments/community_experiments/",
+        "sub": [
+            { "text": "Community experiments", "link": "/experiments/community_experiments/" },
+            { "text": "Experimental protocols", "link": "/experiments/protocols/" },
+            { "text": "Submit an experiment", "link": "/experiments/submit/" },
+            { "text": "Hardware", "link": "/experiments/hardware/" }
+        ]
+    },
+    {
+        "id": 5,
+        "text": "Docs",
+        "link": "/docs/"
+    },
+    {
+        "id": 6,
         "text": "Contact",
         "link": "/contact/"
     }
