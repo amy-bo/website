@@ -19,3 +19,25 @@ pnpm-debug.log*
 
 # macOS-specific files
 .DS_Store
+
+# Cloudflare / wrangler local state
+.wrangler/
+.dev.vars
+
+# Harness and editor state (not for the public repo)
+.vss/
+.vs/
+.claude/
+.vscode/*.local.json
+
+# Legacy checkouts kept only during migration (deleted after)
+/pages/
+/website/
+/ideas/
+
+# vibe runtime files
+.vibe/
+.vibe-signals/
+.vibe-allow-ssh
+.vibe-allow-op
+.vibe-allow-codex
