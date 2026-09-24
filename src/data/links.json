@@ -32,6 +32,10 @@
             {
                 "text": "AMYBO YouTube",
                 "link": "https://www.youtube.com/@AMYBO"
+            },
+            {
+                "text": "Contact",
+                "link": "/contact/"
             }
         ]
     },
@@ -62,10 +66,5 @@
         "id": 5,
         "text": "Docs",
         "link": "/docs/"
-    },
-    {
-        "id": 6,
-        "text": "Contact",
-        "link": "/contact/"
     }
 ]
