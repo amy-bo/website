@@ -36,6 +36,7 @@ export default defineConfig({
 						{ label: 'Contact', slug: 'contact' },
 					],
 				},
+				{ label: 'Projects', autogenerate: { directory: 'projects' } },
 				{ label: 'Events', autogenerate: { directory: 'events' } },
 				{ label: 'Collaborate', autogenerate: { directory: 'collaborate' } },
 				{ label: 'Open experiments', autogenerate: { directory: 'experiments' } },

@@ -13,8 +13,7 @@ EMAIL_FROM = "AMYBO <hello@amybo.org>"
 ORG_NAME = "AMYBO"
 ORG_FOOTER = "AMYBO is a not-for-profit trading name of andeye Ltd, registered in Scotland, company number SC665704."
 PRIVACY_URL = "/privacy/"
-# Until github.com/andeyePro/eventsandeye exists, point at the copy in this repository.
-EVENTSANDEYE_URL = "https://github.com/amy-bo/website/tree/main/eventsandeye"
+EVENTSANDEYE_URL = "https://github.com/andeyePro/eventsandeye"
 
 [[d1_databases]]
 binding = "DB"
