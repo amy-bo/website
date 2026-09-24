@@ -1,10 +1,2 @@
-import { isDev } from '../../../server/env';
-import { handle } from '../../../server/http';
-import { json } from '../../../server/util';
-
-/** Local development only: emails that would have been sent. 404 on the live site. */
-export const onRequestGet = handle(async ({ env }) => {
-	if (!isDev(env)) return new Response('Not found', { status: 404 });
-	const r = await env.DB.prepare('SELECT * FROM dev_outbox ORDER BY id').all();
-	return json({ ok: true, emails: r.results });
-});
+// Thin wrappers: the registration system is Events&I (AGPL-3.0), in ../eventsandeye.
+export { outbox as onRequestGet } from '../../../eventsandeye/src/routes/dev';

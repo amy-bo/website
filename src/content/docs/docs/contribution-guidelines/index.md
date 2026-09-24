@@ -37,7 +37,7 @@ If you've just spotted something you'd like to change:
 
 ### Previewing your changes locally
 
-1. Install [Node.js](https://nodejs.org/) 20 or later.
+1. Install [Node.js](https://nodejs.org/) 22 or later.
 1. Fork [amy-bo/website](https://github.com/amy-bo/website), then clone your fork:
 
     ```

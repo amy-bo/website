@@ -81,7 +81,7 @@ const out = [
 	'',
 	'## Known follow-ups for reviewers',
 	'',
-	'- The About page mentions a blueberry porridge photo that the new site no longer uses (the Docsy template cover image was not carried over).',
+	'- The About page’s paragraph about the Docsy porridge photo was removed, because the photo is not used on this site.',
 	'- `electroPioreactor v0.02` has the Hugo title "electroPioreactor v0.02.md" (a typo carried over verbatim).',
 	'- The Legal screenshot `Xnip2023-07-06_16-30-59.png` was unreferenced on the Hugo site; it is kept for parity.',
 	'',

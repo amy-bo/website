@@ -1,12 +1,15 @@
 # Cloudflare Pages project for amybo.org (static Astro build + Pages Functions in ./functions).
 name = "amybo"
 pages_build_output_dir = "./dist"
-compatibility_date = "2026-05-01"
+compatibility_date = "2026-09-01"
 
 [vars]
 SITE_URL = "https://amybo.org"
 NOTIFY_EMAIL = "hello@amybo.org"
 EMAIL_FROM = "AMYBO <hello@amybo.org>"
+ORG_NAME = "AMYBO"
+ORG_FOOTER = "AMYBO is a not-for-profit trading name of andeye Ltd, registered in Scotland, company number SC665704."
+PRIVACY_URL = "/privacy/"
 # Cloudflare Access application for /admin/* and /api/admin/* (see README):
 ACCESS_TEAM_DOMAIN = "REPLACE_WITH_TEAM.cloudflareaccess.com"
 ACCESS_AUD = "REPLACE_WITH_ACCESS_APPLICATION_AUD_TAG"
@@ -15,7 +18,7 @@ ACCESS_AUD = "REPLACE_WITH_ACCESS_APPLICATION_AUD_TAG"
 binding = "DB"
 database_name = "amybo-rsvp"
 database_id = "REPLACE_WITH_D1_DATABASE_ID"
-migrations_dir = "migrations"
+migrations_dir = "eventsandeye/migrations"
 
 # Secrets (Pages project > Settings > Variables and secrets, or `npx wrangler pages secret put <NAME>`):
 #   RESEND_API_KEY, TOKEN_SECRET, TURNSTILE_SECRET_KEY

@@ -1,7 +1,2 @@
-import { handle, readJson } from '../../../server/http';
-import { updateSettings } from '../../../server/rsvp';
-
-export const onRequestPost = handle(async ({ env, request }) => {
-	const body = await readJson(request);
-	return updateSettings(env, String(body.event || ''), body);
-});
+// Thin wrappers: the registration system is Events&I (AGPL-3.0), in ../eventsandeye.
+export { settings as onRequestPost } from '../../../eventsandeye/src/routes/admin/api';

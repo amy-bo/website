@@ -1,4 +1,2 @@
-import { handle } from '../../../server/http';
-import { adminSummary } from '../../../server/rsvp';
-
-export const onRequestGet = handle(async ({ env, request }) => adminSummary(env, new URL(request.url).searchParams.get('event') || ''));
+// Thin wrappers: the registration system is Events&I (AGPL-3.0), in ../eventsandeye.
+export { summary as onRequestGet } from '../../../eventsandeye/src/routes/admin/api';

@@ -1,5 +1,2 @@
-import { handle, readJson } from '../../../server/http';
-import { adminDelete } from '../../../server/rsvp';
-
-/** Admin removal (e.g. spam). Sends no email. */
-export const onRequestDelete = handle(async ({ env, request }) => adminDelete(env, String((await readJson(request)).id || '')));
+// Thin wrappers: the registration system is Events&I (AGPL-3.0), in ../eventsandeye.
+export { removeRegistration as onRequestDelete } from '../../../eventsandeye/src/routes/admin/api';

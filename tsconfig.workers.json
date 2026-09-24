@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "isolatedModules": true
   },
-  "include": ["functions/**/*.ts", "server/**/*.ts", "workers/**/*.ts"]
+  "include": ["functions/**/*.ts", "eventsandeye/src/**/*.ts", "eventsandeye/worker/**/*.ts"]
 }

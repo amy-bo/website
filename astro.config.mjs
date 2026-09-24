@@ -46,6 +46,7 @@ export default defineConfig({
 			components: {
 				Hero: './src/components/Hero.astro',
 				Header: './src/components/Header.astro',
+				Footer: './src/components/Footer.astro',
 			},
 		}),
 		alpinejs(),
