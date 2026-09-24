@@ -27,16 +27,20 @@ const esc = (s) => String(s).replace(/\|/g, '\\|');
 const pages = walk(ROOT).filter((f) => /\.mdx?$/.test(f)).map((f) => ({ file: f, ...fm(readFileSync(f, 'utf8')) })).map((p) => ({ ...p, url: urlFor(p.file, p.slug) }));
 pages.sort((a, b) => a.url.localeCompare(b.url));
 const map = JSON.parse(readFileSync('migration/hugo-map.json', 'utf8'));
-const built = (url) => existsSync(join('dist', url, 'index.html')) || (url === '/' && existsSync('dist/index.html'));
+const builtAt = (url) => existsSync(join('dist', url, 'index.html')) || (url === '/' && existsSync('dist/index.html'));
+// public/_redirects: "/old  /new  301". An old URL counts as served when it is built, or redirects to a built page.
+const redirects = existsSync('public/_redirects') ? Object.fromEntries(readFileSync('public/_redirects', 'utf8').split('\n').map((l) => l.trim().split(/\s+/)).filter((p) => p.length >= 2 && p[0].startsWith('/') && !p[0].includes('*')).map((p) => [p[0].replace(/\/?$/, '/'), p[1]])) : {};
+const built = (url) => builtAt(url) || (redirects[url] !== undefined && builtAt(redirects[url]));
+const status = (url) => builtAt(url) ? 'Same URL, built' : redirects[url] && builtAt(redirects[url]) ? `Redirects to \`${redirects[url]}\`` : 'MISSING at old URL';
 
 const problems = [];
 const hugoRows = map.filter((m) => m.hugoUrl !== undefined).map((m) => {
-	let status;
-	if (!m.newFile) status = 'Not carried over';
-	else if (!m.newUrl) status = 'n/a';
-	else status = built(m.hugoUrl) ? 'Same URL, built' : 'MISSING at old URL';
-	if (status === 'MISSING at old URL') problems.push(m.hugoUrl);
-	return `| \`${esc(m.hugoUrl)}\` | ${m.newFile ? `\`${esc(m.newFile)}\`` : '–'} | ${status} | ${esc(m.notes || '')} |`;
+	let st;
+	if (!m.newFile) st = 'Not carried over';
+	else if (!m.newUrl) st = 'n/a';
+	else st = status(m.hugoUrl);
+	if (st === 'MISSING at old URL') problems.push(m.hugoUrl);
+	return `| \`${esc(m.hugoUrl)}\` | ${m.newFile ? `\`${esc(m.newFile)}\`` : '–'} | ${st} | ${esc(m.notes || '')} |`;
 });
 for (const p of pages) if (p.source === 'hugo' && p.hugoPath && !built(p.hugoPath)) problems.push(p.hugoPath);
 const images = map.filter((m) => m.hugoUrl === undefined);
@@ -71,7 +75,7 @@ const out = [
 	'| --- | --- | --- | --- |',
 	...hugoRows,
 	'',
-	'Old URLs with no page of their own (search, tags, categories, RSS) redirect via `public/_redirects`.',
+	'Every old `/docs/` URL redirects (301) to its new home via `public/_redirects`, as do search, tags, categories and RSS.',
 	'',
 	'## Hugo images',
 	'',

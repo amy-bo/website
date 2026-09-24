@@ -10,7 +10,7 @@ Every page carries `source:` in its frontmatter:
 
 `provenance:` explains pages that mix sources. To see exactly what changed on a Hugo page, compare it with the Hugo original in git history of [amy-bo/pages](https://github.com/amy-bo/pages).
 
-Totals: 10 amy, 30 hugo, 7 new.
+Totals: 10 amy, 29 hugo, 16 new.
 
 ## Pages
 
@@ -18,51 +18,59 @@ Totals: 10 amy, 30 hugo, 7 new.
 | --- | --- | --- | --- | --- |
 | [`/`](/) | SUSTAINABLE PROTEIN FOR ALL | amy | `/` | Hero, tagline and three cards by Amy (forest photo by Ozark Drones on Unsplash). The event banner and the electroPioreactor card are new. The video and the sections below the cards come from the Hugo homepage. |
 | [`/about/`](/about/) | About AMYBO | hugo | `/about/` | Verbatim from Hugo, except the 'Get involved' heading added so headings nest, and the paragraph about the Docsy porridge photo removed (the photo is not used on this site). |
+| [`/background/`](/background/) | Background | new | – |  |
+| [`/background/overview/`](/background/overview/) | Overview (2023) | hugo | `/docs/overview/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/background/plan-2023/`](/background/plan-2023/) | Next steps (2023 plan) | hugo | `/docs/overview/plan/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/background/proteins/`](/background/proteins/) | Proteins | hugo | `/docs/proteins/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/background/proteins/cultivated-meat/`](/background/proteins/cultivated-meat/) | Cultivated Meat | hugo | `/docs/proteins/cultivated-meat/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/background/proteins/precision-fermentation/`](/background/proteins/precision-fermentation/) | Precision Fermentation | hugo | `/docs/proteins/precision-fermentation/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/background/proteins/single-cell-protein/`](/background/proteins/single-cell-protein/) | Single-Cell Protein | hugo | `/docs/proteins/single-cell-protein/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/collaborate/brand/`](/collaborate/brand/) | Our name & Logo | hugo | `/docs/contribution-guidelines/brand/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/collaborate/contribute/`](/collaborate/contribute/) | Contribute to this site | hugo | `/docs/contribution-guidelines/` | 'Reach out to us' and 'Editing AMYBO.org' are verbatim from Hugo. 'Web stack' onwards is new, replacing the Hugo, Docsy and Netlify instructions for the Astro site. Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/collaborate/fund_us/`](/collaborate/fund_us/) | Fund us | amy | – | Title and description by Amy. Body is new launch text. |
 | [`/collaborate/pioreactor/`](/collaborate/pioreactor/) | Pioreactor | amy | – | Title and description by Amy. Body is new launch text linking to migrated Hugo pages. |
+| [`/collaborate/safety-and-legal/`](/collaborate/safety-and-legal/) | Safety and legal | hugo | `/docs/legal/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/collaborate/safety-and-legal/disclaimer/`](/collaborate/safety-and-legal/disclaimer/) | Disclaimer | hugo | `/docs/legal/disclaimer/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/collaborate/safety-and-legal/risk-management/`](/collaborate/safety-and-legal/risk-management/) | Risk management | hugo | `/docs/risk-assessments/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/collaborate/volunteer/`](/collaborate/volunteer/) | Get involved | amy | – | Title and description by Amy. Body is new launch text; the list of skills is from the Hugo homepage. |
 | [`/contact/`](/contact/) | Contact Amybo | amy | – | Title and description by Amy. Body is new launch text; contact details are as on the Hugo site. |
-| [`/docs/`](/docs/) | Documentation | hugo | `/docs/` | Verbatim from Hugo, plus an opening pointer to the Projects section. |
-| [`/docs/contribution-guidelines/`](/docs/contribution-guidelines/) | Contribution Guidelines | hugo | `/docs/contribution-guidelines/` | 'Reach out to us' and 'Editing AMYBO.org' are verbatim from Hugo. 'Web stack' onwards is new, replacing the Hugo, Docsy and Netlify instructions for the Astro site. |
-| [`/docs/contribution-guidelines/brand/`](/docs/contribution-guidelines/brand/) | Our name & Logo | hugo | `/docs/contribution-guidelines/brand/` |  |
-| [`/docs/electropioreactor/`](/docs/electropioreactor/) | electroPioreactor | hugo | `/docs/electropioreactor/` | Verbatim from Hugo, plus a note at the top pointing to the current project page. |
-| [`/docs/electropioreactor/electropioreactor-v0.02/`](/docs/electropioreactor/electropioreactor-v0.02/) | electroPioreactor v0.02.md | hugo | `/docs/electropioreactor/electropioreactor-v0.02/` |  |
-| [`/docs/equipment/`](/docs/equipment/) | Equipment | hugo | `/docs/equipment/` |  |
-| [`/docs/equipment/autoclaves/`](/docs/equipment/autoclaves/) | Autoclaves | hugo | `/docs/equipment/autoclaves/` |  |
-| [`/docs/equipment/bioreactors/`](/docs/equipment/bioreactors/) | Bioreactors | hugo | `/docs/equipment/bioreactors/` |  |
-| [`/docs/equipment/dna-sequencing/`](/docs/equipment/dna-sequencing/) | DNA Sequencing | hugo | `/docs/equipment/dna-sequencing/` |  |
-| [`/docs/equipment/microscopes/`](/docs/equipment/microscopes/) | Microscopes | hugo | `/docs/equipment/microscopes/` |  |
-| [`/docs/experiments/`](/docs/experiments/) | Experiments | hugo | `/docs/experiments/` |  |
-| [`/docs/experiments/co2-sparging/`](/docs/experiments/co2-sparging/) | CO2 Sparging | hugo | `/docs/experiments/co2-sparging/` |  |
-| [`/docs/experiments/control-testing/`](/docs/experiments/control-testing/) | Control Testing | hugo | `/docs/experiments/control-testing/` |  |
-| [`/docs/experiments/electrolysis/`](/docs/experiments/electrolysis/) | Electrode optimisation | hugo | `/docs/experiments/electrolysis/` |  |
-| [`/docs/experiments/hob-enrichment/`](/docs/experiments/hob-enrichment/) | HOB Enrichment | hugo | `/docs/experiments/hob-enrichment/` |  |
-| [`/docs/experiments/spirulina-batch/`](/docs/experiments/spirulina-batch/) | Spirulina Batch | hugo | `/docs/experiments/spirulina-batch/` |  |
-| [`/docs/kickstartingforgood/`](/docs/kickstartingforgood/) | Kickstarting for Good | hugo | `/docs/kickstartingforgood/` |  |
-| [`/docs/legal/`](/docs/legal/) | Legal | hugo | `/docs/legal/` |  |
-| [`/docs/legal/disclaimer/`](/docs/legal/disclaimer/) | Disclaimer | hugo | `/docs/legal/disclaimer/` |  |
-| [`/docs/openvalve/`](/docs/openvalve/) | OpenValve | hugo | `/docs/openvalve/` |  |
-| [`/docs/overview/`](/docs/overview/) | Overview | hugo | `/docs/overview/` |  |
-| [`/docs/overview/plan/`](/docs/overview/plan/) | Next steps | hugo | `/docs/overview/plan/` |  |
-| [`/docs/pioflo/`](/docs/pioflo/) | Pioflo | hugo | `/docs/pioflo/` |  |
-| [`/docs/pioflo/pioflo-v0.01/`](/docs/pioflo/pioflo-v0.01/) | Pioflo v0.01 | hugo | `/docs/pioflo/pioflo-v0.01/` |  |
-| [`/docs/proteins/`](/docs/proteins/) | Proteins | hugo | `/docs/proteins/` |  |
-| [`/docs/proteins/cultivated-meat/`](/docs/proteins/cultivated-meat/) | Cultivated Meat | hugo | `/docs/proteins/cultivated-meat/` |  |
-| [`/docs/proteins/precision-fermentation/`](/docs/proteins/precision-fermentation/) | Precision Fermentation | hugo | `/docs/proteins/precision-fermentation/` |  |
-| [`/docs/proteins/single-cell-protein/`](/docs/proteins/single-cell-protein/) | Single-Cell Protein | hugo | `/docs/proteins/single-cell-protein/` |  |
-| [`/docs/risk-assessments/`](/docs/risk-assessments/) | Risk management | hugo | `/docs/risk-assessments/` |  |
 | [`/events/`](/events/) | Events | new | – |  |
 | [`/events/2026-11-13-london/`](/events/2026-11-13-london/) | AMYBO get-together, London – Friday 13 November 2026 | new | – |  |
 | [`/events/confirm/`](/events/confirm/) | Complete your registration | new | – |  |
 | [`/events/manage/`](/events/manage/) | Manage your registration | new | – |  |
 | [`/experiments/community_experiments/`](/experiments/community_experiments/) | Community Experiments | amy | – | Title and description by Amy. Body is new launch text linking to the migrated Hugo experiment pages. |
 | [`/experiments/hardware/`](/experiments/hardware/) | Hardware | amy | – | Title and description by Amy. Body is new launch text linking to migrated Hugo pages. |
-| [`/experiments/protocols/`](/experiments/protocols/) | Experiments Protocols | amy | – | Title and description by Amy. Body is new launch text linking to migrated Hugo pages. |
+| [`/experiments/protocols/`](/experiments/protocols/) | Experimental protocols | amy | – | Description by Amy; title corrected from 'Experiments Protocols'. Body is new launch text linking to migrated Hugo pages. |
 | [`/experiments/submit/`](/experiments/submit/) | Submit an Experiment | amy | – | Title and description by Amy. Body is new launch text. |
 | [`/mission/`](/mission/) | Why Amybo | amy | – | Title and description by Amy. Body is new launch text drawing on the Hugo Overview and About pages, which are linked. |
 | [`/privacy/`](/privacy/) | Privacy notice | new | – |  |
 | [`/projects/`](/projects/) | Projects | new | – |  |
+| [`/projects/carma-hub/`](/projects/carma-hub/) | CARMA Hub project | new | – |  |
 | [`/projects/electropioreactor/`](/projects/electropioreactor/) | electroPioreactor | new | – |  |
+| [`/projects/electropioreactor/aep/`](/projects/electropioreactor/aep/) | Aseptic electroPioreactor (AEP) | new | – |  |
+| [`/projects/electropioreactor/mep/`](/projects/electropioreactor/mep/) | Mixed-culture electroPioreactor (MEP) | new | – |  |
+| [`/projects/literature/`](/projects/literature/) | Literature | new | – |  |
+| [`/projects/media/`](/projects/media/) | Growth medium | new | – |  |
+| [`/projects/methods/`](/projects/methods/) | Methods | new | – |  |
+| [`/projects/other-hardware/`](/projects/other-hardware/) | Other hardware | new | – |  |
+| [`/projects/other-hardware/openvalve/`](/projects/other-hardware/openvalve/) | OpenValve | hugo | `/docs/openvalve/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/`](/projects/past/) | Past projects and early notes | new | – |  |
+| [`/projects/past/electropioreactor-2024/`](/projects/past/electropioreactor-2024/) | electroPioreactor (2024 notes) | hugo | `/docs/electropioreactor/` | Verbatim from Hugo, plus a note at the top pointing to the current project page. Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/electropioreactor-v0-02/`](/projects/past/electropioreactor-v0-02/) | electroPioreactor v0.02 (2024) | hugo | `/docs/electropioreactor/electropioreactor-v0.02/` | Title had a stray '.md' on the Hugo site; corrected. Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/equipment/`](/projects/past/equipment/) | Equipment notes (2023) | hugo | `/docs/equipment/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/equipment/autoclaves/`](/projects/past/equipment/autoclaves/) | Autoclaves | hugo | `/docs/equipment/autoclaves/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/equipment/bioreactors/`](/projects/past/equipment/bioreactors/) | Bioreactors: why we chose the Pioreactor | hugo | `/docs/equipment/bioreactors/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/equipment/dna-sequencing/`](/projects/past/equipment/dna-sequencing/) | DNA Sequencing | hugo | `/docs/equipment/dna-sequencing/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/equipment/microscopes/`](/projects/past/equipment/microscopes/) | Microscopes | hugo | `/docs/equipment/microscopes/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/experiments/`](/projects/past/experiments/) | First experiments (2023 to 2024) | hugo | `/docs/experiments/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/experiments/co2-sparging/`](/projects/past/experiments/co2-sparging/) | CO2 Sparging | hugo | `/docs/experiments/co2-sparging/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/experiments/control-testing/`](/projects/past/experiments/control-testing/) | Control Testing | hugo | `/docs/experiments/control-testing/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/experiments/electrolysis/`](/projects/past/experiments/electrolysis/) | Electrode optimisation | hugo | `/docs/experiments/electrolysis/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/experiments/hob-enrichment/`](/projects/past/experiments/hob-enrichment/) | HOB Enrichment | hugo | `/docs/experiments/hob-enrichment/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/experiments/spirulina-batch/`](/projects/past/experiments/spirulina-batch/) | Spirulina Batch | hugo | `/docs/experiments/spirulina-batch/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/kickstarting-for-good/`](/projects/past/kickstarting-for-good/) | Kickstarting for Good | hugo | `/docs/kickstartingforgood/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/pioflo/`](/projects/pioflo/) | PioFlo | hugo | `/docs/pioflo/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/pioflo/pioflo-v0-01/`](/projects/pioflo/pioflo-v0-01/) | Pioflo v0.01 | hugo | `/docs/pioflo/pioflo-v0.01/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 
 ## Every old Hugo page and its counterpart
 
@@ -72,38 +80,38 @@ All old Hugo URLs resolve on the new site.
 | --- | --- | --- | --- |
 | `/` | `src/content/docs/index.mdx` | Same URL, built | Merged below Amy’s homepage cards (source: amy + hugo). blocks/link-down decorative scroll chevron dropped (no text). |
 | `/about/` | `src/content/docs/about.mdx` | Same URL, built | Docsy cover/lead/section/feature blocks flattened to plain markdown/MDX; github.com/AMYBO-org links normalised to github.com/amy-bo; featured-background.jpg cover image dropped (see image entry). |
-| `/docs/contribution-guidelines/brand/` | `src/content/docs/docs/contribution-guidelines/brand.md` | Same URL, built |  |
-| `/docs/contribution-guidelines/` | `src/content/docs/docs/contribution-guidelines/index.md` | Same URL, built | github.com/AMYBO-org links normalised to github.com/amy-bo. |
-| `/docs/equipment/autoclaves/` | `src/content/docs/docs/equipment/autoclaves.md` | Same URL, built |  |
-| `/docs/equipment/bioreactors/` | `src/content/docs/docs/equipment/bioreactors.md` | Same URL, built |  |
-| `/docs/equipment/dna-sequencing/` | `src/content/docs/docs/equipment/dna-sequencing.md` | Same URL, built |  |
-| `/docs/equipment/microscopes/` | `src/content/docs/docs/equipment/microscopes.md` | Same URL, built |  |
-| `/docs/equipment/` | `src/content/docs/docs/equipment/index.md` | Same URL, built |  |
-| `/docs/experiments/co2-sparging/` | `src/content/docs/docs/experiments/co2-sparging/index.md` | Same URL, built | Page bundle; figure shortcodes converted to plain markdown images (no captions in source); span style=color inline HTML kept as raw HTML (valid in .md). |
-| `/docs/experiments/control-testing/` | `src/content/docs/docs/experiments/control-testing/index.mdx` | Same URL, built | Page bundle; used .mdx because the card+youtube shortcode needed the YouTube component; card shortcode flattened to a heading. |
-| `/docs/experiments/electrolysis/` | `src/content/docs/docs/experiments/electrolysis/index.md` | Same URL, built |  |
-| `/docs/experiments/hob-enrichment/` | `src/content/docs/docs/experiments/hob-enrichment.mdx` | Same URL, built | youtube shortcode -> YouTube component; title inferred as 'New Year New Culture' (same video id used elsewhere on the old site). |
-| `/docs/experiments/spirulina-batch/` | `src/content/docs/docs/experiments/spirulina-batch.mdx` | Same URL, built | Two youtube shortcodes -> YouTube components; titles inferred from surrounding Setup/Results headings. |
-| `/docs/experiments/` | `src/content/docs/docs/experiments/index.md` | Same URL, built |  |
-| `/docs/kickstartingforgood/` | `src/content/docs/docs/kickstartingforgood.md` | Same URL, built | hidden:true/toc_hide:true -> sidebar.hidden:true; vimeo shortcode -> raw <iframe> per spec (kept .md since no component import needed). |
-| `/docs/legal/` | `src/content/docs/docs/legal/index.md` | Same URL, built | In-body H1 'DO NOT TRY THIS AT HOME' demoted to H2. |
-| `/docs/legal/disclaimer/` | `src/content/docs/docs/legal/disclaimer.md` | Same URL, built |  |
-| `/docs/openvalve/` | `src/content/docs/docs/openvalve/index.md` | Same URL, built |  |
-| `/docs/overview/plan/` | `src/content/docs/docs/overview/plan.md` | Same URL, built |  |
-| `/docs/overview/` | `src/content/docs/docs/overview/index.md` | Same URL, built | Docsy button flattened to plain markdown link. |
-| `/docs/pioflo/pioflo-v0.01/` | `src/content/docs/docs/pioflo/pioflo-v0.01.md` | Same URL, built | Added slug frontmatter (docs/pioflo/pioflo-v0.01) because Astro's slugger strips dots; absolute image paths (/docs/Pioflo/...) converted to relative page-bundle-style refs. |
-| `/docs/pioflo/` | `src/content/docs/docs/pioflo/index.md` | Same URL, built |  |
-| `/docs/proteins/cultivated-meat/` | `src/content/docs/docs/proteins/cultivated-meat.md` | Same URL, built |  |
-| `/docs/proteins/precision-fermentation/` | `src/content/docs/docs/proteins/precision-fermentation.md` | Same URL, built |  |
-| `/docs/proteins/single-cell-protein/` | `src/content/docs/docs/proteins/single-cell-protein.md` | Same URL, built |  |
-| `/docs/proteins/` | `src/content/docs/docs/proteins/index.md` | Same URL, built |  |
-| `/docs/risk-assessments/` | `src/content/docs/docs/risk-assessments/index.md` | Same URL, built |  |
-| `/docs/` | `src/content/docs/docs/index.md` | Same URL, built | Docsy button flattened to plain markdown link; no Hugo description field existed so none added. |
-| `/docs/electropioreactor/` | `src/content/docs/docs/electropioreactor/index.md` | Same URL, built |  |
-| `/docs/electropioreactor/electropioreactor-v0.02/` | `src/content/docs/docs/electropioreactor/electropioreactor-v0.02.md` | Same URL, built | Added slug frontmatter (docs/electropioreactor/electropioreactor-v0.02) because Astro's slugger strips dots. Title carried verbatim from Hugo frontmatter even though it oddly includes '.md' (title: "electroPioreactor v0.02.md") - not fixed since not broken markup, just an apparent authoring typo; flagged for review. |
+| `/docs/contribution-guidelines/brand/` | `src/content/docs/collaborate/brand.md` | Redirects to `/collaborate/brand/` |  |
+| `/docs/contribution-guidelines/` | `src/content/docs/collaborate/contribute.md` | Redirects to `/collaborate/contribute/` | github.com/AMYBO-org links normalised to github.com/amy-bo. |
+| `/docs/equipment/autoclaves/` | `src/content/docs/projects/past/equipment/autoclaves.md` | Redirects to `/projects/past/equipment/autoclaves/` |  |
+| `/docs/equipment/bioreactors/` | `src/content/docs/projects/past/equipment/bioreactors.md` | Redirects to `/projects/past/equipment/bioreactors/` |  |
+| `/docs/equipment/dna-sequencing/` | `src/content/docs/projects/past/equipment/dna-sequencing.md` | Redirects to `/projects/past/equipment/dna-sequencing/` |  |
+| `/docs/equipment/microscopes/` | `src/content/docs/projects/past/equipment/microscopes.md` | Redirects to `/projects/past/equipment/microscopes/` |  |
+| `/docs/equipment/` | `src/content/docs/projects/past/equipment/index.md` | Redirects to `/projects/past/equipment/` |  |
+| `/docs/experiments/co2-sparging/` | `src/content/docs/projects/past/experiments/co2-sparging/index.md` | Redirects to `/projects/past/experiments/co2-sparging/` | Page bundle; figure shortcodes converted to plain markdown images (no captions in source); span style=color inline HTML kept as raw HTML (valid in .md). |
+| `/docs/experiments/control-testing/` | `src/content/docs/projects/past/experiments/control-testing/index.mdx` | Redirects to `/projects/past/experiments/control-testing/` | Page bundle; used .mdx because the card+youtube shortcode needed the YouTube component; card shortcode flattened to a heading. |
+| `/docs/experiments/electrolysis/` | `src/content/docs/projects/past/experiments/electrolysis/index.md` | Redirects to `/projects/past/experiments/electrolysis/` |  |
+| `/docs/experiments/hob-enrichment/` | `src/content/docs/projects/past/experiments/hob-enrichment.mdx` | Redirects to `/projects/past/experiments/hob-enrichment/` | youtube shortcode -> YouTube component; title inferred as 'New Year New Culture' (same video id used elsewhere on the old site). |
+| `/docs/experiments/spirulina-batch/` | `src/content/docs/projects/past/experiments/spirulina-batch.mdx` | Redirects to `/projects/past/experiments/spirulina-batch/` | Two youtube shortcodes -> YouTube components; titles inferred from surrounding Setup/Results headings. |
+| `/docs/experiments/` | `src/content/docs/projects/past/experiments/index.md` | Redirects to `/projects/past/experiments/` |  |
+| `/docs/kickstartingforgood/` | `src/content/docs/projects/past/kickstarting-for-good.md` | Redirects to `/projects/past/kickstarting-for-good/` | hidden:true/toc_hide:true -> sidebar.hidden:true; vimeo shortcode -> raw <iframe> per spec (kept .md since no component import needed). |
+| `/docs/legal/` | `src/content/docs/collaborate/safety-and-legal/index.md` | Redirects to `/collaborate/safety-and-legal/` | In-body H1 'DO NOT TRY THIS AT HOME' demoted to H2. |
+| `/docs/legal/disclaimer/` | `src/content/docs/collaborate/safety-and-legal/disclaimer.md` | Redirects to `/collaborate/safety-and-legal/disclaimer/` |  |
+| `/docs/openvalve/` | `src/content/docs/projects/other-hardware/openvalve.md` | Redirects to `/projects/other-hardware/openvalve/` |  |
+| `/docs/overview/plan/` | `src/content/docs/background/plan-2023.md` | Redirects to `/background/plan-2023/` |  |
+| `/docs/overview/` | `src/content/docs/background/overview.md` | Redirects to `/background/overview/` | Docsy button flattened to plain markdown link. |
+| `/docs/pioflo/pioflo-v0.01/` | `src/content/docs/projects/pioflo/pioflo-v0-01.md` | Redirects to `/projects/pioflo/pioflo-v0-01/` | Added slug frontmatter (docs/pioflo/pioflo-v0.01) because Astro's slugger strips dots; absolute image paths (/docs/Pioflo/...) converted to relative page-bundle-style refs. |
+| `/docs/pioflo/` | `src/content/docs/projects/pioflo/index.md` | Redirects to `/projects/pioflo/` |  |
+| `/docs/proteins/cultivated-meat/` | `src/content/docs/background/proteins/cultivated-meat.md` | Redirects to `/background/proteins/cultivated-meat/` |  |
+| `/docs/proteins/precision-fermentation/` | `src/content/docs/background/proteins/precision-fermentation.md` | Redirects to `/background/proteins/precision-fermentation/` |  |
+| `/docs/proteins/single-cell-protein/` | `src/content/docs/background/proteins/single-cell-protein.md` | Redirects to `/background/proteins/single-cell-protein/` |  |
+| `/docs/proteins/` | `src/content/docs/background/proteins/index.md` | Redirects to `/background/proteins/` |  |
+| `/docs/risk-assessments/` | `src/content/docs/collaborate/safety-and-legal/risk-management.md` | Redirects to `/collaborate/safety-and-legal/risk-management/` |  |
+| `/docs/` | `src/content/docs/docs/index.md` | Redirects to `/projects/` | Docsy button flattened to plain markdown link; no Hugo description field existed so none added. |
+| `/docs/electropioreactor/` | `src/content/docs/projects/past/electropioreactor-2024.md` | Redirects to `/projects/electropioreactor/` |  |
+| `/docs/electropioreactor/electropioreactor-v0.02/` | `src/content/docs/projects/past/electropioreactor-v0-02.md` | Redirects to `/projects/past/electropioreactor-v0-02/` | Added slug frontmatter (docs/electropioreactor/electropioreactor-v0.02) because Astro's slugger strips dots. Title carried verbatim from Hugo frontmatter even though it oddly includes '.md' (title: "electroPioreactor v0.02.md") - not fixed since not broken markup, just an apparent authoring typo; flagged for review. |
 | `/search/` | – | Not carried over | replaced by Starlight's built-in Pagefind search |
 
-Old URLs with no page of their own (search, tags, categories, RSS) redirect via `public/_redirects`.
+Every old `/docs/` URL redirects (301) to its new home via `public/_redirects`, as do search, tags, categories and RSS.
 
 ## Hugo images
 
@@ -111,20 +119,20 @@ Old URLs with no page of their own (search, tags, categories, RSS) redirect via 
 | --- | --- | --- |
 | `content/en/about/featured-background.jpg` | not carried over | not carried over: unverified rights (Docsy cover image) |
 | `content/en/featured-background.jpg` | not carried over | not carried over: unverified rights (Docsy cover image) |
-| `content/en/docs/Experiments/CO2 Sparging/cylinder.jpg` | `src/content/docs/docs/experiments/co2-sparging/cylinder.jpg` |  |
-| `content/en/docs/Experiments/CO2 Sparging/pwm.jpg` | `src/content/docs/docs/experiments/co2-sparging/pwm.jpg` |  |
-| `content/en/docs/Experiments/CO2 Sparging/regulator.jpg` | `src/content/docs/docs/experiments/co2-sparging/regulator.jpg` |  |
-| `content/en/docs/Experiments/CO2 Sparging/relay.png` | `src/content/docs/docs/experiments/co2-sparging/relay.png` |  |
-| `content/en/docs/Experiments/CO2 Sparging/solenoid.jpg` | `src/content/docs/docs/experiments/co2-sparging/solenoid.jpg` |  |
-| `content/en/docs/Experiments/CO2 Sparging/tubing.jpg` | `src/content/docs/docs/experiments/co2-sparging/tubing.jpg` |  |
-| `content/en/docs/Experiments/Control Testing/autoclaving.jpg` | `src/content/docs/docs/experiments/control-testing/autoclaving.jpg` |  |
-| `content/en/docs/Experiments/Control Testing/equipment.jpg` | `src/content/docs/docs/experiments/control-testing/equipment.jpg` |  |
-| `content/en/docs/Experiments/Control Testing/pioreactors.jpg` | `src/content/docs/docs/experiments/control-testing/pioreactors.jpg` |  |
-| `content/en/docs/Experiments/Control Testing/results.png` | `src/content/docs/docs/experiments/control-testing/results.png` |  |
-| `content/en/docs/Legal/Xnip2023-07-06_16-30-59.png` | `src/content/docs/docs/legal/Xnip2023-07-06_16-30-59.png` | not referenced by any Hugo page (orphaned screenshot); carried over as a page resource of the Legal section index for parity |
-| `content/en/docs/Pioflo/PiofloKombucha001.png` | `src/content/docs/docs/pioflo/PiofloKombucha001.png` |  |
-| `content/en/docs/Pioflo/Pioflo_v0_01_73A7651.webp` | `src/content/docs/docs/pioflo/Pioflo_v0_01_73A7651.webp` |  |
-| `content/en/docs/Pioflo/Pioflo_v0_01_sketch.png` | `src/content/docs/docs/pioflo/Pioflo_v0_01_sketch.png` |  |
+| `content/en/docs/Experiments/CO2 Sparging/cylinder.jpg` | `src/content/docs/projects/past/experiments/co2-sparging/cylinder.jpg` |  |
+| `content/en/docs/Experiments/CO2 Sparging/pwm.jpg` | `src/content/docs/projects/past/experiments/co2-sparging/pwm.jpg` |  |
+| `content/en/docs/Experiments/CO2 Sparging/regulator.jpg` | `src/content/docs/projects/past/experiments/co2-sparging/regulator.jpg` |  |
+| `content/en/docs/Experiments/CO2 Sparging/relay.png` | `src/content/docs/projects/past/experiments/co2-sparging/relay.png` |  |
+| `content/en/docs/Experiments/CO2 Sparging/solenoid.jpg` | `src/content/docs/projects/past/experiments/co2-sparging/solenoid.jpg` |  |
+| `content/en/docs/Experiments/CO2 Sparging/tubing.jpg` | `src/content/docs/projects/past/experiments/co2-sparging/tubing.jpg` |  |
+| `content/en/docs/Experiments/Control Testing/autoclaving.jpg` | `src/content/docs/projects/past/experiments/control-testing/autoclaving.jpg` |  |
+| `content/en/docs/Experiments/Control Testing/equipment.jpg` | `src/content/docs/projects/past/experiments/control-testing/equipment.jpg` |  |
+| `content/en/docs/Experiments/Control Testing/pioreactors.jpg` | `src/content/docs/projects/past/experiments/control-testing/pioreactors.jpg` |  |
+| `content/en/docs/Experiments/Control Testing/results.png` | `src/content/docs/projects/past/experiments/control-testing/results.png` |  |
+| `content/en/docs/Legal/Xnip2023-07-06_16-30-59.png` | `src/content/docs/collaborate/safety-and-legal/Xnip2023-07-06_16-30-59.png` | not referenced by any Hugo page (orphaned screenshot); carried over as a page resource of the Legal section index for parity |
+| `content/en/docs/Pioflo/PiofloKombucha001.png` | `src/content/docs/projects/pioflo/PiofloKombucha001.png` |  |
+| `content/en/docs/Pioflo/Pioflo_v0_01_73A7651.webp` | `src/content/docs/projects/pioflo/Pioflo_v0_01_73A7651.webp` |  |
+| `content/en/docs/Pioflo/Pioflo_v0_01_sketch.png` | `src/content/docs/projects/pioflo/Pioflo_v0_01_sketch.png` |  |
 
 ## Known follow-ups for reviewers
 

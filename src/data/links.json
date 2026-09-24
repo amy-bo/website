@@ -2,7 +2,21 @@
     {
         "id": 1,
         "text": "Why We Exist",
-        "link": "/mission/"
+        "link": "/mission/",
+        "sub": [
+            {
+                "text": "Why AMYBO",
+                "link": "/mission/"
+            },
+            {
+                "text": "About",
+                "link": "/about/"
+            },
+            {
+                "text": "Background",
+                "link": "/background/"
+            }
+        ]
     },
     {
         "id": 3,
@@ -34,8 +48,16 @@
                 "link": "https://www.youtube.com/@AMYBO"
             },
             {
+                "text": "Safety and legal",
+                "link": "/collaborate/safety-and-legal/"
+            },
+            {
+                "text": "Contribute to this site",
+                "link": "/collaborate/contribute/"
+            },
+            {
                 "text": "Contact",
-                "link": "/contact/"
+                "link": "https://contact.andeye.com/?source=amybo.org&subject=Message%20from%20amybo.org&cb=Volunteering&cb=Running%20an%20experiment&cb=Building%20an%20electroPioreactor&cb=Funding%20or%20sponsorship&cb=Press%20or%20speaking&cb=Something%20else"
             }
         ]
     },
@@ -65,6 +87,48 @@
     {
         "id": 5,
         "text": "Projects",
-        "link": "/projects/"
+        "link": "/projects/",
+        "sub": [
+            {
+                "text": "electroPioreactor",
+                "link": "/projects/electropioreactor/"
+            },
+            {
+                "text": "Aseptic electroPioreactor",
+                "link": "/projects/electropioreactor/aep/"
+            },
+            {
+                "text": "Mixed-culture electroPioreactor",
+                "link": "/projects/electropioreactor/mep/"
+            },
+            {
+                "text": "CARMA Hub project",
+                "link": "/projects/carma-hub/"
+            },
+            {
+                "text": "PioFlo",
+                "link": "/projects/pioflo/"
+            },
+            {
+                "text": "Growth medium",
+                "link": "/projects/media/"
+            },
+            {
+                "text": "Methods",
+                "link": "/projects/methods/"
+            },
+            {
+                "text": "Literature",
+                "link": "/projects/literature/"
+            },
+            {
+                "text": "Other hardware",
+                "link": "/projects/other-hardware/"
+            },
+            {
+                "text": "Past projects",
+                "link": "/projects/past/"
+            }
+        ]
     }
 ]

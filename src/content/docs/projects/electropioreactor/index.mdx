@@ -1,0 +1,67 @@
+---
+title: electroPioreactor
+description: Build guides, designs, plugin, medium, methods and results for the electroPioreactor and Aseptic electroPioreactor, all on GitHub.
+source: new
+sidebar:
+  order: 0
+  label: Overview
+tableOfContents:
+  maxHeadingLevel: 2
+---
+
+import { Aside, LinkButton } from '@astrojs/starlight/components';
+
+The electroPioreactor is a [Pioreactor](https://pioreactor.com) adapted to grow hydrogen-oxidising bacteria (HOB). Electrodes in the culture make hydrogen and oxygen from the medium as they are needed, and a relay-driven solenoid sparges CO₂, so the bacteria can fix carbon without any stored hydrogen. Everything is designed, documented and version-controlled in the open at [amy-bo/electroPioreactor](https://github.com/amy-bo/electroPioreactor).
+
+<div class="card-actions">
+	<LinkButton href="https://github.com/amy-bo/electroPioreactor" variant="primary" icon="github">The repository</LinkButton>
+	<LinkButton href="https://github.com/amy-bo/electroPioreactor/releases" variant="secondary">Releases and downloads</LinkButton>
+	<LinkButton href="https://forum.amybo.org/" variant="minimal">Ask on the forum</LinkButton>
+</div>
+
+There are two variants, each with its own page:
+
+- [**Aseptic electroPioreactor (AEP).**](/projects/electropioreactor/aep/) Sealed vial cap, 0.2 μm vent filters and luer-lock ports for defined single-strain research. Six AEP 0.1 units were assembled and used for training at Imperial and Edinburgh in November 2025; the AEP 0.2 kits shipped in September 2026. This is the focus of the [CARMA Hub Pump Priming](https://carmahub.co.uk/about-us/pump-priming-projects/) project led by Sonja Billerbeck (Imperial College London) and Chris French (University of Edinburgh), with AMYBO as design and training partner and [LabCrafter](https://labcrafter.co.uk) as supplier.
+- [**Mixed-culture electroPioreactor (MEP).**](/projects/electropioreactor/mep/) The original, lower-cost version for enrichment cultures and teaching, currently used by MSc students at Edinburgh.
+
+## Build one
+
+| Guide | For |
+| --- | --- |
+| [Aseptic electroPioreactor: overview, design criteria and directory](https://github.com/amy-bo/electroPioreactor/tree/main/AsepticElectroPioreactor) | Start here for the AEP |
+| [AEP 0.1.1 assembly instructions](https://github.com/amy-bo/electroPioreactor/blob/main/AsepticElectroPioreactor/CARMA_PumpPriming/Assembly/AEP0.1.1_Assembly.md) | Tools, parts and step-by-step build |
+| [Mixed-culture electroPioreactor: assembly](https://github.com/amy-bo/electroPioreactor/blob/main/MixedElectroPioreactor/Assembly-EdMSc26.md), [calibration](https://github.com/amy-bo/electroPioreactor/blob/main/MixedElectroPioreactor/Calibration.md), [operation](https://github.com/amy-bo/electroPioreactor/blob/main/MixedElectroPioreactor/Operation.md) and [pre-transport check](https://github.com/amy-bo/electroPioreactor/blob/main/MixedElectroPioreactor/PreTransportCheck-EdMSc26.md) | The MEP, as used for the Edinburgh MSc |
+| [Components and bill of materials](https://github.com/amy-bo/electroPioreactor/tree/main/Components) | What to buy and print, with supplier links |
+| [Parametric vial cap and electrode holder](https://github.com/amy-bo/electroPioreactor/tree/main/Components/Vial%20Cap) | OpenSCAD source and STL for the one 3D-printed part that makes it an electroPioreactor |
+| [CO₂ transfer: regulators, needle valves and venting solenoids](https://github.com/amy-bo/electroPioreactor/tree/main/Components/CO2%20transfer) | Choosing the gas train |
+
+<Aside type="note" title="The AEP 0.2 build guide">
+A step-by-step guide to the AEP 0.2, with a short video, the full text and drawings rendered from the CAD files for every step, is being published at [docs.electropioreactor.org/AEP](https://docs.electropioreactor.org/AEP) using [Docs&I](https://github.com/andeyePro/docsandeye). Until it is complete, that address takes you to the [guide's source](https://github.com/amy-bo/electroPioreactor/tree/AEP02/docs/steps). An MEP guide will follow.
+</Aside>
+
+## Run it: the Pioreactor plugin
+
+The [electroPioreactor plugin](https://github.com/amy-bo/electroPioreactor/tree/main/AEP-Plugin) adds one background job to the Pioreactor web interface: it drives electrolysis at a set power, sparges CO₂ on a schedule, pauses electrolysis during each sparge, and pauses optical-density readings until the bubbles have cleared. All four settings can be changed live.
+
+- [Install it from the SD card or over SSH](https://github.com/amy-bo/electroPioreactor/tree/main/AEP-Plugin#installation), including the [card bundles](https://github.com/amy-bo/electroPioreactor/releases) for units with no network access.
+- The plugin is also published on its own at [amy-bo/pioreactor-electroPioreactor-plugin](https://github.com/amy-bo/pioreactor-electroPioreactor-plugin).
+- Our changes to Pioreactor's own software and OS images go upstream from [amy-bo/pioreactor](https://github.com/amy-bo/pioreactor) and [amy-bo/CustoPiZer](https://github.com/amy-bo/CustoPiZer).
+
+## Medium, methods and literature
+
+The [growth medium](/projects/media/), our [methods](/projects/methods/) and the [literature](/projects/literature/) each have a page of their own, linking into the repository's Media, Methodologies and Literature folders.
+
+## Results and research
+
+- [CARMA Hub results](https://github.com/amy-bo/electroPioreactor/tree/main/AsepticElectroPioreactor/CARMA_PumpPriming/Results): AEP 0.1 training, anode discolouration, and continuous versus intermittent CO₂ sparging. [Meeting notes](https://github.com/amy-bo/electroPioreactor/blob/main/AsepticElectroPioreactor/CARMA_PumpPriming/Meetings.md) are there too.
+- [Harvey Mudd College clinic](https://github.com/amy-bo/electroPioreactor/tree/main/PastResearch/HMC-Clinic): anode optimisation and the solenoid pinch valve that became [OpenValve](/projects/other-hardware/openvalve/), with the [poster](https://github.com/amy-bo/electroPioreactor/blob/main/PastResearch/HMC-Clinic/AMYBO%20Poster%20Presentation.pptx.pdf).
+- [Brown University, Harris Lab](https://github.com/amy-bo/electroPioreactor/tree/main/PastResearch/Brown-HarrisLab): diagnosing and fixing CO₂ sparger backflow.
+- Earlier notes on this site: the [2024 electroPioreactor v0.02 write-up](/projects/electropioreactor/), our [first experiments](/projects/past/experiments/), and the [electrolysis anode](/projects/past/experiments/electrolysis/) and [CO₂ sparging](/projects/past/experiments/co2-sparging/) pages.
+
+## Get involved
+
+- Questions and ideas: [forum.amybo.org](https://forum.amybo.org/), for example the threads on [CO₂ sparging](https://forum.amybo.org/t/co2-sparger-drawback/52), [cathode design](https://forum.amybo.org/t/designing-a-cathode-for-electrolysis/65) and [heterotrophic electrolysis trials](https://forum.amybo.org/t/trial-experiment-on-heterotrophic-electrolysis/163).
+- Bugs and improvements: [open an issue or pull request](https://github.com/amy-bo/electroPioreactor/issues) on the repository. The plugin has [its own issues](https://github.com/amy-bo/pioreactor-electroPioreactor-plugin/issues).
+- Kits and parts: [LabCrafter](https://labcrafter.co.uk) in the UK, [Pioreactor](https://pioreactor.com) elsewhere.
+- The repository is also mirrored on [Radicle](https://app.radicle.xyz/nodes/iris.radicle.xyz/rad%3AzY4GuyErQo91xGYdLi4r2bea9QDJ).
+- Come to the [AMYBO get-together on 13 November 2026](/events/2026-11-13-london/) at Imperial's White City labs to see the AEP 0.2 running.

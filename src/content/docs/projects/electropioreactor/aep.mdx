@@ -1,0 +1,32 @@
+---
+title: Aseptic electroPioreactor (AEP)
+description: The sealed, filtered electroPioreactor for single-strain research, developed with Imperial College London and the University of Edinburgh.
+source: new
+sidebar:
+  order: 1
+  label: Aseptic electroPioreactor
+---
+
+import { LinkButton } from '@astrojs/starlight/components';
+
+The Aseptic electroPioreactor keeps a defined culture defined: a sealed, parametric vial cap, 0.2 μm hydrophobic vent filters on the gas ports and luer-lock connections for feed and sampling, on top of the electrolysis and CO₂ sparging of every electroPioreactor. It is designed to be safe first, then accurate and repeatable, then automated, then good value.
+
+<div class="card-actions">
+	<LinkButton href="https://github.com/amy-bo/electroPioreactor/tree/main/AsepticElectroPioreactor" variant="primary" icon="github">AEP on GitHub</LinkButton>
+	<LinkButton href="https://docs.electropioreactor.org/AEP" variant="secondary">AEP 0.2 build guide</LinkButton>
+</div>
+
+## Versions
+
+- **AEP 0.1 and 0.1.1** (2025): six units assembled and used for training at Imperial and Edinburgh in November 2025. [Assembly instructions](https://github.com/amy-bo/electroPioreactor/blob/main/AsepticElectroPioreactor/CARMA_PumpPriming/Assembly/AEP0.1.1_Assembly.md).
+- **AEP 0.2** (2026): revised vial cap, electrode top stop, GL45 media bottles and an offline card-install route for the plugin. Kits shipped to both universities in September 2026. The step-by-step guide, with video and drawings for each step, is being published at [docs.electropioreactor.org/AEP](https://docs.electropioreactor.org/AEP) using [Docs&I](https://github.com/andeyePro/docsandeye).
+
+## In the repository
+
+- [Overview, design criteria and directory](https://github.com/amy-bo/electroPioreactor/tree/main/AsepticElectroPioreactor)
+- [Results](https://github.com/amy-bo/electroPioreactor/tree/main/AsepticElectroPioreactor/CARMA_PumpPriming/Results): AEP 0.1 training, anode discolouration, continuous versus intermittent CO₂ sparging
+- [Meeting notes](https://github.com/amy-bo/electroPioreactor/blob/main/AsepticElectroPioreactor/CARMA_PumpPriming/Meetings.md) of the CARMA Hub project
+- [Components and bill of materials](https://github.com/amy-bo/electroPioreactor/tree/main/Components), including the [vial cap](https://github.com/amy-bo/electroPioreactor/tree/main/Components/Vial%20Cap) OpenSCAD source
+- [The plugin](/projects/electropioreactor/#run-it-the-pioreactor-plugin) that runs it from the Pioreactor web interface
+
+The AEP is the subject of the [CARMA Hub project](/projects/carma-hub/). Kits and parts come from [LabCrafter](https://labcrafter.co.uk) in the UK and [Pioreactor](https://pioreactor.com) elsewhere.

@@ -40,7 +40,7 @@ export default defineConfig({
 				{ label: 'Events', autogenerate: { directory: 'events' } },
 				{ label: 'Collaborate', autogenerate: { directory: 'collaborate' } },
 				{ label: 'Open experiments', autogenerate: { directory: 'experiments' } },
-				{ label: 'Docs', autogenerate: { directory: 'docs', collapsed: true } },
+				{ label: 'Background', autogenerate: { directory: 'background', collapsed: true } },
 				{ label: 'Privacy', slug: 'privacy' },
 			],
 			customCss: ['./src/styles/global.css', './src/styles/amybo.css'],
