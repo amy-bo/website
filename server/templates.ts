@@ -100,17 +100,6 @@ AMYBO – hello@amybo.org – Privacy notice: https://amybo.org/privacy/`;
 	return { to: reg.email, subject, html, text };
 }
 
-export function alreadyRegisteredEmail(ev: EventRow, reg: RegistrationRow, manageUrl: string): OutgoingEmail {
-	const subject = `Your registration: ${ev.title}`;
-	const html = layout(subject, `
-<p>Hello ${escapeHtml(reg.name)},</p>
-<p>Someone (hopefully you) tried to register this email address for the <strong>${escapeHtml(ev.title)}</strong>, but it is already registered.</p>
-<p>You can view, change or cancel your existing registration here:</p>
-${button(manageUrl, 'Manage my registration')}`);
-	const text = `Hello ${reg.name},\n\nSomeone (hopefully you) tried to register this email address for the ${ev.title}, but it is already registered.\n\nView, change or cancel your registration: ${manageUrl}\n\nAMYBO – hello@amybo.org`;
-	return { to: reg.email, subject, html, text };
-}
-
 export function instructionsEmail(
 	ev: EventRow, reg: RegistrationRow, tours: TourRow[], instr: { subject: string; body_md: string }, manageUrl: string,
 ): OutgoingEmail {

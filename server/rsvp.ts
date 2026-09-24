@@ -1,7 +1,7 @@
 import { type Env, notifyEmail, siteUrl } from './env';
 import { sendBatch, sendEmail, type OutgoingEmail } from './email';
 import {
-	alreadyRegisteredEmail, cancellationEmail, confirmEmail, instructionsEmail, messageEmail, notification,
+	cancellationEmail, confirmEmail, instructionsEmail, messageEmail, notification,
 	type EventRow, type RegistrationRow, type TourRow,
 } from './templates';
 import { makeToken } from './tokens';
@@ -140,10 +140,10 @@ export async function register(env: Env, eventId: string, input: RegistrationInp
 
 	const existing = await env.DB.prepare('SELECT * FROM registrations WHERE event_id = ? AND email = ?').bind(ev.id, email).first<RegistrationRow>();
 	if (existing) {
+		// Pending: re-send the confirm-your-email message. Confirmed: send nothing (the brief allows no other
+		// automatic email); the generic response still gives nothing away.
 		if (existing.status === 'pending') {
 			await sendEmail(env, confirmEmail(ev, existing, await confirmUrl(env, existing.id), await manageUrl(env, existing.id)));
-		} else {
-			await sendEmail(env, alreadyRegisteredEmail(ev, existing, await manageUrl(env, existing.id)));
 		}
 		return { ok: true as const };
 	}
@@ -189,6 +189,16 @@ async function totalsLines(env: Env, ev: EventRow, tours: TourRow[]) {
 	];
 }
 
+/** Tells hello@ when a confirmed registrant newly joins the in-person or a tour waiting list, with current totals. */
+async function notifyWaitlist(env: Env, ev: EventRow, tours: TourRow[], reg: RegistrationRow, event: boolean, tour: boolean, verb: string) {
+	if (!event && !tour) return;
+	const what = [event ? 'the in-person waiting list' : null, tour ? `the ${tours.find((t) => t.id === reg.tour_id)?.label} waiting list` : null].filter(Boolean).join(' and ');
+	await sendEmail(env, notification(notifyEmail(env), `New waiting-list registration: ${ev.title}`, [
+		`${reg.name}${reg.affiliation ? ` (${reg.affiliation})` : ''} ${verb} ${what}.`,
+		...(await totalsLines(env, ev, tours)),
+	]));
+}
+
 export function publicStatus(reg: RegistrationRow, tours: TourRow[]) {
 	const tour = reg.tour_id ? tours.find((t) => t.id === reg.tour_id) : null;
 	return {
@@ -224,13 +234,7 @@ export async function confirm(env: Env, id: string) {
 	reg = (await getRegistration(env, id))!;
 
 	if (!joinsWaitlist) await sendInstructionsTo(env, ev, reg, tours);
-	if (joinsWaitlist || joinsTourWaitlist) {
-		const what = [joinsWaitlist ? 'the in-person waiting list' : null, joinsTourWaitlist ? `the ${tours.find((t) => t.id === reg!.tour_id)?.label} waiting list` : null].filter(Boolean).join(' and ');
-		await sendEmail(env, notification(notifyEmail(env), `New waiting-list registration: ${ev.title}`, [
-			`${reg.name}${reg.affiliation ? ` (${reg.affiliation})` : ''} has confirmed and joined ${what}.`,
-			...(await totalsLines(env, ev, tours)),
-		]));
-	}
+	await notifyWaitlist(env, ev, tours, reg, joinsWaitlist, joinsTourWaitlist, 'has confirmed and joined');
 	return { ok: true as const, already: false, registration: publicStatus(reg, tours) };
 }
 
@@ -269,6 +273,7 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 	}
 	let tour_place = reg.tour_place, tour_waitlist_since = reg.tour_waitlist_since;
 	if (c.tour_id !== reg.tour_id) {
+		if (c.tour_id && !registrationOpen(ev)) throw new UserError('Registration has closed, so lab tour bookings can no longer be changed. Please email hello@amybo.org.', 409);
 		if (c.tour_id) {
 			tour_place = cap.tours.find((t) => t.id === c.tour_id)!.available ? 'place' : 'waitlist';
 			tour_waitlist_since = tour_place === 'waitlist' && reg.status === 'confirmed' ? now : null;
@@ -281,6 +286,12 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 		`UPDATE registrations SET name=?, attendance=?, affiliation=?, needs=?, place=?, waitlist_since=?, tour_id=?, tour_place=?,
 			tour_waitlist_since=?, updated_at=? WHERE id=?`,
 	).bind(c.name, c.attendance, c.affiliation, c.needs, place, waitlist_since, c.tour_id, tour_place, tour_waitlist_since, now, id).run();
+	if (reg.status === 'confirmed') {
+		const updated = (await getRegistration(env, id))!;
+		const newEvent = updated.place === 'waitlist' && reg.place !== 'waitlist';
+		const newTour = updated.tour_place === 'waitlist' && !(reg.tour_place === 'waitlist' && reg.tour_id === updated.tour_id);
+		await notifyWaitlist(env, ev, tours, updated, newEvent, newTour, 'changed their registration and joined');
+	}
 	return manageView(env, id);
 }
 

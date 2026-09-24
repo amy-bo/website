@@ -166,7 +166,7 @@ try {
 	r = await register({ name: 'Alice again', email: alice });
 	check('duplicate returns the same generic success', r.status === 200 && r.data.ok);
 	mails = await mailsTo(alice);
-	check('existing registrant is emailed their manage link, nothing else changes', mails.length === 3 && /already registered/.test(mails[2].text_body));
+	check('confirmed duplicate: no extra automatic email is sent', mails.length === 2);
 
 	console.log('\nSelf-service update');
 	r = await req('GET', `/api/rsvp/manage?t=${encodeURIComponent(aliceManage)}`);
@@ -190,7 +190,7 @@ try {
 
 	r = await req('POST', '/api/admin/instructions', { event: EVENT, subject: 'Joining instructions v2', body_md: 'Room **G01**, sign in at reception.\n\n- Bring ID', change_note: 'Added room' }, ADMIN);
 	check('new instructions version 2', r.data.ok && r.data.version === 2);
-	check('saving a version emails nobody', (await mailsTo(alice)).length === 3 && (await mailsTo(bob)).length === 2);
+	check('saving a version emails nobody', (await mailsTo(alice)).length === 2 && (await mailsTo(bob)).length === 2);
 	r = await req('POST', '/api/admin/messages', { event: EVENT, dry_run: true, audience: { below_version: 2 } }, ADMIN);
 	check('dry run: 2 people on an older version', r.data.count === 2, JSON.stringify(r.data));
 	r = await req('POST', '/api/admin/messages', { event: EVENT, subject: 'Room confirmed', body_md: "What's changed: we are in room **G01**.", audience: { below_version: 2 }, marks_instructions_version: 2 }, ADMIN);
@@ -219,6 +219,19 @@ try {
 	check('sent log lists sent, scheduled and cancelled messages', r.data.messages.some((m) => m.id === schedId && m.status === 'sent') && r.data.messages.some((m) => m.status === 'cancelled'));
 	r = await req('GET', `/api/admin/sent-log?event=${EVENT}`, undefined, ADMIN);
 	check('markdown sent log includes versions and messages', typeof r.data === 'string' && /Version 2/.test(r.data) && /Room confirmed/.test(r.data) && /Version 2: 2 confirmed/.test(r.data));
+
+	console.log('\nChanges that join a waiting list');
+	const dan = 'dan@example.org';
+	await register({ name: 'Dan', email: dan, attendance: 'remote' });
+	await req('POST', '/api/rsvp/confirm', { t: tokenFrom((await mailsTo(dan))[0].text_body, 'confirm') });
+	const danManage = tokenFrom((await mailsTo(dan))[0].text_body, 'manage');
+	r = await req('POST', '/api/rsvp/manage', { t: danManage, name: 'Dan', attendance: 'in_person', tour_id: TOUR2 });
+	check('confirmed remote → in person when full: waiting list for place and tour', r.data.registration.place === 'waitlist' && r.data.registration.tour_place === 'waitlist', JSON.stringify(r.data));
+	check('hello@ told about the waiting-list change', (await mailsTo('hello@amybo.org')).some((m) => /waiting-list/.test(m.subject) && /Dan changed their registration and joined the in-person waiting list and the 11:15 lab tour waiting list/.test(m.text_body)));
+	const helloCount = (await mailsTo('hello@amybo.org')).length;
+	await req('POST', '/api/rsvp/manage', { t: danManage, name: 'Dan D', attendance: 'in_person', tour_id: TOUR2 });
+	check('editing other details while waiting does not re-notify', (await mailsTo('hello@amybo.org')).length === helloCount);
+	await req('DELETE', '/api/rsvp/manage', { t: danManage });
 
 	console.log('\nExports');
 	await register({ name: '=HYPERLINK("http://x")', email: 'formula@example.org', attendance: 'remote' });
@@ -256,6 +269,7 @@ try {
 	check('deadline moved into the past', r.data.ok);
 	check('registration refused after the deadline', (await register({ email: 'late@example.org' })).status === 409);
 	check('status shows closed', (await req('GET', `/api/rsvp/status?event=${EVENT}`)).data.event.open === false);
+	check('tour change refused after the deadline', (await req('POST', '/api/rsvp/manage', { t: bobManage, name: 'Bob', attendance: 'in_person', tour_id: TOUR2 })).status === 409);
 	r = await req('POST', '/api/rsvp/manage', { t: bobManage, name: 'Bob', attendance: 'remote', tour_id: 'none' });
 	check('existing registrant can still switch to remote after the deadline', r.data.ok && r.data.registration.attendance === 'remote');
 
