@@ -10,22 +10,22 @@ Every page carries `source:` in its frontmatter:
 
 `provenance:` explains pages that mix sources. To see exactly what changed on a Hugo page, compare it with the Hugo original in git history of [amy-bo/pages](https://github.com/amy-bo/pages).
 
-Totals: 10 amy, 30 hugo, 5 new.
+Totals: 10 amy, 30 hugo, 7 new.
 
 ## Pages
 
 | URL | Title | Source | Old Hugo URL | Notes |
 | --- | --- | --- | --- | --- |
-| [`/`](/) | SUSTAINABLE PROTEIN FOR ALL | amy | `/` | Hero, tagline and cards by Amy (forest photo by Ozark Drones on Unsplash). The event banner is new. The video and the sections below the cards come from the Hugo homepage. |
+| [`/`](/) | SUSTAINABLE PROTEIN FOR ALL | amy | `/` | Hero, tagline and three cards by Amy (forest photo by Ozark Drones on Unsplash). The event banner and the electroPioreactor card are new. The video and the sections below the cards come from the Hugo homepage. |
 | [`/about/`](/about/) | About AMYBO | hugo | `/about/` | Verbatim from Hugo, except the 'Get involved' heading added so headings nest, and the paragraph about the Docsy porridge photo removed (the photo is not used on this site). |
 | [`/collaborate/fund_us/`](/collaborate/fund_us/) | Fund us | amy | – | Title and description by Amy. Body is new launch text. |
 | [`/collaborate/pioreactor/`](/collaborate/pioreactor/) | Pioreactor | amy | – | Title and description by Amy. Body is new launch text linking to migrated Hugo pages. |
 | [`/collaborate/volunteer/`](/collaborate/volunteer/) | Get involved | amy | – | Title and description by Amy. Body is new launch text; the list of skills is from the Hugo homepage. |
 | [`/contact/`](/contact/) | Contact Amybo | amy | – | Title and description by Amy. Body is new launch text; contact details are as on the Hugo site. |
-| [`/docs/`](/docs/) | Documentation | hugo | `/docs/` |  |
+| [`/docs/`](/docs/) | Documentation | hugo | `/docs/` | Verbatim from Hugo, plus an opening pointer to the Projects section. |
 | [`/docs/contribution-guidelines/`](/docs/contribution-guidelines/) | Contribution Guidelines | hugo | `/docs/contribution-guidelines/` | 'Reach out to us' and 'Editing AMYBO.org' are verbatim from Hugo. 'Web stack' onwards is new, replacing the Hugo, Docsy and Netlify instructions for the Astro site. |
 | [`/docs/contribution-guidelines/brand/`](/docs/contribution-guidelines/brand/) | Our name & Logo | hugo | `/docs/contribution-guidelines/brand/` |  |
-| [`/docs/electropioreactor/`](/docs/electropioreactor/) | electroPioreactor | hugo | `/docs/electropioreactor/` |  |
+| [`/docs/electropioreactor/`](/docs/electropioreactor/) | electroPioreactor | hugo | `/docs/electropioreactor/` | Verbatim from Hugo, plus a note at the top pointing to the current project page. |
 | [`/docs/electropioreactor/electropioreactor-v0.02/`](/docs/electropioreactor/electropioreactor-v0.02/) | electroPioreactor v0.02.md | hugo | `/docs/electropioreactor/electropioreactor-v0.02/` |  |
 | [`/docs/equipment/`](/docs/equipment/) | Equipment | hugo | `/docs/equipment/` |  |
 | [`/docs/equipment/autoclaves/`](/docs/equipment/autoclaves/) | Autoclaves | hugo | `/docs/equipment/autoclaves/` |  |
@@ -61,6 +61,8 @@ Totals: 10 amy, 30 hugo, 5 new.
 | [`/experiments/submit/`](/experiments/submit/) | Submit an Experiment | amy | – | Title and description by Amy. Body is new launch text. |
 | [`/mission/`](/mission/) | Why Amybo | amy | – | Title and description by Amy. Body is new launch text drawing on the Hugo Overview and About pages, which are linked. |
 | [`/privacy/`](/privacy/) | Privacy notice | new | – |  |
+| [`/projects/`](/projects/) | Projects | new | – |  |
+| [`/projects/electropioreactor/`](/projects/electropioreactor/) | electroPioreactor | new | – |  |
 
 ## Every old Hugo page and its counterpart
 

@@ -3,10 +3,15 @@ title: "electroPioreactor"
 description: Affordable electrobioreactor
 source: hugo
 hugoPath: /docs/electropioreactor/
+provenance: Verbatim from Hugo, plus a note at the top pointing to the current project page.
 sidebar:
   order: 40
   label: electroPioreactor
 ---
+
+:::note[This page is from 2024]
+Current designs, build guides, the plugin and results are on the [electroPioreactor project page](/projects/electropioreactor/).
+:::
 
 ## Affordable electrobioreactor
 
