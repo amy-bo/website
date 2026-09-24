@@ -1,0 +1,7 @@
+# Old Hugo/Docsy URLs with no direct equivalent on the Astro site.
+/search/          /          301
+/search           /          301
+/tags/*           /docs/     301
+/categories/*     /docs/     301
+/index.xml        /          301
+/docs/index.xml   /docs/     301
