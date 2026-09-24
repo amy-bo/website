@@ -126,8 +126,9 @@ function parseCommon(input: RegistrationInput, tours: TourRow[]) {
 }
 
 /**
- * Creates a pending registration and sends the confirm-your-email message. The response never reveals whether
- * the address was already registered (the owner of the address gets an email either way).
+ * Creates a pending registration and sends the confirm-your-email message. The response is identical whether or not
+ * the address was already registered: a pending duplicate gets the confirm-your-email message again, a confirmed
+ * duplicate gets no email at all (it is not on the list of permitted automatic emails).
  */
 export async function register(env: Env, eventId: string, input: RegistrationInput) {
 	const ev = await getEvent(env, eventId);

@@ -124,7 +124,7 @@ const siteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '1x0000000000000000
 			const h = document.createElement('p');
 			h.innerHTML = '<strong>Nearly there: check your email.</strong>';
 			const p = document.createElement('p');
-			p.textContent = `We have sent a message to ${String(fd.get('email'))}. Your registration is not complete until you click the "Complete registration" button in that email. Unconfirmed registrations are deleted automatically. If nothing arrives within a few minutes, check your spam folder or email hello@amybo.org.`;
+			p.textContent = `If this address is new or not yet confirmed, we have sent a "Complete registration" email to ${String(fd.get('email'))}. Your registration is not complete until you click the button in that email, and unconfirmed registrations are deleted automatically. If you have already confirmed this address, no new email is sent: use the "Manage my registration" link in your earlier emails. If nothing arrives within a few minutes, check your spam folder or email hello@amybo.org.`;
 			box.append(h, p);
 			result.append(box);
 			box.setAttribute('tabindex', '-1');
