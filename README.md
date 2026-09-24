@@ -2,7 +2,7 @@
 
 The website of [AMYBO](https://amybo.org), a non-profit open source protein fermentation community: sustainable protein for all.
 
-Built with [Astro](https://astro.build) and [Starlight](https://starlight.astro.build), hosted on [Cloudflare Pages](https://pages.cloudflare.com), with a small event-registration system on Pages Functions and D1.
+Built with [Astro](https://astro.build) and [Starlight](https://starlight.astro.build), hosted on [Cloudflare Pages](https://pages.cloudflare.com). Event registration uses [Events&I](eventsandeye/) (beta), andeye's open source registration system on Pages Functions and D1, which lives in `eventsandeye/` until it moves to its own repository.
 
 ## Credits
 
@@ -14,7 +14,7 @@ Every page's frontmatter records where its text came from (`source: amy | hugo |
 
 ## Working on the site
 
-Requires Node.js 20 or later.
+Requires Node.js 22 or later (`.nvmrc`). In the vibe container, the project-local Node 22 in `node_modules/.bin` is used by `npm run` scripts.
 
 ```sh
 npm install
@@ -31,12 +31,11 @@ Pages live in `src/content/docs/`; the file path is the URL. Images go next to t
 ```
 src/content/docs/        pages (docs/ holds everything migrated from the Hugo site)
 src/content/talks/       talks for event pages (one markdown file per talk)
-src/components/          Amy's Hero and Header overrides, event components
-src/pages/admin/rsvps    private registrations admin page
-functions/               Cloudflare Pages Functions: /api/rsvp/*, /api/admin/*
-server/                  shared registration logic, email templates, Access and Turnstile checks
-workers/cron/            companion Worker that runs the scheduled jobs every 5 minutes
-migrations/              D1 database schema and seed data for the 13 November 2026 event
+src/components/          Amy's Hero and Header overrides, footer, talks list
+eventsandeye/            Events&I registration system (AGPL-3.0): server code, admin page, cron worker, schema, tests, Astro components
+functions/               one-line Cloudflare Pages Functions wrappers that route to Events&I
+seed/                    the 13 November 2026 event, its sessions and first joining instructions
+workers/cron/            wrangler config for the Events&I cron worker
 public/_redirects        old Hugo URLs with no direct equivalent
 migration/hugo-map.json  every Hugo file and where it went
 ```
@@ -47,29 +46,28 @@ The 13 November 2026 get-together page is `src/content/docs/events/2026-11-13-lo
 
 **Adding talks.** Copy `src/content/talks/_example.md` to a new file, fill in the title, speaker, affiliation, bio and optionally a headshot (put the image in `src/content/talks/headshots/`), and set `published: true`. Until at least one talk is published, the page shows "Programme to be announced".
 
-**How registration works.**
+**How registration works** is described in the [Events&I README](eventsandeye/README.md): double opt-in, holds, waiting lists that only move when an admin clicks **Promote**, self-service changes, calendar invitations and host lists. For this event:
 
-1. Someone fills in the form (name, email, in person or remote, optional lab tour, optional affiliation and needs, consent). Turnstile and a hidden honeypot field keep bots out.
-2. They get a **"Complete registration"** email. Their place is held for 48 hours, or a third of the time left before the registration deadline if that is shorter. hello@amybo.org is told when half the hold has passed, and the registration is deleted if it is not confirmed in time.
-3. When they confirm, they get the **latest joining instructions**. If in-person places are full they join the waiting list instead, and hello@amybo.org is told. Lab tours have their own capacities and waiting lists.
-4. Every email carries a personal **manage link** to view, change or cancel. Cancelling deletes the registration, confirms by email and tells hello@amybo.org.
+- **Places:** 20 in person (remote unlimited), and 6 on each lab tour. The main registration deadline is 6 November 23:59; each tour can be booked or changed until it starts, while places remain. Change any of these on the admin page.
+- **Sessions:** 10:30 and 11:15 lab tours (optional, booked separately), 12:00 and 14:00 talks (in person and on Google Meet), 17:00 pub. Add the two Meet links, hosts and final times on the admin page under **Sessions**; people whose calendar entries change get an update automatically, and nobody else is emailed.
+- **Calendars:** in-person attendees get one entry for their day, remote attendees one per online talk session, each with reminders and add-to-calendar links.
+- **Hosts:** a session with a host email gets the attendee list whenever it changes (names, plus emails of people who opted in to share them).
 
-Freed places are never handed out automatically: someone on the waiting list moves up only when an admin clicks **Promote**, which sends them the joining instructions.
-
-**The only automatic emails** are: confirm your email, joining instructions (on confirmation or promotion), cancellation confirmation, and notifications to hello@amybo.org. Editing a page or saving new joining instructions never emails anyone.
+**The automatic emails** are: confirm your email; a reminder with joining instructions for anyone who registers twice; joining instructions with calendar invitations on confirmation or promotion; calendar updates only when someone's entries change; cancellation confirmation; notifications to hello@amybo.org; host lists. Editing a page or saving new joining instructions never emails anyone.
 
 **Admin page:** [amybo.org/admin/rsvps](https://amybo.org/admin/rsvps/), behind Cloudflare Access. It shows counts and every registration, and lets you:
 
-- change the in-person maximum, tour capacities and registration deadline
+- change the in-person maximum, registration deadline and assumed travel time
+- edit sessions: times, location, Google Meet links, hosts, capacities and tour booking deadlines
 - promote people from waiting lists, or remove spam
 - download a CSV, or copy a BCC list for sending from Gmail (always paste into BCC, never To or CC)
 - save a new version of the joining instructions, which new registrants then receive
 - email all confirmed registrants, or a filtered group (in person or remote, a tour, people on an older joining-instructions version), now or at a scheduled time, and cancel a scheduled email
-- download the **sent log** as markdown: every joining-instructions version, who has which version, and every message sent
+- download the **sent log** as markdown: every joining-instructions version, who has which version, the sessions, and every message sent
 
 **Updating joining instructions without spamming anyone.** Download the sent log and ask Claude to draft the next version plus a short "what's changed" message. Save the new version, then send the "what's changed" message to *people on an older version*, ticking *counts as joining instructions version N*. Everyone ends up with everything, and nobody gets the same information twice.
 
-**Data retention.** A scheduled job deletes the event's registrations and their email records 30 days after the event ends. See the [privacy notice](https://amybo.org/privacy/).
+**Data retention.** A scheduled job deletes the event's registrations, their email records and host lists 30 days after the event ends. See the [privacy notice](https://amybo.org/privacy/).
 
 ## Setting up Cloudflare (first deploy)
 
@@ -82,13 +80,14 @@ You need a Cloudflare account with the amybo.org zone (already there, since DNS 
    npx wrangler d1 create amybo-rsvp
    ```
 
-   Put the printed `database_id` into both `wrangler.toml` and `workers/cron/wrangler.toml`, commit, then create the tables:
+   Put the printed `database_id` into both `wrangler.toml` and `workers/cron/wrangler.toml`, commit, then create the tables and the 13 November event:
 
    ```sh
    npx wrangler d1 migrations apply amybo-rsvp --remote
+   npx wrangler d1 execute amybo-rsvp --remote --file seed/2026-11-13-london.sql
    ```
 
-2. **Connect GitHub.** In the Cloudflare dashboard: Workers & Pages → Create → Pages → Connect to Git. When GitHub asks, install the Cloudflare Pages app on the **amy-bo** organisation and give it access to **only** the `website` repository. Choose `amy-bo/website`, production branch `main`, framework preset Astro, build command `npm run build`, output directory `dist`. Add the build variable `NODE_VERSION` = `20`. Pages reads the D1 binding and variables from `wrangler.toml`.
+2. **Connect GitHub.** In the Cloudflare dashboard: Workers & Pages → Create → Pages → Connect to Git. When GitHub asks, install the Cloudflare Pages app on the **amy-bo** organisation and give it access to **only** the `website` repository. Choose `amy-bo/website`, production branch `main`, framework preset Astro, build command `npm run build`, output directory `dist`. Add the build variable `NODE_VERSION` = `22`. Pages reads the D1 binding and variables from `wrangler.toml`.
 
 3. **Turnstile.** Dashboard → Turnstile → Add widget for `amybo.org` (and `amybo.pages.dev` for previews), managed mode. Add the **site key** as the Pages build variable `PUBLIC_TURNSTILE_SITE_KEY`, and the **secret key** as the secret `TURNSTILE_SECRET_KEY`.
 
@@ -116,7 +115,7 @@ You need a Cloudflare account with the amybo.org zone (already there, since DNS 
 
 8. **Test on the preview URL** (`https://amybo.pages.dev`): register with your own email, confirm, change and cancel; open `/admin/rsvps/` and check it asks you to log in.
 
-Local development of the functions: copy `.dev.vars.example` to `.dev.vars`, fill in `TOKEN_SECRET`, then `npm run build && npm run db:migrate:local && npm run pages:dev` and open http://localhost:8788. Emails are printed to the console and stored in a local outbox instead of being sent.
+Local development of the functions: copy `.dev.vars.example` to `.dev.vars`, fill in `TOKEN_SECRET`, then `npm run build && npm run db:migrate:local && npm run pages:dev` and open http://localhost:8788. Emails, including calendar attachments, are printed to the console and stored in a local outbox instead of being sent.
 
 ## Cut-over from Netlify to Cloudflare Pages
 
@@ -124,6 +123,8 @@ Local development of the functions: copy `.dev.vars.example` to `.dev.vars`, fil
 - [ ] Event page facts confirmed: times, room and entrance, in-person maximum, tour capacities and registration deadline (set on the admin page).
 - [ ] Joining instructions version 1 checked on the admin page, including the Google Meet link and room details (or a note that they will follow).
 - [ ] Resend domain shows **Verified**; a test registration email arrives and is not in spam.
+- [ ] Calendar invitations checked with real sends to a Gmail and an Outlook address: the invitation shows, adds to the calendar, and a session time change produces an update rather than a duplicate.
+- [ ] Session hosts, the two Google Meet links and final times entered on the admin page.
 - [ ] In Pages → Custom domains, add `amybo.org` and `www.amybo.org`. Cloudflare replaces the existing DNS records that point at Netlify. Wait for the certificate to show Active.
 - [ ] Check https://amybo.org, a few old URLs (for example `/docs/overview/`, `/docs/pioflo/pioflo-v0.01/`, `/about/`), the event page, registration end to end, and that `/admin/rsvps/` needs a login.
 - [ ] In Netlify, remove the custom domain from the old site, then delete or disable the site so it stops building.
@@ -134,4 +135,4 @@ Local development of the functions: copy `.dev.vars.example` to `.dev.vars`, fil
 
 ## Licence
 
-The code is under the MIT licence in [LICENSE](LICENSE), from Amy Andrews' original repository. A licence for the page content has not been chosen yet.
+Website code MIT ([LICENSE](LICENSE)); Events&I in `eventsandeye/` AGPL-3.0; page text CC BY 4.0; AMYBO photos and images CC BY-SA 4.0. Details in [LICENSE-CONTENT.md](LICENSE-CONTENT.md).
