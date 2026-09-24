@@ -14,16 +14,17 @@ Every page's frontmatter records where its text came from (`source: amy | hugo |
 
 ## Working on the site
 
-Requires Node.js 22 or later (`.nvmrc`). In the vibe container, the project-local Node 22 in `node_modules/.bin` is used by `npm run` scripts.
+Requires Node.js 22 or later (`.nvmrc`). A project-local Node 22 is also installed as a dev dependency, so `npm run` scripts use it even where the system Node is older.
 
 ```sh
 npm install
 npm run dev          # http://localhost:4321
-npm run build        # static site into dist/
+npm run build        # static site into dist/ (needs PUBLIC_TURNSTILE_SITE_KEY)
+npm run build:test   # same, with Cloudflare's Turnstile test key, for local testing
 npm run check        # astro check + type-check of the functions and cron worker
 npm run review       # regenerate REVIEW.md (after a build)
 npm run test:a11y    # axe-core accessibility scan of dist/ (after a build)
-npm run test:e2e     # full registration flow against a local D1 database (after a build)
+npm run test:e2e     # full registration flow against a local D1 database (after build:test)
 ```
 
 Pages live in `src/content/docs/`; the file path is the URL. Images go next to the page that uses them. See the [contribution guidelines](https://amybo.org/docs/contribution-guidelines/).
@@ -89,7 +90,7 @@ You need a Cloudflare account with the amybo.org zone (already there, since DNS 
 
 2. **Connect GitHub.** In the Cloudflare dashboard: Workers & Pages → Create → Pages → Connect to Git. When GitHub asks, install the Cloudflare Pages app on the **amy-bo** organisation and give it access to **only** the `website` repository. Choose `amy-bo/website`, production branch `main`, framework preset Astro, build command `npm run build`, output directory `dist`. Add the build variable `NODE_VERSION` = `22`. Pages reads the D1 binding and variables from `wrangler.toml`.
 
-3. **Turnstile.** Dashboard → Turnstile → Add widget for `amybo.org` (and `amybo.pages.dev` for previews), managed mode. Add the **site key** as the Pages build variable `PUBLIC_TURNSTILE_SITE_KEY`, and the **secret key** as the secret `TURNSTILE_SECRET_KEY`.
+3. **Turnstile.** Dashboard → Turnstile → Add widget for `amybo.org` (and `amybo.pages.dev` for previews), managed mode. Add the **site key** as the Pages build variable `PUBLIC_TURNSTILE_SITE_KEY` (the build fails without it, so a test key can never reach the live site), and the **secret key** as the secret `TURNSTILE_SECRET_KEY`.
 
 4. **Resend.** In Resend, add the domain `amybo.org`. Resend shows a few DNS records (an MX and a TXT record on a `send` subdomain, and a DKIM TXT record). Add them in Cloudflare DNS with the proxy **off** (DNS only), then click Verify in Resend. These records sit on subdomains, so Google mail for hello@amybo.org keeps working. Create an API key with **sending access** only.
 
@@ -103,7 +104,7 @@ You need a Cloudflare account with the amybo.org zone (already there, since DNS 
 
    Never set `DEV_MODE` on Cloudflare.
 
-6. **Cloudflare Access for the admin page.** Zero Trust → Access → Applications → Add → Self-hosted. Add these destinations: `amybo.org/admin/*`, `amybo.org/api/admin/*`, `*.amybo.pages.dev/admin/*` and `*.amybo.pages.dev/api/admin/*`. Add a policy *Allow* for the admins' email addresses (one-time PIN login works without any extra setup). Save, then copy the application's **Audience (AUD) tag** into `ACCESS_AUD` in `wrangler.toml`, and your team domain (Zero Trust → Settings → Custom pages, e.g. `amybo.cloudflareaccess.com`) into `ACCESS_TEAM_DOMAIN`. Commit and push. The functions refuse admin requests without a valid Access token even if the Access policy is misconfigured.
+6. **Cloudflare Access for the admin page.** Zero Trust → Access → Applications → Add → Self-hosted. Add these destinations: `amybo.org/admin/*`, `amybo.org/api/admin/*`, `www.amybo.org/admin/*`, `www.amybo.org/api/admin/*`, `*.amybo.pages.dev/admin/*` and `*.amybo.pages.dev/api/admin/*`. Add a policy *Allow* for the admins' email addresses (one-time PIN login works without any extra setup). Save, then copy the application's **Audience (AUD) tag** into `ACCESS_AUD` in `wrangler.toml`, and your team domain (Zero Trust → Settings → Custom pages, e.g. `amybo.cloudflareaccess.com`) into `ACCESS_TEAM_DOMAIN`. Commit and push. The functions refuse admin requests without a valid Access token even if the Access policy is misconfigured.
 
 7. **Cron Worker.** Deploy the scheduled-jobs Worker and give it the same secrets:
 
@@ -123,7 +124,7 @@ Local development of the functions: copy `.dev.vars.example` to `.dev.vars`, fil
 - [ ] Event page facts confirmed: times, room and entrance, in-person maximum, tour capacities and registration deadline (set on the admin page).
 - [ ] Joining instructions version 1 checked on the admin page, including the Google Meet link and room details (or a note that they will follow).
 - [ ] Resend domain shows **Verified**; a test registration email arrives and is not in spam.
-- [ ] Calendar invitations checked with real sends to a Gmail and an Outlook address: the invitation shows, adds to the calendar, and a session time change produces an update rather than a duplicate.
+- [ ] **Gate, not a tick-box:** calendar invitations checked with real sends to a Gmail and an Outlook address. The invitation shows as an invitation (check the raw message has `Content-Type: text/calendar; method=REQUEST`), adds to the calendar, and a session time change produces an update rather than a duplicate. If Outlook only shows a file, tell andeye before opening registration.
 - [ ] Session hosts, the two Google Meet links and final times entered on the admin page.
 - [ ] In Pages → Custom domains, add `amybo.org` and `www.amybo.org`. Cloudflare replaces the existing DNS records that point at Netlify. Wait for the certificate to show Active.
 - [ ] Check https://amybo.org, a few old URLs (for example `/docs/overview/`, `/docs/pioflo/pioflo-v0.01/`, `/about/`), the event page, registration end to end, and that `/admin/rsvps/` needs a login.

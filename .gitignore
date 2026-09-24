@@ -24,14 +24,14 @@ pnpm-debug.log*
 .wrangler/
 .dev.vars
 
-# Harness and editor state (not for the public repo)
+# Local tooling and editor state
 .vss/
 .vs/
 .claude/
 .vscode/*.local.json
 
 
-# vibe runtime files
+# Local development container files
 .vibe/
 .vibe-signals/
 .vibe-allow-ssh
