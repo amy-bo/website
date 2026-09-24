@@ -1,0 +1,22 @@
+# Cloudflare Pages project for amybo.org (static Astro build + Pages Functions in ./functions).
+name = "amybo"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-05-01"
+
+[vars]
+SITE_URL = "https://amybo.org"
+NOTIFY_EMAIL = "hello@amybo.org"
+EMAIL_FROM = "AMYBO <hello@amybo.org>"
+# Cloudflare Access application for /admin/* and /api/admin/* (see README):
+ACCESS_TEAM_DOMAIN = "REPLACE_WITH_TEAM.cloudflareaccess.com"
+ACCESS_AUD = "REPLACE_WITH_ACCESS_APPLICATION_AUD_TAG"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "amybo-rsvp"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+# Secrets (Pages project > Settings > Variables and secrets, or `npx wrangler pages secret put <NAME>`):
+#   RESEND_API_KEY, TOKEN_SECRET, TURNSTILE_SECRET_KEY
+# Local development values live in .dev.vars (gitignored); copy .dev.vars.example.

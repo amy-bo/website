@@ -7,7 +7,13 @@
     "start": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "check": "astro check && tsc -p tsconfig.workers.json",
+    "db:migrate:local": "wrangler d1 migrations apply amybo-rsvp --local",
+    "pages:dev": "wrangler pages dev ./dist --port 8788",
+    "test:e2e": "node scripts/e2e.mjs",
+    "test:a11y": "node scripts/a11y.mjs",
+    "review": "node scripts/review.mjs"
   },
   "dependencies": {
     "@astrojs/alpinejs": "^0.4.8",
@@ -19,5 +25,13 @@
     "astro": "^5.6.1",
     "sharp": "^0.32.5",
     "tailwindcss": "^4.1.10"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "axe-core": "^4.13.0",
+    "jsdom": "^29.1.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.86.0"
   }
 }
