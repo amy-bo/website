@@ -11,6 +11,11 @@ export const apiMiddleware = async (ctx: Ctx) => {
 	if (ctx.request.method !== 'GET' && ctx.request.method !== 'HEAD') {
 		const origin = ctx.request.headers.get('origin');
 		if (origin && origin !== new URL(ctx.request.url).origin) return bad('Cross-origin request refused', 403);
+		// Browsers also say where a request came from; anything but this site (or no browser at all) is refused.
+		const site = ctx.request.headers.get('sec-fetch-site');
+		if (site && site !== 'same-origin' && site !== 'none') return bad('Cross-site request refused', 403);
+		const hasBody = ctx.request.method !== 'DELETE' || ctx.request.headers.has('content-length');
+		if (hasBody && (ctx.request.headers.get('content-type') ?? '').split(';')[0].trim() !== 'application/json') return bad('Admin changes must be sent as JSON', 415);
 	}
 	ctx.data.adminEmail = email;
 	const res = await ctx.next();

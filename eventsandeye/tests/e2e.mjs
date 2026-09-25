@@ -144,6 +144,8 @@ try {
 	check('admin page is HTML with the sessions editor', typeof page.data === 'string' && /id="sessions-form"/.test(page.data) && /Events&amp;I/.test(page.data));
 	check('admin POST without JWT → 401', (await req('POST', '/api/admin/settings', { event: EVENT, in_person_max: 999 })).status === 401);
 	check('admin POST from another origin → 403', (await req('POST', '/api/admin/settings', { event: EVENT }, { ...ADMIN, origin: 'https://evil.example' })).status === 403);
+	check('admin POST marked cross-site by the browser → 403', (await req('POST', '/api/admin/settings', { event: EVENT }, { ...ADMIN, 'sec-fetch-site': 'cross-site' })).status === 403);
+	check('admin POST as a form, not JSON → 415', (await fetch(`${BASE}/api/admin/settings`, { method: 'POST', headers: { ...ADMIN, 'content-type': 'application/x-www-form-urlencoded' }, body: 'event=x' })).status === 415);
 
 	console.log('\nSeed and settings');
 	let r = await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN);
