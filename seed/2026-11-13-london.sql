@@ -2,12 +2,12 @@
 -- Apply once after the Events&I migrations:  npx wrangler d1 execute amybo-rsvp --remote --file seed/2026-11-13-london.sql
 -- Numbers, deadlines, links and hosts are all editable later from /admin/rsvps/.
 
-INSERT INTO events (id, title, starts_at, ends_at, timezone, location, in_person_max, deadline, travel_minutes, page_path) VALUES
+INSERT OR IGNORE INTO events (id, title, starts_at, ends_at, timezone, location, in_person_max, deadline, travel_minutes, page_path) VALUES
   ('2026-11-13-london', 'AMYBO get-together, London', '2026-11-13T10:30:00Z', '2026-11-13T22:00:00Z', 'Europe/London',
    'Bezos Centre for Sustainable Protein, Imperial College White City campus, 84 Wood Lane, London W12 0BZ',
    20, '2026-11-06T23:59:00Z', 60, '/events/2026-11-13-london/');
 
-INSERT INTO sessions (id, event_id, label, kind, mode, choice_group, starts_at, ends_at, capacity, sort) VALUES
+INSERT OR IGNORE INTO sessions (id, event_id, label, kind, mode, choice_group, starts_at, ends_at, capacity, sort) VALUES
   ('2026-11-13-london-tour-1030', '2026-11-13-london', '10:30 lab tour', 'tour', 'in_person', 'tour', '2026-11-13T10:30:00Z', '2026-11-13T11:15:00Z', 6, 1),
   ('2026-11-13-london-tour-1115', '2026-11-13-london', '11:15 lab tour', 'tour', 'in_person', 'tour', '2026-11-13T11:15:00Z', '2026-11-13T12:00:00Z', 6, 2),
   ('2026-11-13-london-talks-am', '2026-11-13-london', 'Welcome and talks', 'talk', 'hybrid', NULL, '2026-11-13T12:00:00Z', '2026-11-13T13:00:00Z', NULL, 3),
@@ -16,7 +16,7 @@ INSERT INTO sessions (id, event_id, label, kind, mode, choice_group, starts_at, 
 
 UPDATE sessions SET location = 'The Broadcaster, 89 Wood Lane, London' WHERE id = '2026-11-13-london-pub';
 
-INSERT INTO instructions (event_id, version, subject, body_md, change_note, created_at, created_by) VALUES
+INSERT OR IGNORE INTO instructions (event_id, version, subject, body_md, change_note, created_at, created_by) VALUES
   ('2026-11-13-london', 1, 'Joining instructions: AMYBO get-together, 13 November 2026',
 'Thank you for registering for the AMYBO get-together on **Friday 13 November 2026**.
 

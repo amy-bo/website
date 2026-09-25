@@ -78,6 +78,18 @@ The 13 November 2026 get-together page is `src/content/docs/events/2026-11-13-lo
 
 **Data retention.** A scheduled job deletes the event's registrations, their email records and host lists 30 days after the event ends. See the [privacy notice](https://amybo.org/privacy/).
 
+## Deploying from GitHub (the quick route)
+
+`.github/workflows/deploy.yml` deploys everything from GitHub Actions on every push to `launch-2026` or `main`, so nothing has to run on a laptop: it builds the site, creates the D1 database if it is missing and writes its id into the configs, applies the migrations and the event seed (both safe to rerun), creates the Pages project if it is missing, sets the secrets, deploys the site with its Functions, and deploys the cron Worker. One-off set-up in the Cloudflare dashboard and on GitHub:
+
+1. **Cloudflare API token** (My Profile → API Tokens → Create Token → Custom): permissions *Account: Cloudflare Pages: Edit*, *Account: D1: Edit*, *Account: Workers Scripts: Edit*, for this account. Copy the token and the **Account ID** (right-hand column of any zone's overview page).
+2. **Turnstile** (dashboard → Turnstile → Add widget): hostnames `amybo.org` and `amybo.pages.dev`, managed mode. Copy the site key and the secret key.
+3. **Resend**: add the domain `amybo.org`, add the DNS records it shows in Cloudflare DNS (proxy off), click Verify, create an API key with sending access.
+4. **GitHub** (repository → Settings → Secrets and variables → Actions). Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `TOKEN_SECRET` (output of `openssl rand -hex 32`; keep it stable), `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`. Variables: `PUBLIC_TURNSTILE_SITE_KEY`, and later `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` once the Access application exists (step 6 below); until then the admin page refuses everyone, which is safe.
+5. Push, or run the workflow by hand from the Actions tab. The site appears at `https://amybo.pages.dev` (production branch = the branch that first created the project). Add `amybo.org` as a custom domain in the Pages project when ready to cut over.
+
+The manual steps below do the same things with the dashboard and `wrangler` on a laptop.
+
 ## Setting up Cloudflare (first deploy)
 
 You need a Cloudflare account with the amybo.org zone (already there, since DNS is on Cloudflare), and admin rights on the amy-bo GitHub organisation.
