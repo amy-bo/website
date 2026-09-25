@@ -130,7 +130,7 @@ Every old `/docs/` URL redirects (301) to its new home via `public/_redirects`, 
 | `content/en/docs/Experiments/Control Testing/equipment.jpg` | `src/content/docs/projects/past/experiments/control-testing/equipment.jpg` |  |
 | `content/en/docs/Experiments/Control Testing/pioreactors.jpg` | `src/content/docs/projects/past/experiments/control-testing/pioreactors.jpg` |  |
 | `content/en/docs/Experiments/Control Testing/results.png` | `src/content/docs/projects/past/experiments/control-testing/results.png` |  |
-| `content/en/docs/Legal/Xnip2023-07-06_16-30-59.png` | `src/content/docs/collaborate/safety-and-legal/Xnip2023-07-06_16-30-59.png` | not referenced by any Hugo page (orphaned screenshot); carried over as a page resource of the Legal section index for parity |
+| `content/en/docs/Legal/Xnip2023-07-06_16-30-59.png` | not carried over | not referenced by any Hugo page (orphaned screenshot) |
 | `content/en/docs/Pioflo/PiofloKombucha001.png` | `src/content/docs/projects/pioflo/PiofloKombucha001.png` |  |
 | `content/en/docs/Pioflo/Pioflo_v0_01_73A7651.webp` | `src/content/docs/projects/pioflo/Pioflo_v0_01_73A7651.webp` |  |
 | `content/en/docs/Pioflo/Pioflo_v0_01_sketch.png` | `src/content/docs/projects/pioflo/Pioflo_v0_01_sketch.png` |  |
@@ -139,4 +139,4 @@ Every old `/docs/` URL redirects (301) to its new home via `public/_redirects`, 
 
 - The About page’s paragraph about the Docsy porridge photo was removed, because the photo is not used on this site.
 - `electroPioreactor v0.02` has the Hugo title "electroPioreactor v0.02.md" (a typo carried over verbatim).
-- The Legal screenshot `Xnip2023-07-06_16-30-59.png` was unreferenced on the Hugo site; it is kept for parity.
+- The Legal screenshot `Xnip2023-07-06_16-30-59.png` was unreferenced on the Hugo site and showed a personal email address, so it was not carried over.

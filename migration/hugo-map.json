@@ -4,7 +4,7 @@
     "hugoUrl": "/",
     "newFile": "src/content/docs/index.mdx",
     "newUrl": "/index.mdx/",
-    "notes": "Merged below Amy\u2019s homepage cards (source: amy + hugo). blocks/link-down decorative scroll chevron dropped (no text)."
+    "notes": "Merged below Amy’s homepage cards (source: amy + hugo). blocks/link-down decorative scroll chevron dropped (no text)."
   },
   {
     "hugoFile": "content/en/about/index.md",
@@ -285,8 +285,10 @@
   },
   {
     "hugoFile": "content/en/docs/Legal/Xnip2023-07-06_16-30-59.png",
-    "newFile": "src/content/docs/collaborate/safety-and-legal/Xnip2023-07-06_16-30-59.png",
-    "notes": "not referenced by any Hugo page (orphaned screenshot); carried over as a page resource of the Legal section index for parity"
+    "newFile": null,
+    "notes": "not referenced by any Hugo page (orphaned screenshot)",
+    "newUrl": null,
+    "note": "Not carried over: an unreferenced support-chat screenshot showing a personal email address and a third party."
   },
   {
     "hugoFile": "content/en/docs/Pioflo/PiofloKombucha001.png",
