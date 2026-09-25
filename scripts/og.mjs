@@ -2,6 +2,7 @@
 // Generates the Open Graph images in public/ with sharp. Run: node scripts/og.mjs
 //   public/og.png        1200x630, brand gradient, logo and strapline (site-wide default)
 //   public/og-event.jpg  1200x630, AMYBO photo behind the 13 November 2026 event title
+//   public/logo.png      512x512, the AMYBO mark on white, for the Organization structured data
 import sharp from 'sharp';
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -21,6 +22,11 @@ async function write(file, svg, background) {
 	writeFileSync(file, out);
 	console.log(`${file} ${out.length} bytes`);
 }
+
+await write('public/logo.png', `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512">
+  <rect width="512" height="512" fill="#ffffff"/>
+  ${readFileSync('src/assets/amybo.svg', 'utf8').replace(/<\?xml[^>]*>|<!DOCTYPE[^>]*>/g, '').replace(/<svg width="7087px" height="4905px"/, '<svg viewBox="0 0 7087 4905" x="40" y="88" width="432" height="336" preserveAspectRatio="xMidYMid meet"')}
+</svg>`);
 
 await write('public/og.png', `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">
   <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b2e14"/><stop offset="1" stop-color="#175a00"/></linearGradient></defs>

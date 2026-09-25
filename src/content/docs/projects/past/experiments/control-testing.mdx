@@ -5,19 +5,19 @@ source: hugo
 hugoPath: /docs/experiments/control-testing/
 sidebar:
   order: 3
-provenance: "Moved from the old Docs section in the 2026 relaunch; text unchanged."
+provenance: "Moved from the old Docs section in the 2026 relaunch; text unchanged. Presentation: an absolute link to the old /docs/ URL made relative to its new page."
 ---
 
-import YouTube from '../../../../../../components/YouTube.astro';
+import YouTube from '../../../../../components/YouTube.astro';
 
 To ensure that the Pioreactors we're using are working as expected, we ran an experiment where we used the exact same experimental conditions with two Pioreactors, with the hope to produce the same results.
 
 The original experiment is described on the [Pioreactor website](https://docs.pioreactor.com/experiments/control-testing).
 
-![A bunsen burner, small weight scale, three vials and a dropper. Two of the vials contain YPD broth and are covered with aluminium foil. The other vial contains stock solution.](./equipment.jpg)
+![A bunsen burner, small weight scale, three vials and a dropper. Two of the vials contain YPD broth and are covered with aluminium foil. The other vial contains stock solution.](./control-testing/equipment.jpg)
 
 ## Kit List
-1. 2 x [Pioreactor 20 ml](https://pioreactor.com/products/pioreactor-20ml?variant=46559156469816) - [see our thoughts on Pioreactors](https://AMYBO.org/docs/equipment/bioreactors/#pioreactorhttpspioreactorcom)
+1. 2 x [Pioreactor 20 ml](https://pioreactor.com/products/pioreactor-20ml?variant=46559156469816) - [see our thoughts on Pioreactors](/projects/past/equipment/bioreactors/#pioreactor)
 1. 2 x [Raspberry Pi Zero 2 W with header](https://www.raspberrypi.com/products/raspberry-pi-zero-2-w/)
 1. 2 x [Raspberry Pi 15W USB-C Power Supply](https://www.raspberrypi.com/products/type-c-power-supply/)
 1. 2 x [Micro SD cards](https://docs.pioreactor.com/user-guide/common-questions#what-microsd-cards-do-you-recommend)
@@ -44,7 +44,7 @@ The original experiment is described on the [Pioreactor website](https://docs.pi
 1. Wait until pressure is completely reduced then lift the weight off the valve allowing any remaining steam to escape. **Never open the pressure cooker until the steam
 valve has been opened to release the pressure.**
 
-![Using a pressure cooker on a gas stove as an autoclave](./autoclaving.jpg)
+![Using a pressure cooker on a gas stove as an autoclave](./control-testing/autoclaving.jpg)
 
 ### Running the experiment
 
@@ -59,13 +59,13 @@ valve has been opened to release the pressure.**
 1. Go back to the graphs and check that an Optical Density (OD) signal is being received.
 1. Select *Manage all Pioreators* again and start *Growth rate*.
 
-![Two Pioreactors standing side by side, with the one on the right connected to a Raspberry Pi 400](./pioreactors.jpg)
+![Two Pioreactors standing side by side, with the one on the right connected to a Raspberry Pi 400](./control-testing/pioreactors.jpg)
 
 ## Results
 
 The raw results from the experiment are [available as CSV files on GitHub](https://github.com/amy-bo/results/tree/main/Control%20Testing).
 
-![A screenshot of the Pioreactor results](./results.png)
+![A screenshot of the Pioreactor results](./control-testing/results.png)
 
 ## Report
 

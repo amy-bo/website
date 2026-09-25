@@ -5,12 +5,12 @@ source: hugo
 hugoPath: /docs/proteins/
 sidebar:
   order: 2
-provenance: "Moved from the old Docs section in the 2026 relaunch; text unchanged."
+provenance: "Moved from the old Docs section in the 2026 relaunch; text unchanged. Presentation: the 'closed source' note promoted from h3 to h2 so headings nest, and three absolute links to the old /docs/ URLs made relative to their new pages."
 ---
 
 Step one in protein development is deciding which protein to develop first.  Choice of bioreactor, feedstocks and downstream processing are all dependent on the organisms we use and the proteins they produce.  This page is very much a work in progress and your input would be hugely welcome.
 
-### A note on "closed source" enterprises
+## A note on "closed source" enterprises
 
 We mention a number of commercial "closed source" companies in these sections.  We fully support their efforts to bring the benefits of alternative proteins.  Commercial competition has brought many excellent innovations to market.  Many companies seek to do good, even before seeking profit, however there is a risk that good companies and/or their IP gets acquired by less benevolent enterprises. Shareholder primacy means that some of the world's poorest, in the most challenging environments may not benefit as much as they could from the innovations that they need most.  Open source projects like this serve to benefit all corporations (as they can access our data) while also ensuring our innovations have the potential to benefit all.
 
@@ -18,9 +18,9 @@ We mention a number of commercial "closed source" companies in these sections.  
 
 Biotechnology is providing amazing advances in many areas of food production including:
 
-1. [Single-cell protein](https://AMYBO.org/docs/proteins/single-cell-protein/)
-2. [Precision fermentation](https://AMYBO.org/docs/proteins/precision-fermentation/)
-3. [Cultivated meat](https://AMYBO.org/docs/proteins/cultivated-meat/)
+1. [Single-cell protein](/background/proteins/single-cell-protein/)
+2. [Precision fermentation](/background/proteins/precision-fermentation/)
+3. [Cultivated meat](/background/proteins/cultivated-meat/)
 
 These are currently ranked in order that Martin envisages attempting them, but if you are working on open science projects around any of these, please do get in touch.
 

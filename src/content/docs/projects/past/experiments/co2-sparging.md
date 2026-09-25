@@ -45,15 +45,15 @@ Describes how to get started with CO2 sparging on the Pioreactor.
 ### Hardware
 1. Connect the CO2 regulator to the Sodastream cylinder using the adapter and a wrench.
 
-    ![Sodastream cylinder connected to CO2 regulator using an adapter](./cylinder.jpg)
+    ![Sodastream cylinder connected to CO2 regulator using an adapter](./co2-sparging/cylinder.jpg)
 1. Connect one end of ~20cm PU tubing <span style="color: red;">to the regulator</span> and the other end <span style="color: green;">to a check valve</span>.
-![PU tubing connected to regulator and check valve](./regulator.jpg)
+![PU tubing connected to regulator and check valve](./co2-sparging/regulator.jpg)
 1. Connect another short piece of PU tubing to <span style="color: red;">the other end of the check valve</span> and <span style="color: green;">attach a 3/16" barb female Luer lock connector</span>. Attach two 1/16" barb male Luer lock connectors to each end of ~10cm of 1/16" silicone tubing and connect to <span style="color: green;">the 3/16" connector</span> and <span style="color: blue;">the Pioreactor port</span>.
-![PU tubing connected to check valve and a Luer lock connector](./tubing.jpg)
+![PU tubing connected to check valve and a Luer lock connector](./co2-sparging/tubing.jpg)
 1. Connect the barrel power cord to <span style="color: red;">PWM channel 4</span> on the one end. You can either solder Dupont female square head wires to the power cord, or crimp a TE Connectivity AMP connector as in the image.
-![Power cord plugged into PWM channel 4 on the Pioreactor](./pwm.jpg)
+![Power cord plugged into PWM channel 4 on the Pioreactor](./co2-sparging/pwm.jpg)
 1. Plug the other end of the power cord into the <span style="color: red;">solenoid of the regulator</span>.
-![Power cord plugged into solenoid of the regulator](./solenoid.jpg)
+![Power cord plugged into solenoid of the regulator](./co2-sparging/solenoid.jpg)
 1. Make sure that your Pioreactor [supports 12V on the PWM channels](https://docs.pioreactor.com/user-guide/external-power) and that a 12V power supply is connected to the barrel jack of the Pioreactor HAT.
 
 ### Software
@@ -71,7 +71,7 @@ Describes how to get started with CO2 sparging on the Pioreactor.
 ```
 3. Test that it works by manually turning on the relay in the **Activities** tab of the *Manage* screen of the Pioreactor UI. You should hear the solenoid turn on and CO2 rushing into the Pioreactor vial. You can adjust the amount of CO2 sparged using the dial on the regulator.
 
-    ![Screenshot of relay plugin](./relay.png)
+    ![Screenshot of relay plugin](./co2-sparging/relay.png)
 4. Create a new [experiment profile](https://docs.pioreactor.com/user-guide/experiment-profiles) and copy and paste the following into the profile:
 ```yaml
 experiment_profile_name: CO2 sparging every hour

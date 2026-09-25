@@ -65,22 +65,22 @@
   {
     "hugoFile": "content/en/docs/Experiments/CO2 Sparging/index.md",
     "hugoUrl": "/docs/experiments/co2-sparging/",
-    "newFile": "src/content/docs/projects/past/experiments/co2-sparging/index.md",
-    "newUrl": "/projects/past/experiments/co2-sparging/index.md/",
+    "newFile": "src/content/docs/projects/past/experiments/co2-sparging.md",
+    "newUrl": "/projects/past/experiments/co2-sparging.md/",
     "notes": "Page bundle; figure shortcodes converted to plain markdown images (no captions in source); span style=color inline HTML kept as raw HTML (valid in .md)."
   },
   {
     "hugoFile": "content/en/docs/Experiments/Control Testing/index.md",
     "hugoUrl": "/docs/experiments/control-testing/",
-    "newFile": "src/content/docs/projects/past/experiments/control-testing/index.mdx",
-    "newUrl": "/projects/past/experiments/control-testing/index.mdx/",
+    "newFile": "src/content/docs/projects/past/experiments/control-testing.mdx",
+    "newUrl": "/projects/past/experiments/control-testing.mdx/",
     "notes": "Page bundle; used .mdx because the card+youtube shortcode needed the YouTube component; card shortcode flattened to a heading."
   },
   {
     "hugoFile": "content/en/docs/Experiments/Electrolysis/index.md",
     "hugoUrl": "/docs/experiments/electrolysis/",
-    "newFile": "src/content/docs/projects/past/experiments/electrolysis/index.md",
-    "newUrl": "/projects/past/experiments/electrolysis/index.md/",
+    "newFile": "src/content/docs/projects/past/experiments/electrolysis.md",
+    "newUrl": "/projects/past/experiments/electrolysis.md/",
     "notes": ""
   },
   {

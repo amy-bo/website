@@ -7,7 +7,7 @@ Built with [Astro](https://astro.build) and [Starlight](https://starlight.astro.
 ## Credits
 
 - **Design and structure:** Amy Andrews, whose 2025 Astro redesign (originally [myndrws/amybo](https://github.com/myndrws/amybo)) is the base of this repository, with its full history.
-- **Content:** carried over from the previous Hugo/Docsy site ([amy-bo/pages](https://github.com/amy-bo/pages)) and its contributors.
+- **Content:** carried over from the previous Hugo/Docsy site ([amy-bo/pages](https://github.com/amy-bo/pages), private until it is archived) and its contributors.
 - **Homepage photo:** [Ozark Drones](https://unsplash.com/@ozarkdrones?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash) on [Unsplash](https://unsplash.com/photos/birds-eye-view-photo-of-trees-jeV-LUEyJoE?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash), edited.
 
 Every page's frontmatter records where its text came from (`source: amy | hugo | new`). [REVIEW.md](REVIEW.md) lists every page with its source and confirms each old Hugo URL still works.

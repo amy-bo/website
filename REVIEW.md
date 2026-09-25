@@ -22,7 +22,7 @@ Totals: 10 amy, 17 new, 29 hugo.
 | [`/background/`](/background/) | Background | new | – |  |
 | [`/background/overview/`](/background/overview/) | Overview (2023) | hugo | `/docs/overview/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/background/plan-2023/`](/background/plan-2023/) | Next steps (2023 plan) | hugo | `/docs/overview/plan/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/background/proteins/`](/background/proteins/) | Proteins | hugo | `/docs/proteins/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/background/proteins/`](/background/proteins/) | Proteins | hugo | `/docs/proteins/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. Presentation: the 'closed source' note promoted from h3 to h2 so headings nest, and three absolute links to the old /docs/ URLs made relative to their new pages. |
 | [`/background/proteins/cultivated-meat/`](/background/proteins/cultivated-meat/) | Cultivated Meat | hugo | `/docs/proteins/cultivated-meat/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/background/proteins/precision-fermentation/`](/background/proteins/precision-fermentation/) | Precision Fermentation | hugo | `/docs/proteins/precision-fermentation/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/background/proteins/single-cell-protein/`](/background/proteins/single-cell-protein/) | Single-Cell Protein | hugo | `/docs/proteins/single-cell-protein/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
@@ -34,7 +34,7 @@ Totals: 10 amy, 17 new, 29 hugo.
 | [`/collaborate/safety-and-legal/disclaimer/`](/collaborate/safety-and-legal/disclaimer/) | Disclaimer | hugo | `/docs/legal/disclaimer/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/collaborate/safety-and-legal/risk-management/`](/collaborate/safety-and-legal/risk-management/) | Risk management | hugo | `/docs/risk-assessments/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/collaborate/volunteer/`](/collaborate/volunteer/) | Get involved | amy | – | Title by Amy; her description rewritten for search results. Body is new launch text; the list of skills is from the Hugo homepage. |
-| [`/contact/`](/contact/) | Contact AMYBO | amy | – | Title by Amy (capitalised as AMYBO); her description rewritten for search results. Body is new launch text; contact details are as on the Hugo site. |
+| [`/contact/`](/contact/) | Contact AMYBO | amy | – | Title by Amy (capitalised as AMYBO); her description rewritten for search results. Body is new launch text; the legal details are new, from Companies House. |
 | [`/events/`](/events/) | Events | new | – |  |
 | [`/events/2026-11-13-london/`](/events/2026-11-13-london/) | AMYBO get-together, London – Friday 13 November 2026 | new | – |  |
 | [`/events/confirm/`](/events/confirm/) | Complete your registration | new | – |  |
@@ -65,10 +65,10 @@ Totals: 10 amy, 17 new, 29 hugo.
 | [`/projects/past/equipment/microscopes/`](/projects/past/equipment/microscopes/) | Microscopes | hugo | `/docs/equipment/microscopes/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/past/experiments/`](/projects/past/experiments/) | First experiments (2023 to 2024) | hugo | `/docs/experiments/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/past/experiments/co2-sparging/`](/projects/past/experiments/co2-sparging/) | CO2 Sparging | hugo | `/docs/experiments/co2-sparging/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/projects/past/experiments/control-testing/`](/projects/past/experiments/control-testing/) | Control Testing | hugo | `/docs/experiments/control-testing/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/experiments/control-testing/`](/projects/past/experiments/control-testing/) | Control Testing | hugo | `/docs/experiments/control-testing/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. Presentation: an absolute link to the old /docs/ URL made relative to its new page. |
 | [`/projects/past/experiments/electrolysis/`](/projects/past/experiments/electrolysis/) | Electrode optimisation | hugo | `/docs/experiments/electrolysis/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/past/experiments/hob-enrichment/`](/projects/past/experiments/hob-enrichment/) | HOB Enrichment | hugo | `/docs/experiments/hob-enrichment/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/projects/past/experiments/spirulina-batch/`](/projects/past/experiments/spirulina-batch/) | Spirulina Batch | hugo | `/docs/experiments/spirulina-batch/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/experiments/spirulina-batch/`](/projects/past/experiments/spirulina-batch/) | Spirulina Batch | hugo | `/docs/experiments/spirulina-batch/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. Presentation: an absolute link to the old /docs/ URL made relative to its new page. |
 | [`/projects/past/kickstarting-for-good/`](/projects/past/kickstarting-for-good/) | Kickstarting for Good | hugo | `/docs/kickstartingforgood/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/pioflo/`](/projects/pioflo/) | PioFlo | hugo | `/docs/pioflo/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/pioflo/pioflo-v0-01/`](/projects/pioflo/pioflo-v0-01/) | Pioflo v0.01 | hugo | `/docs/pioflo/pioflo-v0.01/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
@@ -88,9 +88,9 @@ All old Hugo URLs resolve on the new site.
 | `/docs/equipment/dna-sequencing/` | `src/content/docs/projects/past/equipment/dna-sequencing.md` | Redirects to `/projects/past/equipment/dna-sequencing/` |  |
 | `/docs/equipment/microscopes/` | `src/content/docs/projects/past/equipment/microscopes.md` | Redirects to `/projects/past/equipment/microscopes/` |  |
 | `/docs/equipment/` | `src/content/docs/projects/past/equipment/index.md` | Redirects to `/projects/past/equipment/` |  |
-| `/docs/experiments/co2-sparging/` | `src/content/docs/projects/past/experiments/co2-sparging/index.md` | Redirects to `/projects/past/experiments/co2-sparging/` | Page bundle; figure shortcodes converted to plain markdown images (no captions in source); span style=color inline HTML kept as raw HTML (valid in .md). |
-| `/docs/experiments/control-testing/` | `src/content/docs/projects/past/experiments/control-testing/index.mdx` | Redirects to `/projects/past/experiments/control-testing/` | Page bundle; used .mdx because the card+youtube shortcode needed the YouTube component; card shortcode flattened to a heading. |
-| `/docs/experiments/electrolysis/` | `src/content/docs/projects/past/experiments/electrolysis/index.md` | Redirects to `/projects/past/experiments/electrolysis/` |  |
+| `/docs/experiments/co2-sparging/` | `src/content/docs/projects/past/experiments/co2-sparging.md` | Redirects to `/projects/past/experiments/co2-sparging/` | Page bundle; figure shortcodes converted to plain markdown images (no captions in source); span style=color inline HTML kept as raw HTML (valid in .md). |
+| `/docs/experiments/control-testing/` | `src/content/docs/projects/past/experiments/control-testing.mdx` | Redirects to `/projects/past/experiments/control-testing/` | Page bundle; used .mdx because the card+youtube shortcode needed the YouTube component; card shortcode flattened to a heading. |
+| `/docs/experiments/electrolysis/` | `src/content/docs/projects/past/experiments/electrolysis.md` | Redirects to `/projects/past/experiments/electrolysis/` |  |
 | `/docs/experiments/hob-enrichment/` | `src/content/docs/projects/past/experiments/hob-enrichment.mdx` | Redirects to `/projects/past/experiments/hob-enrichment/` | youtube shortcode -> YouTube component; title inferred as 'New Year New Culture' (same video id used elsewhere on the old site). |
 | `/docs/experiments/spirulina-batch/` | `src/content/docs/projects/past/experiments/spirulina-batch.mdx` | Redirects to `/projects/past/experiments/spirulina-batch/` | Two youtube shortcodes -> YouTube components; titles inferred from surrounding Setup/Results headings. |
 | `/docs/experiments/` | `src/content/docs/projects/past/experiments/index.md` | Redirects to `/projects/past/experiments/` |  |

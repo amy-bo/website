@@ -1,6 +1,6 @@
 # Photos
 
-AMYBO's own photographs, copied from the [amy-bo/electroPioreactor](https://github.com/amy-bo/electroPioreactor) repository and licensed CC BY-SA 4.0. Astro resizes and converts them at build time.
+Photographs copied from the [amy-bo/electroPioreactor](https://github.com/amy-bo/electroPioreactor) repository, taken by AMYBO and licensed CC BY-SA 4.0 (see LICENSE-CONTENT.md). Astro resizes and converts them at build time, without metadata.
 
 | File | Source in the repository |
 | --- | --- |
@@ -8,4 +8,3 @@ AMYBO's own photographs, copied from the [amy-bo/electroPioreactor](https://gith
 | electrode-top-stop.jpg | Components/ElectrodeTopStop/ElectrodeTopStop.jpg |
 | pinch-sliders.jpg | Components/PinchSlider/PinchSliders.jpg |
 | venting-solenoid-on-regulator.jpg | Components/CO2 transfer/VentingSolenoidOnRegulator.jpeg |
-| brown-valve-internals.png | PastResearch/Brown-HarrisLab/Media/Valve_internals.png |
