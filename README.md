@@ -25,6 +25,7 @@ npm run check        # astro check + type-check of the functions and cron worker
 npm run review       # regenerate REVIEW.md (after a build)
 npm run test:a11y    # axe-core accessibility scan of dist/ (after a build)
 npm run test:e2e     # full registration flow against a local D1 database (after build:test)
+npm run test:forum   # the build-time forum feed (src/lib/forum.mjs): live path with a fixture, fallback paths
 node scripts/og.mjs  # regenerate the Open Graph images after changing the logo or event title
 ```
 
@@ -34,7 +35,8 @@ Pages live in `src/content/docs/`; the file path is the URL. Images go next to t
 src/content/docs/        pages: Amy's section pages, projects/ (electroPioreactor, CARMA Hub, PioFlo, other hardware,
                          past projects), background/, collaborate/, events/, privacy, 404
 src/content/talks/       talks for event pages (one markdown file per talk)
-src/components/          Amy's Hero and Header overrides, footer, click-to-play YouTube embed, talks list
+src/components/          Amy's Hero and Header overrides, footer, click-to-play YouTube embed, talks list, forum feed
+src/lib/forum.mjs        fetches forum.amybo.org/latest.json at build time; FORUM_FEED=off skips it, FORUM_FIXTURE=<file> stands in for the forum
 src/assets/photos/       AMYBO photos from amy-bo/electroPioreactor (CC BY-SA 4.0), resized by Astro at build time
 src/assets/diagrams/     SVG diagrams drawn for the site (CC BY-SA 4.0); scripts/og.mjs also turns one into a sharing image
 scripts/                 og.mjs (Open Graph images), review.mjs (REVIEW.md), a11y.mjs (axe-core scan)

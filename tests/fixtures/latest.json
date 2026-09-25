@@ -1,0 +1,15 @@
+{
+  "users": [{ "id": 1, "username": "martin", "avatar_template": "/user_avatar/forum.amybo.org/martin/{size}/1_2.png" }],
+  "topic_list": {
+    "can_create_topic": false,
+    "per_page": 30,
+    "topics": [
+      { "id": 62, "title": "Welcome to the new forum!", "slug": "welcome-to-the-new-forum", "posts_count": 1, "pinned": true, "visible": true, "created_at": "2024-01-10T10:00:00.000Z", "last_posted_at": "2024-01-10T10:00:00.000Z", "category_id": 6 },
+      { "id": 166, "title": "Current measurement experiment", "slug": "current-measurement-experiment", "posts_count": 4, "pinned": false, "visible": true, "created_at": "2026-08-10T09:12:00.000Z", "last_posted_at": "2026-08-12T15:30:00.000Z", "category_id": 4 },
+      { "id": 163, "title": "Trial experiment on heterotrophic electrolysis", "slug": "trial-experiment-on-heterotrophic-electrolysis", "posts_count": 7, "pinned": false, "visible": true, "created_at": "2026-06-01T09:00:00.000Z", "last_posted_at": "2026-07-20T11:00:00.000Z", "category_id": 12 },
+      { "id": 999, "title": "Hidden topic", "slug": "hidden-topic", "posts_count": 2, "pinned": false, "visible": false, "created_at": "2026-07-01T09:00:00.000Z", "last_posted_at": "2026-07-01T09:00:00.000Z" },
+      { "id": 140, "title": "Experimental Design Optimisation", "slug": "experimental-design-optimisation", "posts_count": 1, "pinned": false, "visible": true, "created_at": "2026-03-02T09:00:00.000Z", "last_posted_at": "2026-03-02T09:00:00.000Z", "category_id": 4 },
+      { "id": 132, "title": "Website refresh", "slug": "website-refresh", "posts_count": 9, "pinned": false, "visible": true, "created_at": "2025-11-02T09:00:00.000Z", "last_posted_at": "2026-02-01T09:00:00.000Z", "category_id": 10 }
+    ]
+  }
+}

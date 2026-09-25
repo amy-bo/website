@@ -18,6 +18,7 @@ footer: true
 import { Card, CardGrid } from '@astrojs/starlight/components';
 import { LinkButton, Aside } from "@astrojs/starlight/components";
 import YouTube from '../../components/YouTube.astro';
+import ForumLatest from '../../components/ForumLatest.astro';
 import hobLoop from '../../assets/diagrams/hob-loop.svg';
 
 <Aside type="tip" title="AMYBO get-together, London – Friday 13 November 2026">
@@ -91,7 +92,11 @@ A few companies are already scaling this up, behind patents. We want to do it in
 
 ## On the forum
 
-Most of our thinking happens in public at [forum.amybo.org](https://forum.amybo.org/). A few threads to give you the flavour:
+Most of our thinking happens in public at [forum.amybo.org](https://forum.amybo.org/).
+
+<ForumLatest limit={6} />
+
+A few older threads to give you the flavour:
 
 - [Trial experiment on heterotrophic electrolysis](https://forum.amybo.org/t/trial-experiment-on-heterotrophic-electrolysis/163): first runs of the Aseptic electroPioreactor at Edinburgh.
 - [Current measurement experiment](https://forum.amybo.org/t/current-measurement-experiment/166): what the Pioreactor's LED channel actually does when you hang a pair of electrodes off it.

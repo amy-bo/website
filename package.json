@@ -21,6 +21,7 @@
     "pages:dev": "wrangler pages dev ./dist --port 8788",
     "test:e2e": "E2E_PAGES=/,/events/2026-11-13-london/,/privacy/,/events/confirm/,/events/manage/,/projects/electropioreactor/,/about/ node eventsandeye/tests/e2e.mjs",
     "test:a11y": "node scripts/a11y.mjs",
+    "test:forum": "node --test tests/forum.test.mjs",
     "review": "node scripts/review.mjs",
     "build:test": "PUBLIC_TURNSTILE_ALLOW_TEST_KEY=true astro build"
   },
