@@ -27,7 +27,7 @@
   <path class="g" d="M193 284 V318"/>
   <path class="g" d="M236 341 H300 V200 H392 V440" />
   <rect x="286" y="250" width="28" height="28" rx="5" fill="#fff" stroke="#333" stroke-width="2"/>
-  <text x="278" y="269" class="s" text-anchor="end">inlet filter</text>
+  <text x="322" y="269" class="s">inlet filter</text>
   <path class="w" d="M170 364 V394" marker-end="url(#arrow)"/>
   <text x="170" y="412" class="s" text-anchor="middle">vents to air</text>
   <text x="300" y="192" class="s" text-anchor="middle">CO₂ sparge line</text>
