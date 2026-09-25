@@ -1,0 +1,98 @@
+# Deploys amybo.org to Cloudflare from GitHub, so nothing needs to run on a laptop:
+# builds the site, creates the D1 database if it does not exist, applies migrations and the
+# event seed, deploys the Pages project (with its Functions) and the cron Worker, and sets the
+# secrets from this repository's secrets. See README "Deploying from GitHub".
+#
+# Needs five repository-level GitHub Actions secret values (the API token, account id, TOKEN_SECRET, the Resend key and the Turnstile secret key)
+# Repository variables: PUBLIC_TURNSTILE_SITE_KEY (required), ACCESS_TEAM_DOMAIN and ACCESS_AUD (optional until Access is set up)
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches: [launch-2026, main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  PROJECT: amybo
+  DB_NAME: amybo-rsvp
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Check the secrets and variables are set
+        run: |
+          missing=""
+          for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID TOKEN_SECRET RESEND_API_KEY TURNSTILE_SECRET_KEY PUBLIC_TURNSTILE_SITE_KEY; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then echo "Missing repository secrets or variables:$missing"; exit 1; fi
+        env:
+          TOKEN_SECRET: ${{ secrets.TOKEN_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+          PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.PUBLIC_TURNSTILE_SITE_KEY }}
+
+      - name: Build the site
+        run: npm run build
+        env:
+          PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.PUBLIC_TURNSTILE_SITE_KEY }}
+
+      - name: Create the D1 database if it does not exist, and put its id in the configs
+        run: |
+          id=$(npx wrangler d1 list --json | jq -r --arg n "$DB_NAME" '.[] | select(.name == $n) | (.uuid // .id)')
+          if [ -z "$id" ]; then
+            npx wrangler d1 create "$DB_NAME"
+            id=$(npx wrangler d1 list --json | jq -r --arg n "$DB_NAME" '.[] | select(.name == $n) | (.uuid // .id)')
+          fi
+          [ -n "$id" ] || { echo "Could not find the D1 database id"; exit 1; }
+          sed -i "s/REPLACE_WITH_D1_DATABASE_ID/$id/" wrangler.toml workers/cron/wrangler.toml
+          echo "D1 database id: $id"
+
+      - name: Put the Cloudflare Access details in the configs (when set)
+        if: vars.ACCESS_TEAM_DOMAIN != '' && vars.ACCESS_AUD != ''
+        run: |
+          sed -i "s/REPLACE_WITH_TEAM.cloudflareaccess.com/${{ vars.ACCESS_TEAM_DOMAIN }}/; s/REPLACE_WITH_ACCESS_APPLICATION_AUD_TAG/${{ vars.ACCESS_AUD }}/" wrangler.toml
+
+      - name: Apply migrations and the event seed
+        run: |
+          npx wrangler d1 migrations apply "$DB_NAME" --remote
+          npx wrangler d1 execute "$DB_NAME" --remote --file seed/2026-11-13-london.sql
+
+      - name: Create the Pages project if it does not exist
+        run: |
+          npx wrangler pages project list | grep -qw "$PROJECT" || npx wrangler pages project create "$PROJECT" --production-branch "${GITHUB_REF_NAME}"
+
+      - name: Set the Pages secrets
+        run: |
+          printf '%s' "${{ secrets.TOKEN_SECRET }}" | npx wrangler pages secret put TOKEN_SECRET --project-name "$PROJECT"
+          printf '%s' "${{ secrets.RESEND_API_KEY }}" | npx wrangler pages secret put RESEND_API_KEY --project-name "$PROJECT"
+          printf '%s' "${{ secrets.TURNSTILE_SECRET_KEY }}" | npx wrangler pages secret put TURNSTILE_SECRET_KEY --project-name "$PROJECT"
+
+      - name: Deploy the site and its Functions
+        run: npx wrangler pages deploy dist --project-name "$PROJECT" --branch "${GITHUB_REF_NAME}" --commit-dirty=true
+
+      - name: Deploy the cron Worker and its secrets
+        run: |
+          npx wrangler deploy --config workers/cron/wrangler.toml
+          printf '%s' "${{ secrets.TOKEN_SECRET }}" | npx wrangler secret put TOKEN_SECRET --config workers/cron/wrangler.toml
+          printf '%s' "${{ secrets.RESEND_API_KEY }}" | npx wrangler secret put RESEND_API_KEY --config workers/cron/wrangler.toml

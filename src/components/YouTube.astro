@@ -1,0 +1,49 @@
+---
+/**
+ * Click-to-play YouTube embed. Nothing is loaded from YouTube until the visitor presses play,
+ * which keeps pages fast and avoids third-party requests for people who never watch.
+ * The poster comes from YouTube's image host; the player uses youtube-nocookie.com.
+ */
+interface Props {
+	id: string;
+	title?: string;
+}
+const { id, title = 'YouTube video' } = Astro.props;
+const poster = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+---
+<div class="video-embed" data-yt={id} data-title={title}>
+	<button type="button" class="yt-play" aria-label={`Play video: ${title}`}>
+		<img src={poster} alt="" width="480" height="360" loading="lazy" decoding="async" />
+		<span class="yt-badge" aria-hidden="true">
+			<svg viewBox="0 0 68 48" width="68" height="48"><path d="M66.5 7.7c-.8-2.9-3-5.2-5.9-6C55.4 0 34 0 34 0S12.6 0 7.4 1.7c-2.9.8-5.1 3.1-5.9 6C0 13 0 24 0 24s0 11 1.5 16.3c.8 2.9 3 5.2 5.9 6C12.6 48 34 48 34 48s21.4 0 26.6-1.7c2.9-.8 5.1-3.1 5.9-6C68 35 68 24 68 24s0-11-1.5-16.3z" fill="#f00"/><path d="M45 24 27 14v20z" fill="#fff"/></svg>
+		</span>
+		<span class="yt-title">{title}</span>
+	</button>
+	<p class="yt-fallback"><a href={`https://www.youtube.com/watch?v=${id}`}>Watch on YouTube</a></p>
+</div>
+<script>
+	document.querySelectorAll<HTMLElement>('.video-embed[data-yt]').forEach((box) => {
+		box.querySelector('.yt-play')?.addEventListener('click', () => {
+			const iframe = document.createElement('iframe');
+			iframe.src = `https://www.youtube-nocookie.com/embed/${box.dataset.yt}?autoplay=1`;
+			iframe.title = box.dataset.title || 'YouTube video';
+			iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+			iframe.setAttribute('allowfullscreen', '');
+			box.replaceChildren(iframe);
+			box.classList.add('playing');
+		});
+	});
+</script>
+<style>
+	.video-embed { position: relative; aspect-ratio: 16 / 9; width: 100%; margin-block: 1.5rem; border-radius: 0.5rem; overflow: hidden; background: #000; }
+	.video-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+	.yt-play { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: #000; cursor: pointer; display: block; }
+	.yt-play img { width: 100%; height: 100%; object-fit: cover; opacity: 0.85; }
+	.yt-play:hover img, .yt-play:focus-visible img { opacity: 1; }
+	.yt-play:focus-visible { outline: 3px solid var(--sl-color-accent); outline-offset: -3px; }
+	.yt-badge { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5)); }
+	.yt-title { position: absolute; left: 0; right: 0; bottom: 0; padding: 0.6rem 1rem; text-align: left; color: #fff; font-size: var(--sl-text-sm); background: linear-gradient(transparent, rgba(0, 0, 0, 0.7)); }
+	.yt-fallback { position: absolute; left: 0.75rem; top: 0.5rem; margin: 0; font-size: var(--sl-text-xs); }
+	.yt-fallback a { color: #fff; }
+	@media print { .yt-play { display: none; } .video-embed { aspect-ratio: auto; background: none; } .yt-fallback { position: static; } .yt-fallback a { color: inherit; } }
+</style>

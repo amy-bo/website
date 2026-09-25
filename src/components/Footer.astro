@@ -1,0 +1,18 @@
+---
+import Default from '@astrojs/starlight/components/Footer.astro';
+---
+<Default {...Astro.props}><slot /></Default>
+<nav class="footer-links" aria-label="Footer">
+	<a href="/collaborate/volunteer/">Collaborate</a> · <a href="https://contact.andeye.com/?source=amybo.org&subject=Message%20from%20amybo.org&cb=Volunteering&cb=Running%20an%20experiment&cb=Building%20an%20electroPioreactor&cb=Funding%20or%20sponsorship&cb=Press%20or%20speaking&cb=Something%20else">Contact</a> · <a href="https://forum.amybo.org/">Forum</a>
+</nav>
+<p class="licence-note">
+	Text <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, images
+	<a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a> unless marked otherwise.
+	<a href="https://github.com/amy-bo/website/blob/main/LICENSE-CONTENT.md">Licences</a> ·
+	<a href="/privacy/">Privacy</a>
+</p>
+<style>
+	.footer-links { margin-top: 1.5rem; font-size: var(--sl-text-sm); }
+	.licence-note { font-size: var(--sl-text-xs); color: var(--sl-color-gray-3); margin-top: 0.5rem; }
+	.licence-note a { color: inherit; }
+</style>

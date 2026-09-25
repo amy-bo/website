@@ -1,0 +1,40 @@
+---
+title: Growth medium
+description: A nutrient medium for hydrogen-oxidising bacteria that also works as an electrolyte, and a trace element solution built to keep for years.
+source: new
+provenance: Written by Martin Currie with Claude for the 2026 relaunch, from the repository's Media folder.
+sidebar:
+  order: 4
+  label: Growth medium
+---
+
+import { LinkButton } from '@astrojs/starlight/components';
+
+In an electroPioreactor the growth medium has two jobs. It feeds the bacteria, and it is the electrolyte between the electrodes. Most of the standard HOB media in the literature are fine at the first job and bad at the second: pass a current through them and the chloride becomes chlorine and hypochlorite, which is bleach. So we went looking for a medium designed for in-culture electrolysis.
+
+We read [more than ten papers](https://github.com/amy-bo/electroPioreactor/blob/main/Media/LiteratureMedia.md) on exactly that, and settled on the "optimal medium" of [Sydow et al. (2017)](https://doi.org/10.1002/elsc.201600252) as our base. It is almost chloride-free (only the trace solution's hydrochloric acid), carbon-free, phosphate-buffered at 40 mM and electrochemically stable, and it was optimised for growth rather than for making bioplastic. Our version, which removes that last chloride, is MC02.
+
+<div class="card-actions">
+	<LinkButton href="https://github.com/amy-bo/electroPioreactor/blob/main/Media/README.md" variant="primary" icon="github">The medium, with rationale</LinkButton>
+	<LinkButton href="https://github.com/amy-bo/electroPioreactor/tree/main/Media" variant="secondary">Media folder</LinkButton>
+</div>
+
+## Three tiers of nutrients
+
+| Tier | What | Where it comes from |
+| --- | --- | --- |
+| Macronutrients | H₂, O₂ and CO₂ | Hydrogen and oxygen from electrolysis of the medium; CO₂ sparged from a SodaStream cylinder |
+| Mesonutrients | Phosphates, sulphates of potassium, calcium and magnesium, and ammonium sulphate | Sydow et al.'s optimal medium, weighed out per litre |
+| Micronutrients | Iron, molybdenum, zinc, manganese, copper, nickel and cobalt | Our two-bottle trace element solution, a few millilitres per litre |
+
+Hydrogen is meant to be the limiting nutrient, so we make as much of it as the electrodes will stand. Oxygen is made faster than the bacteria use it and has to be purged, which is one of the two reasons we sparge CO₂.
+
+## The two-bottle trace element solution
+
+The one change we made to Sydow's recipe is how the trace elements are stored. A single-bottle stock goes off: the iron oxidises, drops out of solution and takes the other metals with it, within weeks. Splitting the iron into its own bottle in dilute sulphuric acid (rather than the hydrochloric acid in the original; nobody at the Holtmann lab could remember why they hadn't used sulphuric acid in the first place) means we're aiming for more than five years in the fridge for the mineral bottle, and more than three for the iron bottle if you purge its headspace with nitrogen or argon after opening. If the iron does precipitate, you remake one small bottle, not the lot. The [formulation page](https://github.com/amy-bo/electroPioreactor/blob/main/Media/MediaFormulation.md) has the working.
+
+- [Literature review of media](https://github.com/amy-bo/electroPioreactor/blob/main/Media/LiteratureMedia.md): the papers, what each changed, and why Sydow won.
+- [Formulation](https://github.com/amy-bo/electroPioreactor/blob/main/Media/MediaFormulation.md): the recipe as prepared.
+- Forum threads: [HOB culture medium ingredients](https://forum.amybo.org/t/hob-culture-medium-ingredients/53), where it started in 2023, and the [trace element solution](https://forum.amybo.org/t/trace-element-solution/56).
+
+If you're making it at home, the [Crymlyn Fen protocol](/projects/methods/) explains which ingredients are hard to get in small quantities (the sodium phosphate and the sulphuric acid, mainly), and whether to skip the cobalt.

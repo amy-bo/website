@@ -1,0 +1,66 @@
+---
+title: Projects
+description: What AMYBO is building now, and where the designs, code, protocols and results live.
+source: new
+provenance: Written by Martin Currie with Claude for the 2026 relaunch.
+sidebar:
+  label: All projects
+  order: 0
+---
+
+import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
+
+Everything we make is open source and developed in public on [GitHub](https://github.com/amy-bo). Most of the recent work is on the electroPioreactor, an affordable electro-bioreactor for growing hydrogen-oxidising bacteria, and on the medium and methods that go with it.
+
+<CardGrid>
+	<Card title="electroPioreactor" icon="rocket">
+		A [Pioreactor](https://pioreactor.com) with electrodes in the culture and a CO₂ line. The **Aseptic electroPioreactor (AEP)** is being built and tested with Imperial College London and the University of Edinburgh under CARMA Hub funding; the cheaper **mixed-culture electroPioreactor (MEP)** is for enrichment and teaching.
+		<div class="card-actions">
+			<LinkButton href="/projects/electropioreactor/" variant="primary">electroPioreactor</LinkButton>
+			<LinkButton href="/projects/electropioreactor/aep/" variant="secondary">AEP</LinkButton>
+			<LinkButton href="/projects/electropioreactor/mep/" variant="secondary">MEP</LinkButton>
+		</div>
+	</Card>
+	<Card title="CARMA Hub project" icon="star">
+		Affordable Aseptic Electro-Bioreactor for Reproducible HOB Research. Can two labs with the same open kit get the same results?
+		<div class="card-actions">
+			<LinkButton href="/projects/carma-hub/" variant="secondary">The project</LinkButton>
+		</div>
+	</Card>
+	<Card title="Medium, methods and literature" icon="document">
+		A chloride-free growth medium that doubles as the electrolyte, enrichment protocols for the lab and the kitchen table, and the reading behind them.
+		<div class="card-actions">
+			<LinkButton href="/projects/media/" variant="secondary">Medium</LinkButton>
+			<LinkButton href="/projects/methods/" variant="secondary">Methods</LinkButton>
+			<LinkButton href="/projects/literature/" variant="secondary">Literature</LinkButton>
+		</div>
+	</Card>
+	<Card title="PioFlo" icon="setting">
+		A flow-through Pioreactor, so the Pioreactor software can control a fermenter of any size. A first prototype has been run with kombucha.
+		<div class="card-actions">
+			<LinkButton href="/projects/pioflo/" variant="secondary">PioFlo</LinkButton>
+			<LinkButton href="https://forum.amybo.org/t/pioflo-org-enabling-affordable-bioreactors-at-scale/91" variant="minimal">Discuss on the forum</LinkButton>
+		</div>
+	</Card>
+	<Card title="OpenValve and other hardware" icon="puzzle">
+		A 3D-printable solenoid pinch valve from Harvey Mudd College's clinic team, the CO₂ gas train, holders and the small parts that make it all fit on a bench.
+		<div class="card-actions">
+			<LinkButton href="/projects/other-hardware/" variant="secondary">Other hardware</LinkButton>
+			<LinkButton href="/projects/other-hardware/openvalve/" variant="minimal">OpenValve</LinkButton>
+		</div>
+	</Card>
+</CardGrid>
+
+## Where things live
+
+| What | Where |
+| --- | --- |
+| Designs, build guides, plugin, protocols, results | [amy-bo/electroPioreactor](https://github.com/amy-bo/electroPioreactor) on GitHub, mirrored on [Radicle](https://app.radicle.xyz/nodes/iris.radicle.xyz/rad%3AzY4GuyErQo91xGYdLi4r2bea9QDJ) |
+| Pioreactor plugin, on its own | [amy-bo/pioreactor-electroPioreactor-plugin](https://github.com/amy-bo/pioreactor-electroPioreactor-plugin) |
+| Our changes to Pioreactor's software and OS images | [amy-bo/pioreactor](https://github.com/amy-bo/pioreactor) and [amy-bo/CustoPiZer](https://github.com/amy-bo/CustoPiZer), forks we send pull requests from |
+| Discussion, questions and results as they happen | [forum.amybo.org](https://forum.amybo.org/) |
+| Videos | [YouTube](https://www.youtube.com/@AMYBO) |
+| Reading list | [Bibliography](https://bibbase.org/show?bib=https://raw.githubusercontent.com/amy-bo/electroPioreactor/main/Literature/HOB%20ferm.%20in-culture%20electrolysis.bib) and the [AMYBO Zotero group](https://www.zotero.org/groups/6254483/amybo/library) |
+| This website | [amy-bo/website](https://github.com/amy-bo/website) |
+
+[Past projects](/projects/past/) holds our notes on equipment and first experiments from 2023 and 2024, and [Background](/background/) explains why we chose hydrogen-oxidising bacteria in the first place. Both are worth a read, but the pages above are where the current work is.

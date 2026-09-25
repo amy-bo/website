@@ -1,0 +1,26 @@
+---
+title: Other hardware
+description: Valves, gas handling, holders and the research behind them.
+source: new
+provenance: Written by Martin Currie with Claude for the 2026 relaunch, from the repository's Components and PastResearch folders.
+sidebar:
+  order: 1
+  label: Overview
+---
+
+import { Image } from 'astro:assets';
+import solenoid from '../../../../assets/photos/venting-solenoid.jpg';
+
+Besides the electroPioreactor itself, the project has thrown up a number of smaller pieces of open hardware, mostly because the part we needed either didn't exist or cost more than the bioreactor.
+
+- [**OpenValve**](/projects/other-hardware/openvalve/): a 3D-printable solenoid pinch valve. Designed by Harvey Mudd College's clinic team ([valve team files](https://github.com/amy-bo/electroPioreactor/tree/main/PastResearch/HMC-Clinic/ValveTeamFiles)) and being looked at again by Gerrit at LabCrafter.
+- [**CO₂ transfer**](https://github.com/amy-bo/electroPioreactor/tree/main/Components/CO2%20transfer): regulators, needle valves and venting solenoids for the gas train, with premium and budget options priced up and what we learned about each. The £11 valve in the photo below does the job of a £99 one, with the compromises listed (it isn't media-separated, sterilisable or food-certified).
+- [**Anode work**](https://github.com/amy-bo/electroPioreactor/tree/main/PastResearch/HMC-Clinic/AnodeTeamFiles) by Harvey Mudd College's anode team, and the [clinic poster](https://github.com/amy-bo/electroPioreactor/blob/main/PastResearch/HMC-Clinic/AMYBO%20Poster%20Presentation.pptx.pdf).
+- [**CO₂ sparger backflow**](https://github.com/amy-bo/electroPioreactor/tree/main/PastResearch/Brown-HarrisLab): diagnosis and a revised-component fix by Eli Silver at Brown University's Harris Lab. The short version: a closed solenoid traps CO₂, the CO₂ dissolves, and the medium gets sucked up the line.
+- [**Holders and small parts**](https://github.com/amy-bo/electroPioreactor/tree/main/Components): the GL45 bottle holder, pinch slider and electrode top stop, all as OpenSCAD source and STLs.
+- [Equipment notes from 2023](/projects/past/equipment/): autoclaves, microscopes, DNA sequencing and the bioreactor survey that led us to the Pioreactor.
+
+<figure class="photo">
+	<Image src={solenoid} alt="A small silver aluminium solenoid valve with a black coil, a transparent DIN plug and a loop of black cable, lying on a green cutting mat" width={900} widths={[480, 900]} sizes="(max-width: 50rem) 100vw, 45rem" />
+	<figcaption>A 3/2 venting solenoid. When it shuts off the CO₂ it opens the line to air, so nothing gets sucked back towards the vial. Photo: AMYBO, CC BY-SA 4.0.</figcaption>
+</figure>

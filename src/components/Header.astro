@@ -24,11 +24,14 @@ const shouldRenderSearch =
         {shouldRenderSearch && <Search />}
     </div>
     <div class="right-group sl-flex print:hidden items-center">
-        <!-- Hamburger menu button, visible on md and below -->
+        <!-- Hamburger menu button, visible below lg (64rem): the four labelled menus plus search, social icons and the theme switch do not fit a narrower header -->
         <button
-            class="md:hidden p-2 rounded focus:outline-none focus:ring"
+            class="lg:hidden p-2 rounded"
             @click="open = !open"
-            aria-label="Open site links menu"
+            aria-label="Site links menu"
+            aria-controls="mobile-site-links"
+            :aria-expanded="open.toString()"
+            aria-expanded="false"
         >
             <!-- Hamburger icon -->
             <svg
@@ -45,8 +48,8 @@ const shouldRenderSearch =
             </svg>
         </button>
 
-        <!-- Site links: hidden on md and below, flex on md+ -->
-        <div class="site_links hidden md:flex">
+        <!-- Site links: hidden below lg, flex on lg+ -->
+        <div class="site_links hidden lg:flex">
             {
                 links.map((link, idx) =>
                     link.sub ? (
@@ -59,11 +62,13 @@ const shouldRenderSearch =
                                 class="site_link"
                                 @click={`open${idx} = !open${idx}`}
                                 aria-haspopup="true"
+                                aria-expanded="false"
+                                {...{ ':aria-expanded': `open${idx}.toString()` }}
                             >
                                 {link.text}
                             </button>
                             <div
-                                class="dropdown-menu absolute left-0 mt-2 w-40 bg-white border rounded shadow-lg z-50"
+                                class="dropdown-menu absolute left-0 mt-2 w-48 border rounded shadow-lg z-50"
                                 x-show={`open${idx}`}
                                 @click.away={`open${idx} = false`}
                                 x-transition
@@ -73,7 +78,7 @@ const shouldRenderSearch =
                                     <div class="site_link">
                                         <a
                                             href={sublink.link}
-                                            class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                            class="block px-4 py-2 text-sm"
                                             tabindex="0"
                                         >
                                             {sublink.text}
@@ -91,20 +96,30 @@ const shouldRenderSearch =
             }
         </div>
         <!-- Dropdown menu for mobile -->
-        <div
-            class="absolute top-full left-0 w-full bg-white shadow-md z-50 flex flex-col md:hidden"
+        <nav
+            id="mobile-site-links"
+            aria-label="Site links"
+            class="mobile-menu absolute top-full left-0 w-full shadow-md z-50 flex flex-col lg:hidden"
             x-show="open"
             @click.away="open = false"
             x-transition
+            style="display: none;"
         >
             {
                 links.map((link) => (
-                    <div class="site_link">
-                        <a href={link.link}>{link.text}</a>
-                    </div>
+                    <>
+                        <div class="site_link mobile-parent">
+                            <a href={link.link}>{link.text}</a>
+                        </div>
+                        {(link.sub ?? []).map((sublink) => (
+                            <div class="site_link mobile-child">
+                                <a href={sublink.link}>{sublink.text}</a>
+                            </div>
+                        ))}
+                    </>
                 ))
             }
-        </div>
+        </nav>
         <div class="sl-flex social-icons">
             <SocialIcons />
         </div>
@@ -140,6 +155,7 @@ const shouldRenderSearch =
 
         .site_link a,
         .site_link button {
+            white-space: nowrap;
             color: var(--sl-color-text);
             font-size: var(--sl-font-size-text);
             font-family: var(--sl-font-family);
@@ -157,6 +173,31 @@ const shouldRenderSearch =
             text-decoration: underline;
         }
 
+        .dropdown-menu,
+        .mobile-menu {
+            background-color: var(--sl-color-bg-nav);
+            border-color: var(--sl-color-hairline-light);
+        }
+        .dropdown-menu a:hover {
+            background-color: var(--sl-color-gray-6);
+        }
+        .mobile-menu {
+            padding-block: 0.5rem;
+        }
+        .mobile-parent {
+            padding: 0.6rem 1rem 0.2rem;
+        }
+        .mobile-parent a {
+            font-weight: 600;
+        }
+        .mobile-child {
+            padding: 0.2rem 1rem 0.2rem 2.25rem;
+        }
+        .mobile-child a::before {
+            content: "\2013\00a0";
+            color: var(--sl-color-gray-3);
+        }
+
         .right-group,
         .social-icons {
             gap: 1rem;
@@ -168,7 +209,26 @@ const shouldRenderSearch =
             border-inline-end: 1px solid var(--sl-color-gray-5);
         }
 
-        @media (min-width: 50rem) {
+        /* Between 64rem and 78rem the header is a flex row with smaller labels, so the menus, search, icons and theme
+           switch fit beside the logo. Starlight's grid below (title column as wide as the sidebar) only has room from 78rem. */
+        @media (min-width: 64rem) and (max-width: 77.99rem) {
+            .header {
+                gap: 0.75rem;
+            }
+            .site_links {
+                gap: 0.75rem;
+            }
+            .site_link a,
+            .site_link button {
+                font-size: var(--sl-text-sm);
+            }
+            .right-group,
+            .social-icons {
+                gap: 0.75rem;
+            }
+        }
+
+        @media (min-width: 78rem) {
             :global(:root[data-has-sidebar]) {
                 --__sidebar-pad: calc(2 * var(--sl-nav-pad-x));
             }

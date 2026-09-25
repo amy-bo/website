@@ -1,0 +1,25 @@
+# Companion cron Worker for amybo.org. Deploy with: npx wrangler deploy --config workers/cron/wrangler.toml
+name = "amybo-cron"
+main = "../../eventsandeye/worker/index.ts"
+compatibility_date = "2026-09-01"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+SITE_URL = "https://amybo.org"
+NOTIFY_EMAIL = "hello@amybo.org"
+EMAIL_FROM = "AMYBO <hello@amybo.org>"
+ORG_NAME = "AMYBO"
+ORG_FOOTER = "AMYBO is a non-profit trading name of andeye Ltd, registered in Scotland, company number SC665704."
+PRIVACY_URL = "/privacy/"
+EVENTSANDEYE_URL = "https://github.com/andeyePro/eventsandeye"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "amybo-rsvp"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "../../eventsandeye/migrations"
+
+# Secrets (set with `npx wrangler secret put <NAME> --config workers/cron/wrangler.toml`):
+#   RESEND_API_KEY, TOKEN_SECRET (must match the Pages project's value)

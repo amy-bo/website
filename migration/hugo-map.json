@@ -1,0 +1,306 @@
+[
+  {
+    "hugoFile": "content/en/_index.md",
+    "hugoUrl": "/",
+    "newFile": "src/content/docs/index.mdx",
+    "newUrl": "/index.mdx/",
+    "notes": "Merged below Amy\u2019s homepage cards (source: amy + hugo). blocks/link-down decorative scroll chevron dropped (no text)."
+  },
+  {
+    "hugoFile": "content/en/about/index.md",
+    "hugoUrl": "/about/",
+    "newFile": "src/content/docs/about.mdx",
+    "newUrl": "/about.mdx/",
+    "notes": "Docsy cover/lead/section/feature blocks flattened to plain markdown/MDX; github.com/AMYBO-org links normalised to github.com/amy-bo; featured-background.jpg cover image dropped (see image entry)."
+  },
+  {
+    "hugoFile": "content/en/docs/Contribution guidelines/Brand.md",
+    "hugoUrl": "/docs/contribution-guidelines/brand/",
+    "newFile": "src/content/docs/collaborate/brand.md",
+    "newUrl": "/collaborate/brand.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Contribution guidelines/_index.md",
+    "hugoUrl": "/docs/contribution-guidelines/",
+    "newFile": "src/content/docs/collaborate/contribute.md",
+    "newUrl": "/collaborate/contribute.md/",
+    "notes": "github.com/AMYBO-org links normalised to github.com/amy-bo."
+  },
+  {
+    "hugoFile": "content/en/docs/Equipment/Autoclaves.md",
+    "hugoUrl": "/docs/equipment/autoclaves/",
+    "newFile": "src/content/docs/projects/past/equipment/autoclaves.md",
+    "newUrl": "/projects/past/equipment/autoclaves.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Equipment/Bioreactors.md",
+    "hugoUrl": "/docs/equipment/bioreactors/",
+    "newFile": "src/content/docs/projects/past/equipment/bioreactors.md",
+    "newUrl": "/projects/past/equipment/bioreactors.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Equipment/DNA Sequencing.md",
+    "hugoUrl": "/docs/equipment/dna-sequencing/",
+    "newFile": "src/content/docs/projects/past/equipment/dna-sequencing.md",
+    "newUrl": "/projects/past/equipment/dna-sequencing.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Equipment/Microscopes.md",
+    "hugoUrl": "/docs/equipment/microscopes/",
+    "newFile": "src/content/docs/projects/past/equipment/microscopes.md",
+    "newUrl": "/projects/past/equipment/microscopes.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Equipment/_index.md",
+    "hugoUrl": "/docs/equipment/",
+    "newFile": "src/content/docs/projects/past/equipment/index.md",
+    "newUrl": "/projects/past/equipment/index.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/CO2 Sparging/index.md",
+    "hugoUrl": "/docs/experiments/co2-sparging/",
+    "newFile": "src/content/docs/projects/past/experiments/co2-sparging.md",
+    "newUrl": "/projects/past/experiments/co2-sparging.md/",
+    "notes": "Page bundle; figure shortcodes converted to plain markdown images (no captions in source); span style=color inline HTML kept as raw HTML (valid in .md)."
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/Control Testing/index.md",
+    "hugoUrl": "/docs/experiments/control-testing/",
+    "newFile": "src/content/docs/projects/past/experiments/control-testing.mdx",
+    "newUrl": "/projects/past/experiments/control-testing.mdx/",
+    "notes": "Page bundle; used .mdx because the card+youtube shortcode needed the YouTube component; card shortcode flattened to a heading."
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/Electrolysis/index.md",
+    "hugoUrl": "/docs/experiments/electrolysis/",
+    "newFile": "src/content/docs/projects/past/experiments/electrolysis.md",
+    "newUrl": "/projects/past/experiments/electrolysis.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/HOB Enrichment.md",
+    "hugoUrl": "/docs/experiments/hob-enrichment/",
+    "newFile": "src/content/docs/projects/past/experiments/hob-enrichment.mdx",
+    "newUrl": "/projects/past/experiments/hob-enrichment.mdx/",
+    "notes": "youtube shortcode -> YouTube component; title inferred as 'New Year New Culture' (same video id used elsewhere on the old site)."
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/Spirulina Batch.md",
+    "hugoUrl": "/docs/experiments/spirulina-batch/",
+    "newFile": "src/content/docs/projects/past/experiments/spirulina-batch.mdx",
+    "newUrl": "/projects/past/experiments/spirulina-batch.mdx/",
+    "notes": "Two youtube shortcodes -> YouTube components; titles inferred from surrounding Setup/Results headings."
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/_index.md",
+    "hugoUrl": "/docs/experiments/",
+    "newFile": "src/content/docs/projects/past/experiments/index.md",
+    "newUrl": "/projects/past/experiments/index.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/KickstartingForGood.md",
+    "hugoUrl": "/docs/kickstartingforgood/",
+    "newFile": "src/content/docs/projects/past/kickstarting-for-good.md",
+    "newUrl": "/projects/past/kickstarting-for-good.md/",
+    "notes": "hidden:true/toc_hide:true -> sidebar.hidden:true; vimeo shortcode -> raw <iframe> per spec (kept .md since no component import needed)."
+  },
+  {
+    "hugoFile": "content/en/docs/Legal/_index.md",
+    "hugoUrl": "/docs/legal/",
+    "newFile": "src/content/docs/collaborate/safety-and-legal/index.md",
+    "newUrl": "/collaborate/safety-and-legal/index.md/",
+    "notes": "In-body H1 'DO NOT TRY THIS AT HOME' demoted to H2."
+  },
+  {
+    "hugoFile": "content/en/docs/Legal/disclaimer.md",
+    "hugoUrl": "/docs/legal/disclaimer/",
+    "newFile": "src/content/docs/collaborate/safety-and-legal/disclaimer.md",
+    "newUrl": "/collaborate/safety-and-legal/disclaimer.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/OpenValve/_index.md",
+    "hugoUrl": "/docs/openvalve/",
+    "newFile": "src/content/docs/projects/other-hardware/openvalve.md",
+    "newUrl": "/projects/other-hardware/openvalve.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Overview/Plan.md",
+    "hugoUrl": "/docs/overview/plan/",
+    "newFile": "src/content/docs/background/plan-2023.md",
+    "newUrl": "/background/plan-2023.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Overview/_index.md",
+    "hugoUrl": "/docs/overview/",
+    "newFile": "src/content/docs/background/overview.md",
+    "newUrl": "/background/overview.md/",
+    "notes": "Docsy button flattened to plain markdown link."
+  },
+  {
+    "hugoFile": "content/en/docs/Pioflo/Pioflo v0.01.md",
+    "hugoUrl": "/docs/pioflo/pioflo-v0.01/",
+    "newFile": "src/content/docs/projects/pioflo/pioflo-v0-01.md",
+    "newUrl": "/projects/pioflo/pioflo-v0-01.md/",
+    "notes": "Added slug frontmatter (docs/pioflo/pioflo-v0.01) because Astro's slugger strips dots; absolute image paths (/docs/Pioflo/...) converted to relative page-bundle-style refs."
+  },
+  {
+    "hugoFile": "content/en/docs/Pioflo/_index.md",
+    "hugoUrl": "/docs/pioflo/",
+    "newFile": "src/content/docs/projects/pioflo/index.md",
+    "newUrl": "/projects/pioflo/index.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Proteins/Cultivated Meat.md",
+    "hugoUrl": "/docs/proteins/cultivated-meat/",
+    "newFile": "src/content/docs/background/proteins/cultivated-meat.md",
+    "newUrl": "/background/proteins/cultivated-meat.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Proteins/Precision Fermentation.md",
+    "hugoUrl": "/docs/proteins/precision-fermentation/",
+    "newFile": "src/content/docs/background/proteins/precision-fermentation.md",
+    "newUrl": "/background/proteins/precision-fermentation.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Proteins/Single-cell protein.md",
+    "hugoUrl": "/docs/proteins/single-cell-protein/",
+    "newFile": "src/content/docs/background/proteins/single-cell-protein.md",
+    "newUrl": "/background/proteins/single-cell-protein.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Proteins/_index.md",
+    "hugoUrl": "/docs/proteins/",
+    "newFile": "src/content/docs/background/proteins/index.md",
+    "newUrl": "/background/proteins/index.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Risk assessments/_index.md",
+    "hugoUrl": "/docs/risk-assessments/",
+    "newFile": "src/content/docs/collaborate/safety-and-legal/risk-management.md",
+    "newUrl": "/collaborate/safety-and-legal/risk-management.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/_index.md",
+    "hugoUrl": "/docs/",
+    "newFile": "src/content/docs/docs/index.md",
+    "newUrl": "/docs/index.md/",
+    "notes": "Docsy button flattened to plain markdown link; no Hugo description field existed so none added."
+  },
+  {
+    "hugoFile": "content/en/docs/electroPioreactor/_index.md",
+    "hugoUrl": "/docs/electropioreactor/",
+    "newFile": "src/content/docs/projects/past/electropioreactor-2024.md",
+    "newUrl": "/projects/past/electropioreactor-2024.md/",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/electroPioreactor/electroPioreactor v0.02.md",
+    "hugoUrl": "/docs/electropioreactor/electropioreactor-v0.02/",
+    "newFile": "src/content/docs/projects/past/electropioreactor-v0-02.md",
+    "newUrl": "/projects/past/electropioreactor-v0-02.md/",
+    "notes": "Added slug frontmatter (docs/electropioreactor/electropioreactor-v0.02) because Astro's slugger strips dots. Title carried verbatim from Hugo frontmatter even though it oddly includes '.md' (title: \"electroPioreactor v0.02.md\") - not fixed since not broken markup, just an apparent authoring typo; flagged for review."
+  },
+  {
+    "hugoFile": "content/en/search.md",
+    "hugoUrl": "/search/",
+    "newFile": null,
+    "newUrl": null,
+    "notes": "replaced by Starlight's built-in Pagefind search"
+  },
+  {
+    "hugoFile": "content/en/about/featured-background.jpg",
+    "newFile": null,
+    "notes": "not carried over: unverified rights (Docsy cover image)"
+  },
+  {
+    "hugoFile": "content/en/featured-background.jpg",
+    "newFile": null,
+    "notes": "not carried over: unverified rights (Docsy cover image)"
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/CO2 Sparging/cylinder.jpg",
+    "newFile": "src/content/docs/projects/past/experiments/co2-sparging/cylinder.jpg",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/CO2 Sparging/pwm.jpg",
+    "newFile": "src/content/docs/projects/past/experiments/co2-sparging/pwm.jpg",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/CO2 Sparging/regulator.jpg",
+    "newFile": "src/content/docs/projects/past/experiments/co2-sparging/regulator.jpg",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/CO2 Sparging/relay.png",
+    "newFile": "src/content/docs/projects/past/experiments/co2-sparging/relay.png",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/CO2 Sparging/solenoid.jpg",
+    "newFile": "src/content/docs/projects/past/experiments/co2-sparging/solenoid.jpg",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/CO2 Sparging/tubing.jpg",
+    "newFile": "src/content/docs/projects/past/experiments/co2-sparging/tubing.jpg",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/Control Testing/autoclaving.jpg",
+    "newFile": "src/content/docs/projects/past/experiments/control-testing/autoclaving.jpg",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/Control Testing/equipment.jpg",
+    "newFile": "src/content/docs/projects/past/experiments/control-testing/equipment.jpg",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/Control Testing/pioreactors.jpg",
+    "newFile": "src/content/docs/projects/past/experiments/control-testing/pioreactors.jpg",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Experiments/Control Testing/results.png",
+    "newFile": "src/content/docs/projects/past/experiments/control-testing/results.png",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Legal/Xnip2023-07-06_16-30-59.png",
+    "newFile": "src/content/docs/collaborate/safety-and-legal/Xnip2023-07-06_16-30-59.png",
+    "notes": "not referenced by any Hugo page (orphaned screenshot); carried over as a page resource of the Legal section index for parity"
+  },
+  {
+    "hugoFile": "content/en/docs/Pioflo/PiofloKombucha001.png",
+    "newFile": "src/content/docs/projects/pioflo/PiofloKombucha001.png",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Pioflo/Pioflo_v0_01_73A7651.webp",
+    "newFile": "src/content/docs/projects/pioflo/Pioflo_v0_01_73A7651.webp",
+    "notes": ""
+  },
+  {
+    "hugoFile": "content/en/docs/Pioflo/Pioflo_v0_01_sketch.png",
+    "newFile": "src/content/docs/projects/pioflo/Pioflo_v0_01_sketch.png",
+    "notes": ""
+  }
+]

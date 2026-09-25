@@ -19,3 +19,24 @@ pnpm-debug.log*
 
 # macOS-specific files
 .DS_Store
+
+# Cloudflare / wrangler local state
+.wrangler/
+.dev.vars
+
+# Local tooling and editor state
+.vss/
+.vs/
+.claude/
+.vscode/*.local.json
+
+
+# Local development container files
+.vibe/
+.vibe-signals/
+.vibe-allow-ssh
+.vibe-allow-op
+.vibe-allow-codex
+
+# Local content-guard allowlist
+.vibe-content-allow

@@ -18,3 +18,37 @@
 .card-actions > * {
   margin: 0.25rem 0.5rem 0.25rem 0;
 }
+.photo-credit {
+  font-size: var(--sl-text-xs);
+  color: var(--sl-color-gray-3);
+}
+
+/* Amy's full-bleed hero is 100vw wide, which is wider than the page when a scrollbar shows. Clip the excess
+   without turning the page into a scroll container (overflow-x: hidden would break sticky positioning). */
+.page {
+  overflow-x: clip;
+}
+
+@media print {
+  .hero, .header, .right-sidebar, .sidebar-pane, .mobile-menu, .card-actions, .register-link { display: none !important; }
+}
+
+/* The search box's keyboard-shortcut badge only fits once Starlight's header grid is in use (see Header.astro). */
+@media (max-width: 77.99rem) {
+  site-search button > kbd { display: none !important; }
+}
+
+/* White hero text over Amy's forest photo: a soft shadow keeps it readable over the paler patches of canopy. */
+.hero h1, .hero .tagline {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55), 0 0 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Photos on project and event pages (Astro <Image>, credited in the caption). */
+.sl-markdown-content figure.photo { margin: 1.5rem 0; }
+.sl-markdown-content figure.photo img { width: 100%; height: auto; border-radius: 0.5rem; display: block; }
+.sl-markdown-content figure.photo figcaption { margin-top: 0.5rem; font-size: var(--sl-text-sm); color: var(--sl-color-gray-3); }
+
+/* Two or three small captioned photos side by side on wide screens, stacked on phones. */
+.sl-markdown-content .photo-row { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+@media (min-width: 40rem) { .sl-markdown-content .photo-row { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); } }
+.sl-markdown-content .photo-row figure.photo { margin: 0; }

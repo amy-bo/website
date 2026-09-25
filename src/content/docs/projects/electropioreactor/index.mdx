@@ -1,0 +1,111 @@
+---
+title: electroPioreactor
+description: A Pioreactor that makes its own hydrogen and oxygen. Designs, build guide, plugin, medium, methods and results, all on GitHub.
+source: new
+provenance: Written by Martin Currie with Claude for the 2026 relaunch, from the electroPioreactor repository and the forum. The diagram was drawn for this page.
+head:
+  - tag: meta
+    attrs:
+      property: og:image
+      content: https://amybo.org/og-electropioreactor.png
+  - tag: meta
+    attrs:
+      property: og:image:alt
+      content: Cross-section diagram of an electroPioreactor
+  - tag: meta
+    attrs:
+      name: twitter:image
+      content: https://amybo.org/og-electropioreactor.png
+sidebar:
+  order: 0
+  label: Overview
+tableOfContents:
+  maxHeadingLevel: 2
+---
+
+import { Aside, LinkButton } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import diagram from '../../../../assets/diagrams/electropioreactor.svg';
+import solenoid from '../../../../assets/photos/venting-solenoid-on-regulator.jpg';
+import imager from '../../../../assets/photos/imager-app-options.png';
+
+The electroPioreactor is a [Pioreactor](https://pioreactor.com), the cute and cost-effective open source bioreactor, with two additions: a pair of electrodes through the cap, and a CO₂ line into the vial. The electrodes split water in the medium into hydrogen and oxygen, exactly where the bacteria need them. The CO₂ gives the bacteria their carbon and carries away the surplus oxygen. Everything else (stirring, heating, optical density, pumps, the web interface) is the Pioreactor doing what it already does well.
+
+We built it because hydrogen-oxidising bacteria are a very promising sustainable protein, and hydrogen is an awkward gas. A sealed vial of hydrogen and oxygen is a knallgas mixture and unlikely to get past any sensible risk assessment. Making the gases in the culture, only as fast as we choose to make them (the current sets the rate), gets round that. It also means the whole thing runs from two plug-in power supplies and a SodaStream cylinder.
+
+<div class="card-actions">
+	<LinkButton href="https://github.com/amy-bo/electroPioreactor" variant="primary" icon="github">The repository</LinkButton>
+	<LinkButton href="https://github.com/amy-bo/electroPioreactor/releases" variant="secondary">Releases and downloads</LinkButton>
+	<LinkButton href="https://forum.amybo.org/" variant="minimal">Ask on the forum</LinkButton>
+</div>
+
+## How it works
+
+<figure class="photo">
+	<img src={diagram.src} alt="Cross-section of an electroPioreactor: a 20 ml vial on a Pioreactor base, with an anode and a cathode through a 3D-printed cap, a CO₂ line from a SodaStream cylinder through a regulator and a venting solenoid to the bottom of the vial, a vent filter on the cap, and infrared light measured from the side for optical density" width="900" height="600" loading="lazy" />
+	<figcaption>An Aseptic electroPioreactor, not to scale. The mixed-culture version is the same idea without the septum, filters and luer ports.</figcaption>
+</figure>
+
+A few things that took us a while to learn, and that the diagram doesn't show:
+
+- **The electrodes run at constant current, not constant voltage.** We drive them from one of the Pioreactor's LED channels. Its driver holds the current steady (as long as the cell voltage stays well below the Pi's 5 V rail), so the rate of hydrogen production is set by the current and nothing else. Details in the [current measurement experiment](https://forum.amybo.org/t/current-measurement-experiment/166) on the forum.
+- **The medium is also the electrolyte.** Most standard HOB media contain chloride, which electrolysis turns into hypochlorite, which kills the culture. Ours is chloride-free and phosphate-buffered; see the [growth medium](/projects/media/) page.
+- **The bacteria use less oxygen than the electrolysis makes.** Water splits into two hydrogens for every oxygen, and the bacteria don't need that much oxygen, so it builds up. Bubbling CO₂ through the vial purges it, as well as feeding the culture. The plugin pauses the electrolysis while it sparges.
+- **Anodes matter more than cathodes.** We started with platinised titanium anodes and have moved to mixed metal oxide (iridium and tantalum oxide on titanium), which in our hands gives the same current at a lower voltage. The cathode is plain stainless steel, and that seems to be the right choice: platinum also catalyses hydrogen and oxygen recombining into water, which is the last thing we want at the cathode. There is a whole [thread on evaluating platinised electrodes](https://forum.amybo.org/t/evaluating-platinized-electrodes-for-electrolysis/71), and another on [graphite](https://forum.amybo.org/t/alternative-anode-testing-graphite/95).
+- **The solenoid has to vent.** A normal two-port solenoid traps a slug of CO₂ between itself and the vial when it closes. The CO₂ dissolves, and the vacuum it leaves sucks medium back up the line. Eli Silver at Brown University [diagnosed this](https://github.com/amy-bo/electroPioreactor/tree/main/PastResearch/Brown-HarrisLab) and a 3/2 venting solenoid fixes it.
+
+<figure class="photo">
+	<Image src={solenoid} alt="A CO₂ regulator with two pressure gauges on a SodaStream cylinder, with a small silver solenoid valve with a black coil fitted to its outlet" width={720} widths={[480, 720]} sizes="(max-width: 50rem) 100vw, 36rem" />
+	<figcaption>The gas train on an early build: SodaStream cylinder, regulator, venting solenoid. Photo: AMYBO, CC BY-SA 4.0.</figcaption>
+</figure>
+
+There are two variants, each with its own page:
+
+- [**Aseptic electroPioreactor (AEP).**](/projects/electropioreactor/aep/) Sealed cap with a silicone septum, 0.2 μm vent filters and luer-lock ports, for keeping a single strain pure. Six AEP 0.1 units were built, and Imperial and Edinburgh students trained on them at the University of Edinburgh in November 2025. The AEP 0.2 kits started arriving in September 2026. This is the subject of the [CARMA Hub Pump Priming](https://carmahub.co.uk/about-us/pump-priming-projects/) project led by Sonja Billerbeck (Imperial College London) and Chris French (University of Edinburgh), with AMYBO as design and training partner and [LabCrafter](https://labcrafter.co.uk) supplying the kits.
+- [**Mixed-culture electroPioreactor (MEP).**](/projects/electropioreactor/mep/) The original, cheaper version, for enrichment cultures from environmental samples and for teaching. Two went to the University of Edinburgh for the 2026 MSc industrial projects.
+
+## Build one
+
+| Guide | For |
+| --- | --- |
+| [AEP 0.2 build guide](https://docs.electropioreactor.org/AEP) | The current aseptic kit. Being published step by step with a video and drawings for each step, using [Docs&I](https://github.com/andeyePro/docsandeye). |
+| [AEP 0.1.1 assembly instructions](https://github.com/amy-bo/electroPioreactor/blob/main/AsepticElectroPioreactor/CARMA_PumpPriming/Assembly/README.md) | The units built at the November 2025 training. Tools, parts and every step. |
+| [Mixed-culture electroPioreactor: assembly](https://github.com/amy-bo/electroPioreactor/blob/main/MixedElectroPioreactor/Assembly-EdMSc26.md), [calibration](https://github.com/amy-bo/electroPioreactor/blob/main/MixedElectroPioreactor/Calibration.md), [operation](https://github.com/amy-bo/electroPioreactor/blob/main/MixedElectroPioreactor/Operation.md) and [pre-transport check](https://github.com/amy-bo/electroPioreactor/blob/main/MixedElectroPioreactor/PreTransportCheck-EdMSc26.md) | The MEP as built for Edinburgh's MSc students in 2026. |
+| [Components and bill of materials](https://github.com/amy-bo/electroPioreactor/tree/main/Components) | Every part with a link, including the budget labware and tools. |
+| [Parametric vial cap and electrode holder](https://github.com/amy-bo/electroPioreactor/tree/main/Components/Vial%20Cap) | One OpenSCAD file for the cap, septum and electrode top stop. Prints without supports. |
+| [CO₂ transfer: regulators, needle valves and venting solenoids](https://github.com/amy-bo/electroPioreactor/tree/main/Components/CO2%20transfer) | Choosing the gas train, with premium and budget options priced up. |
+
+Kits and parts come from [LabCrafter](https://labcrafter.co.uk) in the UK and [Pioreactor](https://pioreactor.com) elsewhere. If you build one, please tell us how it went on the [forum](https://forum.amybo.org/), especially the bits that didn't work.
+
+## The Pioreactor plugin
+
+The [electroPioreactor plugin](https://github.com/amy-bo/electroPioreactor/tree/main/AEP-Plugin) adds one background job to the Pioreactor's web interface. It drives the electrolysis at a power you choose, opens the CO₂ solenoid for a set number of seconds at a set interval, pauses the electrolysis while it sparges, and pauses the optical density readings for the sparge plus a settle time so bubbles don't get counted as growth. All four settings can be changed live while it runs.
+
+- [Install it over SSH, or from the SD card](https://github.com/amy-bo/electroPioreactor/tree/main/AEP-Plugin#installation). The card route needs a Pioreactor OS release with boot-partition plugin support, which Pioreactor accepted in principle on 24 September 2026; until that ships, use SSH. The [card bundles](https://github.com/amy-bo/electroPioreactor/releases) are on the releases page.
+- Needs Pioreactor 26.5.0 or later. Run `pio update` on older units.
+- Our fixes to Pioreactor's own software go upstream through our [amy-bo/pioreactor](https://github.com/amy-bo/pioreactor) and [amy-bo/CustoPiZer](https://github.com/amy-bo/CustoPiZer) forks.
+
+<figure class="photo">
+	<Image src={imager} alt="Raspberry Pi Imager's App Options dialog with Eject media when finished switched off and the Content Repository Edit button circled" width={900} widths={[480, 900]} sizes="(max-width: 50rem) 100vw, 45rem" />
+	<figcaption>The one change to make in Raspberry Pi Imager for the card install: leave the card mounted after writing, so the plugin can be dropped onto it.</figcaption>
+</figure>
+
+## Medium, methods and literature
+
+- [Growth medium](/projects/media/): why we use Sydow et al.'s chloride-free medium, and our two-bottle trace element solution that keeps for years.
+- [Methods](/projects/methods/): enrichment, sampling and medium protocols, including one you can follow at home.
+- [Literature](/projects/literature/): the bibliography and the journal club's Zotero library.
+
+## Results and research
+
+- [CARMA Hub results](https://github.com/amy-bo/electroPioreactor/tree/main/AsepticElectroPioreactor/CARMA_PumpPriming/Results): the November 2025 training write-up, the anode discolouration photos, and continuous versus intermittent CO₂ sparging.
+- [Meeting notes](https://github.com/amy-bo/electroPioreactor/blob/main/AsepticElectroPioreactor/CARMA_PumpPriming/Meetings.md) from the CARMA Hub project.
+- [Harvey Mudd College clinic](https://github.com/amy-bo/electroPioreactor/tree/main/PastResearch/HMC-Clinic): the clinic's anode optimisation and the solenoid pinch valve that became [OpenValve](/projects/other-hardware/openvalve/), with their [poster](https://github.com/amy-bo/electroPioreactor/blob/main/PastResearch/HMC-Clinic/AMYBO%20Poster%20Presentation.pptx.pdf).
+- [Brown University, Harris Lab](https://github.com/amy-bo/electroPioreactor/tree/main/PastResearch/Brown-HarrisLab): the CO₂ backflow diagnosis and fix.
+- Earlier notes on this site: the [2024 electroPioreactor v0.02 write-up](/projects/past/electropioreactor-v0-02/), our [first experiments](/projects/past/experiments/), and the [electrolysis anode](/projects/past/experiments/electrolysis/) and [CO₂ sparging](/projects/past/experiments/co2-sparging/) pages from 2023.
+
+## Get involved
+
+The forum is where the work happens: [forum.amybo.org](https://forum.amybo.org/). If you'd like to run an enrichment, test an electrode, improve a part or just follow along, [say hello there](https://forum.amybo.org/) or [open an issue or pull request](https://github.com/amy-bo/electroPioreactor/issues). The plugin has [its own issues](https://github.com/amy-bo/electroPioreactor/issues?q=label%3Aplugin) too.
+
+The repository is mirrored on [Radicle](https://app.radicle.xyz/nodes/iris.radicle.xyz/rad%3AzY4GuyErQo91xGYdLi4r2bea9QDJ), and you can see electroPioreactors running at the [AMYBO get-together on 13 November 2026](/events/2026-11-13-london/).

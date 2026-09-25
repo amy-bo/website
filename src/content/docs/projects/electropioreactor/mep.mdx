@@ -1,0 +1,55 @@
+---
+title: Mixed-culture electroPioreactor (MEP)
+description: The original, lower-cost electroPioreactor for enrichment cultures and teaching.
+source: new
+provenance: Written by Martin Currie with Claude for the 2026 relaunch, from the MixedElectroPioreactor folder of the repository.
+head:
+  - tag: meta
+    attrs:
+      property: og:image
+      content: https://amybo.org/og-electropioreactor.png
+  - tag: meta
+    attrs:
+      property: og:image:alt
+      content: Cross-section diagram of an electroPioreactor
+  - tag: meta
+    attrs:
+      name: twitter:image
+      content: https://amybo.org/og-electropioreactor.png
+sidebar:
+  order: 2
+  label: Mixed-culture electroPioreactor
+---
+
+import { LinkButton } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import sliders from '../../../../assets/photos/pinch-sliders.jpg';
+
+The mixed-culture electroPioreactor is where all of this started: a standard Pioreactor vial with an electrode pair through the cap and a CO₂ line, and none of the sealing that makes the [AEP](/projects/electropioreactor/aep/) aseptic. It is cheaper and simpler, and it suits the job we first built it for, which is enrichment. Take a spoonful of mud or river water, put it in a chloride-free medium with hydrogen and CO₂ as the only food, and see what grows. Whatever keeps growing through a few rounds of that, and stops when the electrolysis stops, is very likely a hydrogen-oxidising bacterium, and it might be one nobody has grown before.
+
+The MEP was the only electroPioreactor until the AEP came along. We picked it up again in 2026 as the low-cost version, and built two (MEP 0.3, known to us as ed04 and ed05) for the [School of Biological Sciences](https://biology.ed.ac.uk/) at the University of Edinburgh, for its 2026 MSc industrial projects.
+
+<div class="card-actions">
+	<LinkButton href="https://github.com/amy-bo/electroPioreactor/tree/main/MixedElectroPioreactor" variant="primary" icon="github">MEP on GitHub</LinkButton>
+</div>
+
+<figure class="photo">
+	<Image src={sliders} alt="Five small black 3D-printed pinch sliders with keyhole slots, one fitted on a length of clear silicone tubing" width={900} widths={[480, 900]} sizes="(max-width: 50rem) 100vw, 45rem" />
+	<figcaption>Pinch sliders: a few pence of PETG that closes a silicone line without a valve. Photo: AMYBO, CC BY-SA 4.0.</figcaption>
+</figure>
+
+## Documents
+
+Written for the Edinburgh students, so they assume you have never seen a Pioreactor before:
+
+- [Assembly](https://github.com/amy-bo/electroPioreactor/blob/main/MixedElectroPioreactor/Assembly-EdMSc26.md)
+- [Calibration](https://github.com/amy-bo/electroPioreactor/blob/main/MixedElectroPioreactor/Calibration.md)
+- [Operation](https://github.com/amy-bo/electroPioreactor/blob/main/MixedElectroPioreactor/Operation.md): 14 ml of medium in a 20 ml vial, and what to do each day
+- [Pre-transport check](https://github.com/amy-bo/electroPioreactor/blob/main/MixedElectroPioreactor/PreTransportCheck-EdMSc26.md): what we test before a unit leaves the workshop
+- [Card bundle](https://github.com/amy-bo/electroPioreactor/releases) for installing the plugin from the SD card
+
+A guide with a video and drawings for each step will follow the [AEP guide](https://docs.electropioreactor.org/AEP) at docs.electropioreactor.org, sharing the steps the two variants have in common.
+
+## History
+
+The 2024 electroPioreactor v0.02, the design the MEP grew from, is written up in our [earlier notes](/projects/past/electropioreactor-v0-02/) with a full bill of materials, along with the [2024 electroPioreactor page](/projects/past/electropioreactor-2024/) and the [first experiments](/projects/past/experiments/). The [home enrichment protocol](/projects/methods/) is written for an AEP 0.1, but the stages are the same on an MEP.

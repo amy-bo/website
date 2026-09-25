@@ -1,0 +1,38 @@
+---
+import { getCollection, render } from 'astro:content';
+import { Image } from 'astro:assets';
+
+interface Props {
+	event: string;
+	announce: string;
+}
+const { event, announce } = Astro.props;
+const talks = (await getCollection('talks', (t) => t.data.event === event && t.data.published)).sort((a, b) => a.data.order - b.data.order);
+const rendered = await Promise.all(talks.map(async (t) => ({ t, Content: (await render(t)).Content })));
+---
+{
+	talks.length === 0 ? (
+		<p class="tba"><strong>Programme to be announced {announce}.</strong> Talk titles, speakers and bios will appear here.</p>
+	) : (
+		<ul class="talks" role="list">
+			{rendered.map(({ t, Content }) => (
+				<li class="talk">
+					{t.data.headshot && <Image src={t.data.headshot} alt={t.data.headshotAlt ?? `Photo of ${t.data.speaker}`} width={120} height={120} class="headshot" />}
+					<div>
+						<h3>{t.data.start && <span class="time">{t.data.start} </span>}{t.data.title}</h3>
+						<p class="speaker">{t.data.speaker}{t.data.affiliation && <>, {t.data.affiliation}</>}</p>
+						<Content />
+					</div>
+				</li>
+			))}
+		</ul>
+	)
+}
+<style>
+	.tba { padding: 1rem; border-inline-start: 4px solid var(--sl-color-accent); background: var(--sl-color-gray-6); }
+	.talks { list-style: none; padding: 0; }
+	.talk { display: flex; gap: 1rem; align-items: flex-start; margin-block: 1.5rem; }
+	.headshot { border-radius: 50%; flex: none; object-fit: cover; }
+	.speaker { font-style: italic; margin-top: 0; }
+	.time { color: var(--sl-color-gray-3); font-weight: normal; }
+</style>

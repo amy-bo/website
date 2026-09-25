@@ -1,13 +1,29 @@
 {
-  "name": "amybo",
+  "name": "amybo-website",
+  "description": "amybo.org: the website of AMYBO, a non-profit open source protein fermentation community",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "homepage": "https://amybo.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amy-bo/website.git"
+  },
   "type": "module",
-  "version": "0.0.1",
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "check": "astro check && tsc -p tsconfig.workers.json",
+    "db:migrate:local": "wrangler d1 migrations apply amybo-rsvp --local && wrangler d1 execute amybo-rsvp --local --file seed/2026-11-13-london.sql",
+    "pages:dev": "wrangler pages dev ./dist --port 8788",
+    "test:e2e": "E2E_PAGES=/,/events/2026-11-13-london/,/privacy/,/events/confirm/,/events/manage/,/projects/electropioreactor/,/about/ node eventsandeye/tests/e2e.mjs",
+    "test:a11y": "node scripts/a11y.mjs",
+    "test:forum": "node --test tests/forum.test.mjs",
+    "review": "node scripts/review.mjs",
+    "build:test": "PUBLIC_TURNSTILE_ALLOW_TEST_KEY=true astro build"
   },
   "dependencies": {
     "@astrojs/alpinejs": "^0.4.8",
@@ -19,5 +35,26 @@
     "astro": "^5.6.1",
     "sharp": "^0.32.5",
     "tailwindcss": "^4.1.10"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@cloudflare/workers-types": "^5.20260924.1",
+    "axe-core": "^4.13.0",
+    "jsdom": "^29.1.1",
+    "node": "^22.23.3",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.138.0",
+    "vite": "^6.4.3"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "overrides": {
+    "@tailwindcss/vite": {
+      "vite": "$vite"
+    },
+    "vitefu": {
+      "vite": "$vite"
+    }
   }
 }
