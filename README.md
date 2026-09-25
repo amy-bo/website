@@ -25,19 +25,24 @@ npm run check        # astro check + type-check of the functions and cron worker
 npm run review       # regenerate REVIEW.md (after a build)
 npm run test:a11y    # axe-core accessibility scan of dist/ (after a build)
 npm run test:e2e     # full registration flow against a local D1 database (after build:test)
+node scripts/og.mjs  # regenerate the Open Graph images after changing the logo or event title
 ```
 
-Pages live in `src/content/docs/`; the file path is the URL. Images go next to the page that uses them. See the [contribution guidelines](https://amybo.org/docs/contribution-guidelines/).
+Pages live in `src/content/docs/`; the file path is the URL. Images go next to the page that uses them, or in `src/assets/photos/` (AMYBO's own photos, with their sources listed there). See the [contribution guidelines](https://amybo.org/collaborate/contribute/).
 
 ```
-src/content/docs/        pages (docs/ holds everything migrated from the Hugo site)
+src/content/docs/        pages: Amy's section pages, projects/ (electroPioreactor, CARMA Hub, PioFlo, other hardware,
+                         past projects), background/, collaborate/, events/, privacy, 404
 src/content/talks/       talks for event pages (one markdown file per talk)
-src/components/          Amy's Hero and Header overrides, footer, talks list
+src/components/          Amy's Hero and Header overrides, footer, click-to-play YouTube embed, talks list
+src/assets/photos/       AMYBO photos from amy-bo/electroPioreactor (CC BY-SA 4.0), resized by Astro at build time
+scripts/                 og.mjs (Open Graph images), review.mjs (REVIEW.md), a11y.mjs (axe-core scan)
+public/                  robots.txt, og.png and og-event.jpg, _redirects
 eventsandeye/            Events&I registration system (AGPL-3.0): server code, admin page, cron worker, schema, tests, Astro components
 functions/               one-line Cloudflare Pages Functions wrappers that route to Events&I
 seed/                    the 13 November 2026 event, its sessions and first joining instructions
 workers/cron/            wrangler config for the Events&I cron worker
-public/_redirects        old Hugo URLs with no direct equivalent
+public/_redirects        every old Hugo /docs/ URL, redirected to its new home under /projects/, /background/ or /collaborate/
 migration/hugo-map.json  every Hugo file and where it went
 ```
 
@@ -54,7 +59,7 @@ The 13 November 2026 get-together page is `src/content/docs/events/2026-11-13-lo
 - **Calendars:** in-person attendees get one entry for their day, remote attendees one per online talk session, each with reminders and add-to-calendar links.
 - **Hosts:** a session with a host email gets the attendee list whenever it changes (names, plus emails of people who opted in to share them).
 
-**The automatic emails** are: confirm your email; a reminder with joining instructions for anyone who registers twice; joining instructions with calendar invitations on confirmation or promotion; calendar updates only when someone's entries change; cancellation confirmation; notifications to hello@amybo.org; host lists. Editing a page or saving new joining instructions never emails anyone.
+**The automatic emails** are: confirm your email; a reminder with joining instructions for anyone who registers twice; joining instructions with calendar invitations on confirmation or promotion; calendar updates only when someone's entries change; cancellation confirmation; notifications to the organisers' mailbox (`NOTIFY_EMAIL` in `wrangler.toml`); host lists. Editing a page or saving new joining instructions never emails anyone.
 
 **Admin page:** [amybo.org/admin/rsvps](https://amybo.org/admin/rsvps/), behind Cloudflare Access. It shows counts and every registration, and lets you:
 
@@ -92,7 +97,7 @@ You need a Cloudflare account with the amybo.org zone (already there, since DNS 
 
 3. **Turnstile.** Dashboard → Turnstile → Add widget for `amybo.org` (and `amybo.pages.dev` for previews), managed mode. Add the **site key** as the Pages build variable `PUBLIC_TURNSTILE_SITE_KEY` (the build fails without it, so a test key can never reach the live site), and the **secret key** as the secret `TURNSTILE_SECRET_KEY`.
 
-4. **Resend.** In Resend, add the domain `amybo.org`. Resend shows a few DNS records (an MX and a TXT record on a `send` subdomain, and a DKIM TXT record). Add them in Cloudflare DNS with the proxy **off** (DNS only), then click Verify in Resend. These records sit on subdomains, so Google mail for hello@amybo.org keeps working. Create an API key with **sending access** only.
+4. **Resend.** In Resend, add the domain `amybo.org`. Resend shows a few DNS records (an MX and a TXT record on a `send` subdomain, and a DKIM TXT record). Add them in Cloudflare DNS with the proxy **off** (DNS only), then click Verify in Resend. These records sit on subdomains, so the existing Google mail for the domain keeps working. Create an API key with **sending access** only.
 
 5. **Secrets.** In the Pages project → Settings → Variables and secrets, for Production (and Preview if you use previews):
 
@@ -133,6 +138,10 @@ Local development of the functions: copy `.dev.vars.example` to `.dev.vars`, fil
 - [ ] Update links that point at the old repository (forum, YouTube descriptions, GitHub organisation profile).
 
 **Rollback:** in Cloudflare DNS, point `amybo.org` back at the Netlify site (the Netlify site keeps working until it is deleted), so do not delete it until the new site has run cleanly for a while.
+
+## Changes
+
+Done work is logged in [CHANGELOG.md](CHANGELOG.md); what remains is in [TODO.md](TODO.md).
 
 ## Licence
 

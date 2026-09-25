@@ -1,7 +1,15 @@
 {
-  "name": "amybo",
+  "name": "amybo-website",
+  "description": "amybo.org: the website of AMYBO, a non-profit open source protein fermentation community",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "homepage": "https://amybo.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amy-bo/website.git"
+  },
   "type": "module",
-  "version": "0.0.1",
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",

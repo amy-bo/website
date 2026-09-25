@@ -1,0 +1,16 @@
+# Changelog
+
+Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
+
+## 2026-09-25
+
+- [x] **Header fits at tablet widths, copy edit of the section pages** (3d891f6) — Amy's four menus plus search, icons and theme switch overflowed Starlight's header grid below about 1250 px, so the hamburger menu serves up to 64rem, a compact flex row covers 64 to 78rem and the grid applies from 78rem. Added the missing gray-600 step to Amy's palette (Starlight's dark-mode gray-4 was invalid), a text shadow on the hero title, search-result descriptions in place of Amy's placeholders, consistent AMYBO and PioFlo spellings, CO₂ subscripts.
+- [x] **Homepage rewrite, photos, sharing images, structured data, 404, print styles** (0f3ae1e) — Amy's hero, tagline and cards kept, with a fourth card for building an electroPioreactor and a "What we are doing now" strip; YouTube embeds behind a click-to-play facade; AMYBO's own photos from amy-bo/electroPioreactor (CC BY-SA 4.0) on the project and event pages, resized by Astro; Hugo markdown images get a responsive srcset; generated Open Graph images (`scripts/og.mjs`), site-wide sharing meta, Organization and Event JSON-LD, robots.txt, sitemap without the registration-only pages, a 404 page, overflow clip for the full-bleed hero, print styles.
+
+## 2026-09-24
+
+- [x] **Projects replaces Docs** (6be6299, 73a67c3, d1240ab) — a Projects hub with separate pages for the electroPioreactor, AEP, MEP, CARMA Hub, growth medium, methods, literature, PioFlo, other hardware and past projects, each linking into the matching folder of amy-bo/electroPioreactor; the old Hugo Docs pages moved under Projects, Background and Collaborate with every old `/docs/` URL redirected; no email addresses on the site, all contact through contact.andeye.com links.
+- [x] **Navigation** (d2beb06, 8c36a4c) — Events and Contact under Collaborate Now and in the footer, a grouped and indented mobile menu, footer links and licence line.
+- [x] **Events&I spun out** (335bd9b, 193d5ea, 655b984, 5b71b79, 70a5ba5) — the registration system became Events&I (AGPL-3.0, andeye CLA) at andeyePro/eventsandeye with sessions, calendar invitations (iTIP), host lists and contact-sharing opt-in; the independent Fable 5.1 review's fixes applied before the first push.
+- [x] **Registration system** (557dd19, 697ee1d, b287261) — Cloudflare Pages Functions, D1, cron Worker, admin page behind Cloudflare Access, double opt-in, holds, waiting lists with admin-only promotion, Resend email, Turnstile.
+- [x] **Site migration** (ae9cf15, f167580, bf96490, 7da1afa) — Amy's Astro Starlight redesign as the base, every Hugo page migrated with provenance frontmatter, REVIEW.md, redirects, axe scan, README with the Cloudflare setup and cut-over checklist.
