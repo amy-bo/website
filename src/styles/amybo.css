@@ -33,6 +33,16 @@
   .hero, .header, .right-sidebar, .sidebar-pane, .mobile-menu, .card-actions, .register-link { display: none !important; }
 }
 
+/* The search box's keyboard-shortcut badge only fits once Starlight's header grid is in use (see Header.astro). */
+@media (max-width: 77.99rem) {
+  site-search button > kbd { display: none !important; }
+}
+
+/* White hero text over Amy's forest photo: a soft shadow keeps it readable over the paler patches of canopy. */
+.hero h1, .hero .tagline {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55), 0 0 24px rgba(0, 0, 0, 0.35);
+}
+
 /* Photos on project and event pages (Astro <Image>, credited in the caption). */
 .sl-markdown-content figure.photo { margin: 1.5rem 0; }
 .sl-markdown-content figure.photo img { width: 100%; height: auto; border-radius: 0.5rem; display: block; }

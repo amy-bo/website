@@ -24,9 +24,9 @@ const shouldRenderSearch =
         {shouldRenderSearch && <Search />}
     </div>
     <div class="right-group sl-flex print:hidden items-center">
-        <!-- Hamburger menu button, visible on md and below -->
+        <!-- Hamburger menu button, visible below lg (64rem): the four labelled menus plus search, social icons and the theme switch do not fit a narrower header -->
         <button
-            class="md:hidden p-2 rounded focus:outline-none focus:ring"
+            class="lg:hidden p-2 rounded"
             @click="open = !open"
             aria-label="Site links menu"
             aria-controls="mobile-site-links"
@@ -48,8 +48,8 @@ const shouldRenderSearch =
             </svg>
         </button>
 
-        <!-- Site links: hidden on md and below, flex on md+ -->
-        <div class="site_links hidden md:flex">
+        <!-- Site links: hidden below lg, flex on lg+ -->
+        <div class="site_links hidden lg:flex">
             {
                 links.map((link, idx) =>
                     link.sub ? (
@@ -99,7 +99,7 @@ const shouldRenderSearch =
         <nav
             id="mobile-site-links"
             aria-label="Site links"
-            class="mobile-menu absolute top-full left-0 w-full shadow-md z-50 flex flex-col md:hidden"
+            class="mobile-menu absolute top-full left-0 w-full shadow-md z-50 flex flex-col lg:hidden"
             x-show="open"
             @click.away="open = false"
             x-transition
@@ -155,6 +155,7 @@ const shouldRenderSearch =
 
         .site_link a,
         .site_link button {
+            white-space: nowrap;
             color: var(--sl-color-text);
             font-size: var(--sl-font-size-text);
             font-family: var(--sl-font-family);
@@ -208,7 +209,26 @@ const shouldRenderSearch =
             border-inline-end: 1px solid var(--sl-color-gray-5);
         }
 
-        @media (min-width: 50rem) {
+        /* Between 64rem and 78rem the header is a flex row with smaller labels, so the menus, search, icons and theme
+           switch fit beside the logo. Starlight's grid below (title column as wide as the sidebar) only has room from 78rem. */
+        @media (min-width: 64rem) and (max-width: 77.99rem) {
+            .header {
+                gap: 0.75rem;
+            }
+            .site_links {
+                gap: 0.75rem;
+            }
+            .site_link a,
+            .site_link button {
+                font-size: var(--sl-text-sm);
+            }
+            .right-group,
+            .social-icons {
+                gap: 0.75rem;
+            }
+        }
+
+        @media (min-width: 78rem) {
             :global(:root[data-has-sidebar]) {
                 --__sidebar-pad: calc(2 * var(--sl-nav-pad-x));
             }

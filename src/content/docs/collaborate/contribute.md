@@ -3,7 +3,7 @@ title: "Contribute to this site"
 description: How to contribute to the AMYBO community
 source: hugo
 hugoPath: /docs/contribution-guidelines/
-provenance: "'Reach out to us' and 'Editing AMYBO.org' are verbatim from Hugo. 'Web stack' onwards is new, replacing the Hugo, Docsy and Netlify instructions for the Astro site. Moved from the old Docs section in the 2026 relaunch; text unchanged."
+provenance: "'Reach out to us' and 'Editing AMYBO.org' are verbatim from Hugo (email addresses replaced by the contact form). 'Web stack' onwards is new, replacing the Hugo, Docsy and Netlify instructions for the Astro site. Moved from the old Docs section in the 2026 relaunch."
 sidebar:
   order: 20
   label: Contribute to this site

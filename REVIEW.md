@@ -16,7 +16,7 @@ Totals: 10 amy, 17 new, 29 hugo.
 
 | URL | Title | Source | Old Hugo URL | Notes |
 | --- | --- | --- | --- | --- |
-| [`/`](/) | SUSTAINABLE PROTEIN FOR ALL | amy | `/` | Hero, tagline and the first three cards by Amy (forest photo by Ozark Drones on Unsplash). The event banner, the electroPioreactor card and the 'What we are doing now' section are new. Below that, 'We need your help' and 'Let's democratise food' are the Hugo homepage's words; its 2023 lines about fortnightly videos and editable pages were rewritten. |
+| [`/`](/) | SUSTAINABLE PROTEIN FOR ALL | amy | `/` | Hero, tagline and the first three cards by Amy (her one-line description rewritten for search results) (forest photo by Ozark Drones on Unsplash). The event banner, the electroPioreactor card and the 'What we are doing now' section are new. Below that, 'We need your help' and 'Let's democratise food' are the Hugo homepage's words; its 2023 lines about fortnightly videos and editable pages were rewritten. |
 | [`/404/`](/404/) | Page not found | new | – |  |
 | [`/about/`](/about/) | About AMYBO | hugo | `/about/` | Verbatim from Hugo, except the 'Get involved' heading added so headings nest, and the paragraph about the Docsy porridge photo removed (the photo is not used on this site). |
 | [`/background/`](/background/) | Background | new | – |  |
@@ -27,23 +27,23 @@ Totals: 10 amy, 17 new, 29 hugo.
 | [`/background/proteins/precision-fermentation/`](/background/proteins/precision-fermentation/) | Precision Fermentation | hugo | `/docs/proteins/precision-fermentation/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/background/proteins/single-cell-protein/`](/background/proteins/single-cell-protein/) | Single-Cell Protein | hugo | `/docs/proteins/single-cell-protein/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/collaborate/brand/`](/collaborate/brand/) | Our name & Logo | hugo | `/docs/contribution-guidelines/brand/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/collaborate/contribute/`](/collaborate/contribute/) | Contribute to this site | hugo | `/docs/contribution-guidelines/` | 'Reach out to us' and 'Editing AMYBO.org' are verbatim from Hugo. 'Web stack' onwards is new, replacing the Hugo, Docsy and Netlify instructions for the Astro site. Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/collaborate/fund_us/`](/collaborate/fund_us/) | Fund us | amy | – | Title and description by Amy. Body is new launch text. |
-| [`/collaborate/pioreactor/`](/collaborate/pioreactor/) | Pioreactor | amy | – | Title and description by Amy. Body is new launch text linking to migrated Hugo pages. |
+| [`/collaborate/contribute/`](/collaborate/contribute/) | Contribute to this site | hugo | `/docs/contribution-guidelines/` | 'Reach out to us' and 'Editing AMYBO.org' are verbatim from Hugo (email addresses replaced by the contact form). 'Web stack' onwards is new, replacing the Hugo, Docsy and Netlify instructions for the Astro site. Moved from the old Docs section in the 2026 relaunch. |
+| [`/collaborate/fund_us/`](/collaborate/fund_us/) | Fund us | amy | – | Title by Amy; her description rewritten for search results. Body is new launch text. |
+| [`/collaborate/pioreactor/`](/collaborate/pioreactor/) | Pioreactor | amy | – | Title by Amy; her description rewritten for search results. Body is new launch text linking to migrated Hugo pages. |
 | [`/collaborate/safety-and-legal/`](/collaborate/safety-and-legal/) | Safety and legal | hugo | `/docs/legal/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/collaborate/safety-and-legal/disclaimer/`](/collaborate/safety-and-legal/disclaimer/) | Disclaimer | hugo | `/docs/legal/disclaimer/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/collaborate/safety-and-legal/risk-management/`](/collaborate/safety-and-legal/risk-management/) | Risk management | hugo | `/docs/risk-assessments/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/collaborate/volunteer/`](/collaborate/volunteer/) | Get involved | amy | – | Title and description by Amy. Body is new launch text; the list of skills is from the Hugo homepage. |
-| [`/contact/`](/contact/) | Contact Amybo | amy | – | Title and description by Amy. Body is new launch text; contact details are as on the Hugo site. |
+| [`/collaborate/volunteer/`](/collaborate/volunteer/) | Get involved | amy | – | Title by Amy; her description rewritten for search results. Body is new launch text; the list of skills is from the Hugo homepage. |
+| [`/contact/`](/contact/) | Contact AMYBO | amy | – | Title by Amy (capitalised as AMYBO); her description rewritten for search results. Body is new launch text; contact details are as on the Hugo site. |
 | [`/events/`](/events/) | Events | new | – |  |
 | [`/events/2026-11-13-london/`](/events/2026-11-13-london/) | AMYBO get-together, London – Friday 13 November 2026 | new | – |  |
 | [`/events/confirm/`](/events/confirm/) | Complete your registration | new | – |  |
 | [`/events/manage/`](/events/manage/) | Manage your registration | new | – |  |
-| [`/experiments/community_experiments/`](/experiments/community_experiments/) | Community Experiments | amy | – | Title and description by Amy. Body is new launch text linking to the migrated Hugo experiment pages. |
-| [`/experiments/hardware/`](/experiments/hardware/) | Hardware | amy | – | Title and description by Amy. Body is new launch text linking to migrated Hugo pages. |
-| [`/experiments/protocols/`](/experiments/protocols/) | Experimental protocols | amy | – | Description by Amy; title corrected from 'Experiments Protocols'. Body is new launch text linking to migrated Hugo pages. |
-| [`/experiments/submit/`](/experiments/submit/) | Submit an Experiment | amy | – | Title and description by Amy. Body is new launch text. |
-| [`/mission/`](/mission/) | Why Amybo | amy | – | Title and description by Amy. Body is new launch text drawing on the Hugo Overview and About pages, which are linked. |
+| [`/experiments/community_experiments/`](/experiments/community_experiments/) | Community Experiments | amy | – | Title by Amy; her description rewritten for search results. Body is new launch text linking to the migrated Hugo experiment pages. |
+| [`/experiments/hardware/`](/experiments/hardware/) | Hardware | amy | – | Title by Amy; her description rewritten for search results. Body is new launch text linking to migrated Hugo pages. |
+| [`/experiments/protocols/`](/experiments/protocols/) | Experimental protocols | amy | – | Title corrected from Amy's 'Experiments Protocols'; her description rewritten for search results. Body is new launch text linking to migrated Hugo pages. |
+| [`/experiments/submit/`](/experiments/submit/) | Submit an Experiment | amy | – | Title by Amy; her description rewritten for search results. Body is new launch text. |
+| [`/mission/`](/mission/) | Why AMYBO | amy | – | Title by Amy (capitalised as AMYBO); her description rewritten for search results. Body is new launch text drawing on the Hugo Overview and About pages, which are linked. |
 | [`/privacy/`](/privacy/) | Privacy notice | new | – |  |
 | [`/projects/`](/projects/) | Projects | new | – |  |
 | [`/projects/carma-hub/`](/projects/carma-hub/) | CARMA Hub project | new | – |  |
