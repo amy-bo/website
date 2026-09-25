@@ -57,7 +57,7 @@ The 13 November 2026 get-together page is `src/content/docs/events/2026-11-13-lo
 
 **How registration works** is described in the [Events&I README](eventsandeye/README.md): double opt-in, holds, waiting lists that only move when an admin clicks **Promote**, self-service changes, calendar invitations and host lists. For this event:
 
-- **Places:** 20 in person (remote unlimited), and 6 on each lab tour. The main registration deadline is 6 November 23:59; each tour can be booked or changed until it starts, while places remain. Change any of these on the admin page.
+- **Places:** 20 in person (remote unlimited), and 10 on each lab tour. The main registration deadline is 6 November, 12 noon; each tour can be booked or changed until it starts, while places remain. Change any of these on the admin page.
 - **Sessions:** 10:30 and 11:15 lab tours (optional, booked separately), 12:00 and 14:00 talks (in person and on Google Meet), 17:00 pub. Add the two Meet links, hosts and final times on the admin page under **Sessions**; people whose calendar entries change get an update automatically, and nobody else is emailed.
 - **Calendars:** in-person attendees get one entry for their day, remote attendees one per online talk session, each with reminders and add-to-calendar links.
 - **Hosts:** a session with a host email gets the attendee list whenever it changes (names, plus emails of people who opted in to share them).

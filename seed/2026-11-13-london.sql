@@ -7,7 +7,7 @@
 INSERT INTO events (id, title, starts_at, ends_at, timezone, location, in_person_max, deadline, travel_minutes, page_path, extra_question) VALUES
   ('2026-11-13-london', 'AMYBO get-together, London', '2026-11-13T10:30:00Z', '2026-11-13T22:00:00Z', 'Europe/London',
    'Bezos Centre for Sustainable Protein, Imperial College White City campus, 84 Wood Lane, London W12 0BZ',
-   20, '2026-11-06T23:59:00Z', 60, '/events/2026-11-13-london/',
+   20, '2026-11-06T12:00:00Z', 60, '/events/2026-11-13-london/',
    'Staying on for Saturday 14 November? Tell us if you would like to do something together, and what you fancy.')
 ON CONFLICT(id) DO UPDATE SET title = excluded.title, starts_at = excluded.starts_at, ends_at = excluded.ends_at, location = excluded.location,
   in_person_max = excluded.in_person_max, deadline = excluded.deadline, travel_minutes = excluded.travel_minutes, page_path = excluded.page_path, extra_question = excluded.extra_question;
