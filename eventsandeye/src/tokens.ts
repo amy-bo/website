@@ -7,7 +7,9 @@ import { base64url, base64urlDecode } from './util';
  * and links can be regenerated for any email (e.g. admin broadcasts) without keeping secrets in D1.
  * Registration ids are 128-bit random, and the MAC makes tokens unguessable.
  */
-type Purpose = 'manage' | 'confirm';
+/** manage: view, change or cancel (sent only in emails to a confirmed address). confirm: the double opt-in link.
+ * calendar: read-only .ics download, safe to appear inside calendar entries. */
+type Purpose = 'manage' | 'confirm' | 'calendar';
 
 async function key(env: Env): Promise<CryptoKey> {
 	if (!env.TOKEN_SECRET || env.TOKEN_SECRET.length < 32) throw new Error('TOKEN_SECRET is missing or too short');

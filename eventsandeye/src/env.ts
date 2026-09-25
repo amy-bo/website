@@ -27,6 +27,10 @@ export interface Env {
 	/** Where people can read the Events&I source and give feedback (AGPL). */
 	EVENTSANDEYE_URL?: string;
 	/** "true" only in local development: enables the dev outbox endpoints and test keys. Never set in production. */
+	/** "false" turns off the two-factor check on admin sign-ins (on by default). */
+	ACCESS_REQUIRE_MFA?: string;
+	/** Comma-separated `amr` values accepted as a second factor; see access.ts. */
+	ACCESS_MFA_METHODS?: string;
 	DEV_MODE?: string;
 	/** Local development only: JSON Web Key Set used instead of the Access certs URL, for tests. */
 	ACCESS_JWKS_JSON?: string;

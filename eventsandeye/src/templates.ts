@@ -130,27 +130,39 @@ function calendarText(cal: CalendarBlock | undefined, tz: string): string {
 	}).join('\n');
 }
 
-export function confirmEmail(b: Brand, ev: EventRow, reg: RegistrationRow, confirmUrl: string, manageUrl: string): OutgoingEmail {
+/**
+ * The double opt-in email. It goes to an address nobody has verified yet, so it carries no manage link, does not
+ * repeat the name typed into the form, and lists only the choices the recipient is about to confirm.
+ */
+export function confirmEmail(b: Brand, ev: EventRow, reg: RegistrationRow, sessions: SessionRow[], confirmUrl: string): OutgoingEmail {
 	const subject = `Complete your registration: ${ev.title}`;
+	const choices = [
+		...statusLines(reg, sessions).map((l) => l.replace('You have an in-person place.', 'An in-person place is held for you.').replace('You are booked on', 'A place is held for you on')),
+		reg.share_contact ? 'You chose to share your email address with the hosts of the sessions you attend.' : 'Session hosts will see only your name and whether you have a place.',
+	];
 	const html = layout(b, subject, `
 <h1 style="font-size:22px;margin-top:0">Please complete your registration</h1>
-<p>Hello ${escapeHtml(reg.name)},</p>
-<p>Thanks for registering for the <strong>${escapeHtml(ev.title)}</strong> on ${escapeHtml(ukDateTime(ev.starts_at, ev.timezone))}.</p>
-<p><strong>Your registration is not complete yet.</strong> Please confirm your email address by clicking the button below. We are holding your place until ${escapeHtml(ukDateTime(reg.hold_expires_at ?? ev.deadline, ev.timezone))}; after that, an unconfirmed registration is deleted automatically.</p>
+<p>Hello,</p>
+<p>Someone, hopefully you, registered this address for the <strong>${escapeHtml(ev.title)}</strong> on ${escapeHtml(ukDateTime(ev.starts_at, ev.timezone))}.</p>
+<p><strong>The registration is not complete yet.</strong> Please confirm your email address by clicking the button below. The place is held until ${escapeHtml(ukDateTime(reg.hold_expires_at ?? ev.deadline, ev.timezone))}; after that, an unconfirmed registration is deleted automatically.</p>
+<p>You are confirming:</p><ul>${choices.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}</ul>
 ${button(confirmUrl, 'Complete registration')}
 <p style="font-size:14px">If the button does not work, copy this link into your browser:<br><a href="${escapeHtml(confirmUrl)}">${escapeHtml(confirmUrl)}</a></p>
-<p style="font-size:14px">You can view, change or cancel your registration at any time: <a href="${escapeHtml(manageUrl)}">manage my registration</a>.</p>
+<p style="font-size:14px">To change anything, register again with the same address: the newest registration replaces this one. Once you have confirmed, every email has a link to view, change or cancel your registration.</p>
 <p style="font-size:14px">If you did not register, ignore this email and the registration will be deleted.</p>`);
-	const text = `Hello ${reg.name},
+	const text = `Hello,
 
-Thanks for registering for the ${ev.title} on ${ukDateTime(ev.starts_at, ev.timezone)}.
+Someone, hopefully you, registered this address for the ${ev.title} on ${ukDateTime(ev.starts_at, ev.timezone)}.
 
-YOUR REGISTRATION IS NOT COMPLETE YET. Please confirm your email address by opening this link and clicking "Complete registration":
+THE REGISTRATION IS NOT COMPLETE YET. Please confirm your email address by opening this link and clicking "Complete registration":
 ${confirmUrl}
 
-We are holding your place until ${ukDateTime(reg.hold_expires_at ?? ev.deadline, ev.timezone)}; after that, an unconfirmed registration is deleted automatically.
+The place is held until ${ukDateTime(reg.hold_expires_at ?? ev.deadline, ev.timezone)}; after that, an unconfirmed registration is deleted automatically.
 
-View, change or cancel your registration: ${manageUrl}
+You are confirming:
+${choices.map((l) => `- ${l}`).join('\n')}
+
+To change anything, register again with the same address: the newest registration replaces this one. Once you have confirmed, every email has a link to view, change or cancel your registration.
 
 If you did not register, ignore this email and the registration will be deleted.${textFooter(b)}`;
 	return { to: reg.email, subject, html, text };
@@ -183,8 +195,10 @@ export function alreadyRegisteredIntro(ev: EventRow, reg: RegistrationRow) {
 	return { html: lines.map((l) => `<p>${escapeHtml(l)}</p>`).join(''), text: lines.join('\n') };
 }
 
-export function waitlistReminderEmail(b: Brand, ev: EventRow, reg: RegistrationRow, sessions: SessionRow[], manageUrl: string): OutgoingEmail {
-	const intro = alreadyRegisteredIntro(ev, reg);
+export function waitlistReminderEmail(b: Brand, ev: EventRow, reg: RegistrationRow, sessions: SessionRow[], manageUrl: string, justConfirmed = false): OutgoingEmail {
+	const intro = justConfirmed
+		? { html: `<p>Thank you for confirming your registration for the ${escapeHtml(ev.title)}.</p><p>Your latest joining instructions follow.</p>`, text: `Thank you for confirming your registration for the ${ev.title}.\nYour latest joining instructions follow.` }
+		: alreadyRegisteredIntro(ev, reg);
 	const st = statusLines(reg, sessions);
 	const subject = `Your registration: ${ev.title}`;
 	const html = layout(b, subject, `<p>Hello ${escapeHtml(reg.name)},</p>${intro.html.replace('Your latest joining instructions follow.', 'You will receive joining instructions if a place becomes available.')}${st.map((l) => `<p><strong>${escapeHtml(l)}</strong></p>`).join('')}${button(manageUrl, 'Manage my registration')}`);

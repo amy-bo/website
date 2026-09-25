@@ -31,7 +31,7 @@
 			<label for="m-extra">Anything else for the organisers, for example plans for the day after (optional)</label>
 			<textarea id="m-extra" name="extra_answer" rows="2" maxlength="500"></textarea>
 		</div>
-		<label class="choice"><input type="checkbox" name="share_contact" id="m-share" /> Share my email address with the hosts of the sessions I attend (otherwise hosts see only your name, so if plans change at the last minute they may not be able to reach you directly)</label>
+		<label class="choice"><input type="checkbox" name="share_contact" id="m-share" /> Share my email address with the hosts of the sessions I attend (otherwise hosts see only your name and whether you have a place, so if plans change at the last minute they may not be able to reach you directly)</label>
 		<div id="m-calendar"></div>
 		<p class="help">Moving to a different tour, or from remote to in person, is subject to availability: if it is full you join the waiting list.</p>
 		<div class="actions">
@@ -43,6 +43,8 @@
 </div>
 <script>
 	const t = new URLSearchParams(location.search).get('t');
+	// Keep the link out of the address bar and history once read: it is the key to this registration.
+	if (t) history.replaceState(null, '', location.pathname);
 	const form = document.getElementById('manage-form') as HTMLFormElement;
 	const loading = document.getElementById('manage-loading')!;
 	const out = document.getElementById('manage-result')!;

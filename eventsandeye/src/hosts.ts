@@ -4,10 +4,13 @@ import type { Env } from './env';
 import { type Brand, type EventRow, type HostLine, hostListEmail, type RegistrationRow, type SessionRow } from './templates';
 import { nowIso } from './util';
 
-/** Who belongs on a session host's list. Only confirmed registrations appear; emails only with the registrant's consent. */
+/**
+ * Who belongs on a session host's list: confirmed registrations only, each with whether they have a place. The
+ * registrant's email and affiliation appear only if they agreed to share their contact details with hosts.
+ */
 export function hostLines(s: SessionRow, regs: RegistrationRow[]): HostLine[] {
 	const confirmed = regs.filter((r) => r.status === 'confirmed').sort((a, b) => (a.confirmed_at ?? '').localeCompare(b.confirmed_at ?? ''));
-	const line = (r: RegistrationRow, detail: string): HostLine => ({ id: r.id, name: `${r.name}${r.affiliation ? ` (${r.affiliation})` : ''}`, detail, ...(r.share_contact ? { email: r.email } : {}) });
+	const line = (r: RegistrationRow, detail: string): HostLine => ({ id: r.id, name: `${r.name}${r.share_contact && r.affiliation ? ` (${r.affiliation})` : ''}`, detail, ...(r.share_contact ? { email: r.email } : {}) });
 	if (s.choice_group) {
 		return confirmed.filter((r) => r.tour_id === s.id && r.attendance === 'in_person').map((r) => line(r, r.tour_place === 'waitlist' ? 'waiting list' : r.place === 'waitlist' ? 'booked, but waiting for an in-person place' : 'booked'));
 	}

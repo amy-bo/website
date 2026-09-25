@@ -48,9 +48,9 @@ writeFileSync('.dev.vars', [
 ].join('\n'));
 
 const b64u = (b) => Buffer.from(b).toString('base64url');
-function jwt({ key = privateKey, kid = 'e2e', aud = 'e2e-aud', exp = Math.floor(Date.now() / 1000) + 600, email = 'admin@example.org' } = {}) {
+function jwt({ key = privateKey, kid = 'e2e', aud = 'e2e-aud', exp = Math.floor(Date.now() / 1000) + 600, email = 'admin@example.org', amr = ['pwd', 'mfa'] } = {}) {
 	const h = b64u(JSON.stringify({ alg: 'RS256', kid, typ: 'JWT' }));
-	const p = b64u(JSON.stringify({ aud: [aud], email, exp, iat: Math.floor(Date.now() / 1000), iss: 'https://e2e.cloudflareaccess.com' }));
+	const p = b64u(JSON.stringify({ aud: [aud], email, exp, iat: Math.floor(Date.now() / 1000), iss: 'https://e2e.cloudflareaccess.com', ...(amr ? { amr } : {}) }));
 	return `${h}.${p}.${b64u(sign('RSA-SHA256', Buffer.from(`${h}.${p}`), key))}`;
 }
 const ADMIN = { 'cf-access-jwt-assertion': jwt() };
@@ -86,6 +86,12 @@ async function req(method, path, body, headers = {}) {
 const outbox = async () => (await req('GET', '/api/dev/outbox')).data.emails.map((e) => ({ ...e, att: JSON.parse(e.attachments || '[]') }));
 const mailsTo = async (to) => (await outbox()).filter((e) => e.to_addr === to);
 const last = async (to) => (await mailsTo(to)).at(-1);
+/** The manage link from the newest email to this address that has one (only confirmed registrants get it). */
+async function manageOf(addr) {
+	const ms = await mailsTo(addr);
+	for (let i = ms.length - 1; i >= 0; i--) { const t = tokenFrom(ms[i].text_body, 'manage'); if (t) return t; }
+	return null;
+}
 const tokenFrom = (text, kind) => {
 	const m = new RegExp(`/events/${kind}/\\?t=([^\\s"&<]+)`).exec(text);
 	return m ? decodeURIComponent(m[1]) : null;
@@ -102,7 +108,7 @@ async function registerAndConfirm(over) {
 	const m = (await mailsTo(over.email))[0];
 	const t = tokenFrom(m.text_body, 'confirm');
 	const r = await req('POST', '/api/rsvp/confirm', { t });
-	return { confirm: t, manage: tokenFrom(m.text_body, 'manage'), result: r.data };
+	return { confirm: t, manage: await manageOf(over.email), result: r.data };
 }
 
 async function waitReady() {
@@ -129,6 +135,9 @@ try {
 		check(`${p} with wrong audience → 401`, (await req('GET', p, undefined, { 'cf-access-jwt-assertion': jwt({ aud: 'someone-else' }) })).status === 401);
 		check(`${p} with expired JWT → 401`, (await req('GET', p, undefined, { 'cf-access-jwt-assertion': jwt({ exp: Math.floor(Date.now() / 1000) - 3600 }) })).status === 401);
 		check(`${p} with garbage JWT → 401`, (await req('GET', p, undefined, { 'cf-access-jwt-assertion': 'a.b.c' })).status === 401);
+		check(`${p} with a malformed key id and signature → 401, not 500`, (await req('GET', p, undefined, { 'cf-access-jwt-assertion': `${b64u('{"alg":"RS256","kid":"e2e"}')}.${b64u('{}')}.%%%` })).status === 401);
+		check(`${p} signed in with a one-time PIN only (no second factor) → 401`, (await req('GET', p, undefined, { 'cf-access-jwt-assertion': jwt({ amr: ['email'] }) })).status === 401);
+		check(`${p} with no authentication methods reported → 401`, (await req('GET', p, undefined, { 'cf-access-jwt-assertion': jwt({ amr: null }) })).status === 401);
 		check(`${p} with valid JWT → 200`, (await req('GET', p, undefined, ADMIN)).status === 200);
 	}
 	const page = await req('GET', '/admin/rsvps/', undefined, ADMIN);
@@ -172,25 +181,32 @@ try {
 	check('Alice registers', r.status === 200 && r.data.ok, JSON.stringify(r.data));
 	let mails = await mailsTo(alice);
 	check('Alice gets one confirm-your-email message', mails.length === 1 && /Complete your registration/.test(mails[0].subject));
-	check('confirm email states until when the place is held', /We are holding your place until \w+day, \d+ \w+ 2026/.test(mails[0].text_body), mails[0].text_body.slice(0, 400));
+	check('confirm email states until when the place is held', /The place is held until \w+day, \d+ \w+ 2026/.test(mails[0].text_body), mails[0].text_body.slice(0, 400));
 	check('confirm email says registration is not complete, and carries the Events&I beta footer', /NOT COMPLETE YET/.test(mails[0].text_body) && /Complete registration/.test(mails[0].html_body) && /Events&amp;I<\/a> \(beta\)/.test(mails[0].html_body) && /Events&I \(beta\)/.test(mails[0].text_body));
 	const aliceConfirm = tokenFrom(mails[0].text_body, 'confirm');
-	const aliceManage = tokenFrom(mails[0].text_body, 'manage');
-	check('confirm and manage links present', !!aliceConfirm && !!aliceManage);
+	check('confirm link present; no manage link before the address is confirmed', !!aliceConfirm && !tokenFrom(mails[0].text_body, 'manage'));
+	check('confirm email lists the choices being confirmed, without repeating the typed name', /You are confirming:/.test(mails[0].text_body) && /10:30 lab tour/.test(mails[0].text_body) && /share your email address with the hosts/.test(mails[0].text_body) && !/Alice/.test(mails[0].text_body));
+	let aliceManage = null;
 	r = await register({ name: 'Bob', email: bob, tour_id: TOUR1 });
 	const bobMail = (await mailsTo(bob))[0];
 	const bobConfirm = tokenFrom(bobMail.text_body, 'confirm');
-	const bobManage = tokenFrom(bobMail.text_body, 'manage');
+	let bobManage = null;
 	check('confirm via GET does nothing (link scanners)', [404, 405].includes((await req('GET', `/api/rsvp/confirm?t=${encodeURIComponent(aliceConfirm)}`)).status));
 	check('tampered confirm token → 404', (await req('POST', '/api/rsvp/confirm', { t: aliceConfirm.slice(0, -2) + 'xx' })).status === 404);
-	check('manage token cannot confirm', (await req('POST', '/api/rsvp/confirm', { t: aliceManage })).status === 404);
 	r = await req('POST', '/api/rsvp/confirm', { t: aliceConfirm });
 	check('Alice confirms → place + tour place', r.data.ok && r.data.registration.place === 'place' && r.data.registration.tour_place === 'place', JSON.stringify(r.data));
+	check('confirm response carries no contact details or needs', !('email' in r.data.registration) && !('needs' in r.data.registration) && !('name' in r.data.registration) && !('affiliation' in r.data.registration));
+	aliceManage = await manageOf(alice);
+	check('manage link arrives with the joining instructions', !!aliceManage);
+	check('manage token cannot confirm', (await req('POST', '/api/rsvp/confirm', { t: aliceManage })).status === 404);
 	let m = await last(alice);
 	check('Alice receives joining instructions v1', /Joining instructions/.test(m.subject) && /You have an in-person place/.test(m.text_body));
 	check('…with exactly one calendar invitation', m.att.length === 1 && m.att[0].filename === 'invite.ics' && /method=REQUEST/.test(m.att[0].content_type), JSON.stringify(m.att.map((a) => a.filename)));
 	let ics = m.att[0].content;
 	check('invitation: METHOD:REQUEST, SEQUENCE:0, Europe/London VTIMEZONE', /METHOD:REQUEST/.test(ics) && /SEQUENCE:0/.test(ics) && /TZID:Europe\/London/.test(ics));
+	check('calendar entries never carry the manage link', !/\/events\/manage\//.test(unfold(ics)) && !/events\/manage/.test(decodeURIComponent(m.html_body.match(/calendar\.google\.com[^"]*/)?.[0] ?? '')));
+	{ const icsT = decodeURIComponent((/\/api\/rsvp\/calendar\?t=([^&"]+)/.exec(m.html_body) || [])[1] ?? '');
+	  check('the .ics download token cannot open or change the registration', !!icsT && (await req('GET', `/api/rsvp/manage?t=${encodeURIComponent(icsT)}`)).status === 404); }
 	check('invitation starts at her 10:30 tour and ends when the talks end', icsProp(ics, 'DTSTART').at(-1)?.endsWith('20261113T103000') && icsProp(ics, 'DTEND').at(-1)?.endsWith('20261113T163000'), icsProp(ics, 'DTSTART').concat(icsProp(ics, 'DTEND')).join(' '));
 	check('in-person reminders: week, day, travel + 15 min, 15 min', ['-P7D', '-P1D', '-PT75M', '-PT15M'].every((t) => ics.includes(`TRIGGER:${t}`)));
 	check('organiser and attendee set, lines folded to 75 octets', /ORGANIZER;CN="AMYBO":mailto:hello@amybo\.org/.test(unfold(ics)) && /ATTENDEE;[^\r\n]*mailto:alice@example\.org/.test(unfold(ics)) && ics.split('\r\n').every((l) => Buffer.byteLength(l) <= 75));
@@ -201,8 +217,9 @@ try {
 	check('confirming twice is idempotent and sends nothing more', r.data.ok && r.data.already === true && (await mailsTo(alice)).length === 2);
 
 	r = await req('POST', '/api/rsvp/confirm', { t: bobConfirm });
+	bobManage = await manageOf(bob);
 	check('Bob confirms → in-person waiting list and tour waiting list', r.data.registration.place === 'waitlist' && r.data.registration.tour_place === 'waitlist', JSON.stringify(r.data));
-	check('Bob gets no joining instructions or calendar while waiting', (await mailsTo(bob)).length === 1);
+	{ const bm = await mailsTo(bob); check('Bob gets his manage link but no joining instructions or calendar while waiting', bm.length === 2 && /Thank you for confirming/.test(bm[1].text_body) && /waiting list/.test(bm[1].text_body) && !/Joining instructions/.test(bm[1].subject) && bm[1].att.length === 0 && !!tokenFrom(bm[1].text_body, 'manage'), bm.map((x) => x.subject).join(' | ')); }
 	let hello = await mailsTo(NOTIFY);
 	check('organiser told about the new waiting-list registration with totals', hello.some((x) => /waiting-list registration/.test(x.subject) && /In person: 1 confirmed of 1 places, 1 on the waiting list/.test(x.text_body)), hello.map((x) => x.subject).join(' | '));
 	host1 = await mailsTo('host1@example.org');
@@ -216,7 +233,22 @@ try {
 	check('reminder re-attaches the current calendar invitation (same sequence)', m.att.length === 1 && /SEQUENCE:0/.test(m.att[0].content));
 	await register({ name: 'Bob', email: bob });
 	m = await last(bob);
-	check('waitlisted duplicate gets a reminder of their status, no instructions or calendar', (await mailsTo(bob)).length === 2 && /already registered/.test(m.text_body) && /waiting list/.test(m.text_body) && !/Draft schedule/.test(m.text_body) && m.att.length === 0);
+	check('waitlisted duplicate gets a reminder of their status, no instructions or calendar', (await mailsTo(bob)).length === 3 && /already registered/.test(m.text_body) && /waiting list/.test(m.text_body) && !/Draft schedule/.test(m.text_body) && m.att.length === 0);
+
+	console.log('\nRegistering again before confirming');
+	const frank = 'frank@example.org';
+	const fr1 = await register({ name: 'Frank', email: frank, attendance: 'in_person', tour_id: 'none', share_contact: true });
+	check('Frank registers', fr1.status === 200, JSON.stringify(fr1.data));
+	const frank1 = tokenFrom((await mailsTo(frank))[0].text_body, 'confirm');
+	const fr2 = await register({ name: 'Frank', email: frank, attendance: 'remote', tour_id: 'none', share_contact: false });
+	check('Frank registers again, remote', fr2.status === 200, JSON.stringify(fr2.data));
+	const frankMails = await mailsTo(frank);
+	const frank2 = tokenFrom(frankMails[1].text_body, 'confirm');
+	check('the second registration replaces the first: old confirm link dead', frankMails.length === 2 && frank1 !== frank2 && (await req('POST', '/api/rsvp/confirm', { t: frank1 })).status === 404);
+	r = await req('POST', '/api/rsvp/confirm', { t: frank2 });
+	check('what is confirmed is the latest submission', r.data.ok && r.data.registration.attendance === 'remote', JSON.stringify(r.data));
+	r = await req('DELETE', '/api/rsvp/manage', { t: await manageOf(frank) });
+	check('Frank cancels', r.data.ok);
 
 	console.log('\nSelf-service changes and calendar updates');
 	r = await req('GET', `/api/rsvp/manage?t=${encodeURIComponent(aliceManage)}`);
@@ -272,7 +304,7 @@ try {
 	check('summary counts, no calendar internals exposed', r.data.capacity.inPerson.confirmed === 1 && r.data.capacity.inPerson.waiting === 1 && !('calendar_state' in r.data.registrations[0]), JSON.stringify(r.data.capacity));
 	const bobId = r.data.registrations.find((x) => x.email === bob).id;
 	r = await req('POST', '/api/admin/promote', { id: bobId, what: 'tour' }, ADMIN);
-	check('promote Bob to the 10:30 tour (still waiting for a place → no email yet)', r.data.ok && (await mailsTo(bob)).length === 2);
+	check('promote Bob to the 10:30 tour (still waiting for a place → no email yet)', r.data.ok && (await mailsTo(bob)).length === 3);
 	r = await req('POST', '/api/admin/promote', { id: bobId, what: 'event' }, ADMIN);
 	m = await last(bob);
 	check('promote Bob to a place → joining instructions with an invitation starting 10:30', r.data.ok && /You have an in-person place/.test(m.text_body) && /booked on the 10:30 lab tour/.test(m.text_body) && m.att.length === 1 && icsProp(m.att[0].content, 'DTSTART').at(-1)?.endsWith('T103000'));
@@ -342,8 +374,8 @@ try {
 	await cron(created + 26 * 3600_000);
 	check('warning not repeated', (await mailsTo(NOTIFY)).filter((x) => /half way/.test(x.subject) && /Eve/.test(x.text_body)).length === 1);
 	await cron(created + 49 * 3600_000);
-	const eveManage = tokenFrom((await mailsTo(eve))[0].text_body, 'manage');
-	check('after the hold: unconfirmed registration deleted', (await req('GET', `/api/rsvp/manage?t=${encodeURIComponent(eveManage)}`)).status === 404);
+	const eveConfirm = tokenFrom((await mailsTo(eve))[0].text_body, 'confirm');
+	check('after the hold: unconfirmed registration deleted', (await req('POST', '/api/rsvp/confirm', { t: eveConfirm })).status === 404);
 
 	console.log('\nTour booking deadlines (separate from the registration deadline)');
 	r = await req('POST', '/api/admin/sessions', { event: EVENT, sessions: [{ id: TOUR1, booking_deadline: new Date(Date.now() - 60_000).toISOString() }] }, ADMIN);
@@ -352,6 +384,9 @@ try {
 	check('status shows the 10:30 tour closed, registration still open', r.data.event.open === true && r.data.tours.find((t) => t.id === TOUR1).open === false && r.data.tours.find((t) => t.id === TOUR2).open === true);
 	check('Alice cannot move into the closed tour', (await req('POST', '/api/rsvp/manage', { t: aliceManage, name: 'Alice A', attendance: 'in_person', tour_id: TOUR1 })).status === 409);
 	check('Bob cannot leave the closed tour either', (await req('POST', '/api/rsvp/manage', { t: bobManage, name: 'Bob', attendance: 'in_person', tour_id: 'none' })).status === 409);
+	r = await req('POST', '/api/rsvp/manage', { t: bobManage, name: 'Bob', attendance: 'in_person', share_contact: false });
+	check('with his tour closed, Bob can still save other changes (closed tour kept)', r.data.ok && r.data.registration.tour_id === TOUR1 && r.data.registration.share_contact === false, JSON.stringify(r.data));
+	check('closed tour: same refusal for a registered and an unregistered address', (await register({ email: bob, tour_id: TOUR1 })).status === 409 && (await register({ email: `${randomUUID()}@example.org`, tour_id: TOUR1 })).status === 409);
 	r = await req('POST', '/api/admin/settings', { event: EVENT, deadline: new Date(Date.now() - 60_000).toISOString() }, ADMIN);
 	check('registration deadline moved into the past', r.data.ok);
 	check('new registration refused after the deadline', (await register({ email: 'late@example.org' })).status === 409);

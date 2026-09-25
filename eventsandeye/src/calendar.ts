@@ -21,12 +21,13 @@ export const isCore = (s: SessionRow) => !s.choice_group && s.kind !== 'social';
  *   reminders a week and a day before, "time to leave" (travel time + 15 minutes) and 15 minutes before.
  * Nobody without a confirmed place gets entries (unconfirmed, or waiting for an in-person place).
  */
-export function entriesFor(env: Env, ev: EventRow, sessions: SessionRow[], reg: RegistrationRow, manageUrl: string): CalEntry[] {
+export function entriesFor(env: Env, ev: EventRow, sessions: SessionRow[], reg: RegistrationRow): CalEntry[] {
 	if (reg.status !== 'confirmed') return [];
 	if (reg.attendance === 'in_person' && reg.place !== 'place') return [];
 	const tz = ev.timezone;
 	const uid = (key: string) => `${reg.id}-${key}@${hostOf(env)}`;
-	const manage = `Change or cancel your registration: ${manageUrl}`;
+	// Calendar entries are often shared (delegates, forwarded invitations), so they never carry the manage link.
+	const manage = `Event details: ${siteUrl(env)}${ev.page_path}\nTo change or cancel, use the "Manage my registration" link in your registration emails.`;
 	const ordered = [...sessions].sort((a, b) => a.starts_at.localeCompare(b.starts_at) || a.sort - b.sort);
 
 	if (reg.attendance === 'remote') {
@@ -73,7 +74,9 @@ export function entriesFor(env: Env, ev: EventRow, sessions: SessionRow[], reg: 
 	}];
 }
 
-const hashEntry = (e: CalEntry) => sha256(JSON.stringify([e.summary, e.description, e.location, e.start, e.end, e.url ?? '', e.alarms]));
+// Times are normalised so that re-saving the same time in another ISO spelling ('…:00Z' vs '…:00.000Z') is not a change.
+const iso = (t: string) => { const d = Date.parse(t); return Number.isNaN(d) ? t : new Date(d).toISOString(); };
+const hashEntry = (e: CalEntry) => sha256(JSON.stringify([e.summary, e.description, e.location, iso(e.start), iso(e.end), e.url ?? '', e.alarms]));
 
 export interface CalendarPlan {
 	entries: CalEntry[];

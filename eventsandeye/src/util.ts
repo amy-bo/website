@@ -40,7 +40,8 @@ export const EMAIL_RE = /^[^\s@<>()[\]\\,;:"]+@[^\s@<>()[\]\\,;:"]+\.[^\s@<>()[\
 export function cleanText(v: unknown, max: number): string | null {
 	if (typeof v !== 'string') return null;
 	// eslint-disable-next-line no-control-regex
-	const s = v.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim();
+	// Control characters, and invisible format characters (zero-width, bidirectional overrides) that can disguise a name or address.
+	const s = v.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g, '').trim();
 	if (!s) return null;
 	return s.slice(0, max);
 }

@@ -12,6 +12,7 @@ const { contactHref } = Astro.props;
 </div>
 <script>
 	const t = new URLSearchParams(location.search).get('t');
+	if (t) history.replaceState(null, '', location.pathname);
 	const btn = document.getElementById('confirm-btn') as HTMLButtonElement;
 	const out = document.getElementById('confirm-result')!;
 	if (!t) {

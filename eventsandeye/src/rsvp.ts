@@ -114,7 +114,7 @@ export async function confirmUrl(env: Env, id: string) {
 	return `${siteUrl(env)}/events/confirm/?t=${encodeURIComponent(await makeToken(env, 'confirm', id))}`;
 }
 export async function icsUrlFor(env: Env, id: string) {
-	const t = encodeURIComponent(await makeToken(env, 'manage', id));
+	const t = encodeURIComponent(await makeToken(env, 'calendar', id));
 	return (key: string) => `${siteUrl(env)}/api/rsvp/calendar?t=${t}&entry=${encodeURIComponent(key)}`;
 }
 
@@ -171,11 +171,13 @@ export async function register(env: Env, eventId: string, input: RegistrationInp
 	const email = cleanText(input.email, 254)?.toLowerCase() ?? '';
 	if (!EMAIL_RE.test(email)) throw new UserError('Please enter a valid email address.');
 
+	// Checked before looking the address up, so the answer is the same whether or not the address is already registered.
+	const tour = c.tour_id ? sessions.find((s) => s.id === c.tour_id)! : null;
+	if (tour && !sessionBookingOpen(tour)) throw new UserError(`Booking for the ${tour.label} has closed.`, 409);
+
 	const existing = await env.DB.prepare('SELECT * FROM registrations WHERE event_id = ? AND email = ?').bind(ev.id, email).first<RegistrationRow>();
-	if (existing) {
-		if (existing.status === 'pending') {
-			await sendEmail(env, confirmEmail(brand(env), ev, existing, await confirmUrl(env, existing.id), await manageUrl(env, existing.id)));
-		} else if (existing.attendance === 'in_person' && existing.place === 'waitlist') {
+	if (existing && existing.status === 'confirmed') {
+		if (existing.attendance === 'in_person' && existing.place === 'waitlist') {
 			const pid = await sendEmail(env, waitlistReminderEmail(brand(env), ev, existing, sessions, await manageUrl(env, existing.id)));
 			await recordDelivery(env, existing.id, 'already_registered', pid);
 		} else {
@@ -183,9 +185,10 @@ export async function register(env: Env, eventId: string, input: RegistrationInp
 		}
 		return { ok: true as const };
 	}
+	// An unconfirmed earlier registration is replaced by this one, so what the owner confirms is what they last asked for
+	// (and the confirm email lists it). The earlier confirm link stops working.
+	if (existing) await env.DB.prepare(`DELETE FROM registrations WHERE id = ? AND status = 'pending'`).bind(existing.id).run();
 
-	const tour = c.tour_id ? sessions.find((s) => s.id === c.tour_id)! : null;
-	if (tour && !sessionBookingOpen(tour)) throw new UserError(`Booking for the ${tour.label} has closed.`, 409);
 	const now = Date.now();
 	const nowS = new Date(now).toISOString();
 	const cap = await capacity(env, ev, sessions, nowS);
@@ -204,7 +207,14 @@ export async function register(env: Env, eventId: string, input: RegistrationInp
 	const tourAfter = tour ? after.tours.find((t) => t.id === tour.id)! : null;
 	if (tour && tour_place === 'place' && tourAfter && tour.capacity != null && tourAfter.held > tour.capacity) await demoteIfLatest(env, id, 'tour_place', tour.id);
 	const reg = (await getRegistration(env, id))!;
-	const pid = await sendEmail(env, confirmEmail(brand(env), ev, reg, await confirmUrl(env, id), await manageUrl(env, id)));
+	let pid: string;
+	try {
+		pid = await sendEmail(env, confirmEmail(brand(env), ev, reg, sessions, await confirmUrl(env, id)));
+	} catch (e) {
+		// Nobody can confirm a registration whose email never went out: do not keep their details or hold a place.
+		await env.DB.prepare(`DELETE FROM registrations WHERE id = ? AND status = 'pending'`).bind(id).run();
+		throw e;
+	}
 	await recordDelivery(env, id, 'confirm_email', pid);
 	return { ok: true as const };
 }
@@ -227,7 +237,7 @@ async function sendInstructions(env: Env, ev: EventRow, reg: RegistrationRow, se
 	const instr = await latestInstructions(env, ev.id);
 	if (!instr) return;
 	const murl = await manageUrl(env, reg.id);
-	const p = await plan(parseState(reg.calendar_state), entriesFor(env, ev, sessions, reg, murl));
+	const p = await plan(parseState(reg.calendar_state), entriesFor(env, ev, sessions, reg));
 	const send = opts.resendAllCalendar ? [...p.requests, ...p.unchanged] : p.requests;
 	const files = attachments(env, ev, reg, send, p.cancels);
 	const pid = await sendEmail(env, instructionsEmail(brand(env), ev, reg, sessions, instr, murl, { entries: p.entries, icsUrl: await icsUrlFor(env, reg.id) }, files, opts.intro));
@@ -238,7 +248,7 @@ async function sendInstructions(env: Env, ev: EventRow, reg: RegistrationRow, se
 /** Sends updated or cancelled invitations if, and only if, this person's calendar entries changed. */
 async function syncCalendar(env: Env, ev: EventRow, reg: RegistrationRow, sessions: SessionRow[]) {
 	const murl = await manageUrl(env, reg.id);
-	const p = await plan(parseState(reg.calendar_state), entriesFor(env, ev, sessions, reg, murl));
+	const p = await plan(parseState(reg.calendar_state), entriesFor(env, ev, sessions, reg));
 	if (!p.requests.length && !p.cancels.length) return false;
 	const files = attachments(env, ev, reg, p.requests, p.cancels);
 	const pid = await sendEmail(env, calendarUpdateEmail(brand(env), ev, reg, p.requests.map((r) => r.entry), p.cancels.map((c) => c.summary), { entries: p.entries, icsUrl: await icsUrlFor(env, reg.id) }, murl, files));
@@ -267,6 +277,12 @@ async function notifyWaitlist(env: Env, ev: EventRow, sessions: SessionRow[], re
 	]));
 }
 
+/** What the confirm page needs. No contact details or needs: whoever holds a confirm link may not be the registrant. */
+function confirmStatus(reg: RegistrationRow, sessions: SessionRow[]) {
+	const tour = reg.tour_id ? sessions.find((t) => t.id === reg.tour_id) : null;
+	return { status: reg.status, attendance: reg.attendance, place: reg.place, tour_label: tour?.label ?? null, tour_place: reg.tour_place };
+}
+
 export function publicStatus(reg: RegistrationRow, sessions: SessionRow[]) {
 	const tour = reg.tour_id ? sessions.find((t) => t.id === reg.tour_id) : null;
 	return {
@@ -282,7 +298,7 @@ export async function confirm(env: Env, id: string) {
 	if (!reg) throw new UserError('This registration no longer exists. Unconfirmed registrations are deleted after a while, so please register again.', 404);
 	const ev = await getEvent(env, reg.event_id);
 	const sessions = await getSessions(env, ev.id);
-	if (reg.status === 'confirmed') return { ok: true as const, already: true, registration: publicStatus(reg, sessions) };
+	if (reg.status === 'confirmed') return { ok: true as const, already: true, registration: confirmStatus(reg, sessions) };
 
 	const now = nowIso();
 	let place = reg.place, tour_place = reg.tour_place;
@@ -302,25 +318,30 @@ export async function confirm(env: Env, id: string) {
 	reg = (await getRegistration(env, id))!;
 
 	if (!joinsWaitlist) await sendInstructions(env, ev, reg, sessions);
+	else {
+		// Waiting for an in-person place: no joining instructions yet, but they need their manage link.
+		const pid = await sendEmail(env, waitlistReminderEmail(brand(env), ev, reg, sessions, await manageUrl(env, reg.id), true));
+		await recordDelivery(env, reg.id, 'waitlist_confirmed', pid);
+	}
 	await notifyWaitlist(env, ev, sessions, reg, joinsWaitlist, joinsTourWaitlist, 'has confirmed and joined');
 	await syncHosts(env, brand(env), ev, sessions);
-	return { ok: true as const, already: false, registration: publicStatus(reg, sessions) };
+	return { ok: true as const, already: false, registration: confirmStatus(reg, sessions) };
 }
 
 export async function manageView(env: Env, id: string) {
 	const reg = await getRegistration(env, id);
 	if (!reg) throw new UserError('This registration no longer exists.', 404);
+	if (reg.status !== 'confirmed') throw new UserError('Please confirm your email address first, using the link in your registration email.', 403);
 	const ev = await getEvent(env, reg.event_id);
 	const sessions = await getSessions(env, ev.id);
 	const cap = await capacity(env, ev, sessions);
-	const murl = await manageUrl(env, reg.id);
 	const ics = await icsUrlFor(env, reg.id);
 	return {
 		ok: true as const,
 		event: { id: ev.id, title: ev.title, starts_at: ev.starts_at, deadline: ev.deadline, page_path: ev.page_path, open: registrationOpen(ev) },
 		tours: cap.tours.map((t) => ({ id: t.id, label: t.label, available: t.available, open: t.open })),
 		registration: publicStatus(reg, sessions),
-		calendar: entriesFor(env, ev, sessions, reg, murl).map((e) => ({ key: e.key, summary: e.summary, start: e.start, url: ics(e.key) })),
+		calendar: entriesFor(env, ev, sessions, reg).map((e) => ({ key: e.key, summary: e.summary, start: e.start, url: ics(e.key) })),
 	};
 }
 
@@ -328,9 +349,13 @@ export async function manageView(env: Env, id: string) {
 export async function updateRegistration(env: Env, id: string, input: RegistrationInput) {
 	const reg = await getRegistration(env, id);
 	if (!reg) throw new UserError('This registration no longer exists.', 404);
+	if (reg.status !== 'confirmed') throw new UserError('Please confirm your email address first, using the link in your registration email.', 403);
 	const ev = await getEvent(env, reg.event_id);
 	const sessions = await getSessions(env, ev.id);
-	const c = parseCommon(input, sessions);
+	// A tour whose booking has closed shows as a disabled choice, which browsers leave out of the form: an absent
+	// tour_id means "unchanged" (only an explicit 'none' drops the tour), so other details can still be saved.
+	const c = { ...parseCommon(input, sessions) };
+	if (input.tour_id === undefined && c.attendance === 'in_person') c.tour_id = reg.tour_id;
 	const now = nowIso();
 	const cap = await capacity(env, ev, sessions, now);
 
@@ -368,7 +393,10 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 		const newTour = updated.tour_place === 'waitlist' && !(reg.tour_place === 'waitlist' && reg.tour_id === updated.tour_id);
 		await notifyWaitlist(env, ev, sessions, updated, newEvent, newTour, 'changed their registration and joined');
 		// A remote registrant moving in person gets full joining instructions once they have a place; otherwise only calendar changes go out.
-		if (reg.attendance === 'remote' && updated.attendance === 'in_person' && updated.place === 'place') await sendInstructions(env, ev, updated, sessions);
+		// Anyone who now qualifies for joining instructions but never had them (a remote person moving in person with a
+		// place, or someone leaving the in-person waiting list to join remotely) gets them in full.
+		const qualifies = updated.attendance === 'remote' || updated.place === 'place';
+		if (qualifies && (reg.instructions_version === 0 || (reg.attendance === 'remote' && updated.attendance === 'in_person'))) await sendInstructions(env, ev, updated, sessions);
 		else await syncCalendar(env, ev, updated, sessions);
 		await syncHosts(env, brand(env), ev, sessions);
 	}
@@ -382,6 +410,8 @@ export async function cancel(env: Env, id: string) {
 	const ev = await getEvent(env, reg.event_id);
 	const sessions = await getSessions(env, ev.id);
 	await env.DB.prepare('DELETE FROM registrations WHERE id = ?').bind(id).run();
+	// Hosts first, so a failed email below cannot leave the person on a host's list.
+	await syncHosts(env, brand(env), ev, sessions);
 	const state = parseState(reg.calendar_state);
 	const files = attachments(env, ev, reg, [], Object.values(state).map((s) => ({ ...s, seq: s.seq + 1 })));
 	await sendEmail(env, cancellationEmail(brand(env), ev, reg, `${siteUrl(env)}${ev.page_path}`, files));
@@ -390,7 +420,6 @@ export async function cancel(env: Env, id: string) {
 		`${reg.name}${reg.affiliation ? ` (${reg.affiliation})` : ''} cancelled (${reg.status}, ${detail}${reg.tour_id ? `, ${sessions.find((t) => t.id === reg.tour_id)?.label ?? 'tour'} ${reg.tour_place ?? ''}` : ''}).`,
 		...(await totalsLines(env, ev, sessions)),
 	]));
-	await syncHosts(env, brand(env), ev, sessions);
 	return { ok: true as const };
 }
 
@@ -400,7 +429,7 @@ export async function calendarFile(env: Env, id: string, key: string) {
 	if (!reg) throw new UserError('This registration no longer exists.', 404);
 	const ev = await getEvent(env, reg.event_id);
 	const sessions = await getSessions(env, ev.id);
-	const entry = entriesFor(env, ev, sessions, reg, await manageUrl(env, id)).find((e) => e.key === key);
+	const entry = entriesFor(env, ev, sessions, reg).find((e) => e.key === key);
 	if (!entry) throw new UserError('No such calendar entry.', 404);
 	const seq = parseState(reg.calendar_state)[key]?.seq ?? 0;
 	return buildIcs({ method: 'PUBLISH', entry, sequence: seq, organizer: { name: orgName(env), email: notifyEmail(env) }, tz: ev.timezone });
@@ -488,14 +517,14 @@ export async function createMessage(env: Env, eventId: string, input: Record<str
 	await env.DB.prepare(
 		`INSERT INTO messages (id, event_id, subject, body_md, audience, marks_instructions_version, status, scheduled_at, created_at, created_by)
 		 VALUES (?,?,?,?,?,?,?,?,?,?)`,
-	).bind(id, eventId, subject, body, JSON.stringify(audience), marks, scheduled_at ? 'scheduled' : 'sending', scheduled_at, nowIso(), createdBy).run();
+	).bind(id, eventId, subject, body, JSON.stringify(audience), marks, 'scheduled', scheduled_at, nowIso(), createdBy).run();
 	if (!scheduled_at) await deliverMessage(env, id);
 	return env.DB.prepare('SELECT * FROM messages WHERE id = ?').bind(id).first<MessageRow>();
 }
 
 /** Sends a message to its audience, recording each delivery. Safe to call from the cron: claims the row first. */
 export async function deliverMessage(env: Env, id: string) {
-	const claim = await env.DB.prepare(`UPDATE messages SET status='sending' WHERE id=? AND status IN ('scheduled','sending') RETURNING *`).bind(id).first<MessageRow>();
+	const claim = await env.DB.prepare(`UPDATE messages SET status='sending' WHERE id=? AND status = 'scheduled' RETURNING *` /* one claim only, even if two cron runs overlap */).bind(id).first<MessageRow>();
 	if (!claim) return;
 	try {
 		const recipients = await audienceRecipients(env, claim.event_id, JSON.parse(claim.audience));
@@ -579,7 +608,7 @@ export async function updateSessions(env: Env, eventId: string, input: Record<st
 		if (e.location !== undefined) s.location = cleanText(e.location, 300);
 		if (e.online_url !== undefined) {
 			const u = cleanText(e.online_url, 500);
-			if (u && !/^https:\/\//.test(u)) throw new UserError('Online links must start with https://');
+			if (u && (!/^https:\/\//.test(u) || /\s/.test(u))) throw new UserError('Online links must start with https:// and contain no spaces or line breaks.');
 			s.online_url = u;
 		}
 		if (e.host_name !== undefined) s.host_name = cleanText(e.host_name, 120);
@@ -598,7 +627,7 @@ export async function updateSessions(env: Env, eventId: string, input: Record<st
 	if (input.dry_run === true) {
 		let n = 0;
 		for (const r of await confirmedRegs(env, ev.id)) {
-			const p = await plan(parseState(r.calendar_state), entriesFor(env, ev, next, r, await manageUrl(env, r.id)));
+			const p = await plan(parseState(r.calendar_state), entriesFor(env, ev, next, r));
 			if (p.requests.length || p.cancels.length) n++;
 		}
 		return { ok: true as const, calendar_updates: n };
@@ -649,8 +678,8 @@ export async function adminSummary(env: Env, eventId: string) {
 export function registrationsCsv(regs: Omit<RegistrationRow, 'calendar_state'>[], sessions: SessionRow[]): string {
 	const cols = ['name', 'email', 'attendance', 'status', 'place', 'tour', 'tour_place', 'affiliation', 'needs', 'extra_answer', 'share_contact', 'instructions_version', 'created_at', 'confirmed_at'];
 	const esc = (v: unknown) => {
-		let s = v == null ? '' : String(v);
-		if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; // defuse spreadsheet formula injection
+		let s = v == null ? '' : String(v).replace(/\t/g, ' ');
+		if (/^[\s]*[=+\-@]/.test(s) || /^[\r\n]/.test(s)) s = `'${s}`; // defuse spreadsheet formula injection
 		return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 	};
 	const rows = regs.map((r) => [r.name, r.email, r.attendance, r.status, r.place, sessions.find((t) => t.id === r.tour_id)?.label ?? '', r.tour_place,
@@ -699,13 +728,16 @@ export async function runScheduled(env: Env, now = Date.now()) {
 			await env.DB.prepare(`DELETE FROM registrations WHERE id=? AND status='pending'`).bind(r.id).run();
 			report.holdsExpired++;
 		} else if (!r.hold_warned_at && now >= start + (exp - start) / 2) {
-			const ev = await getEvent(env, r.event_id);
-			await sendEmail(env, notification(brand(env), `Unconfirmed registration half way to expiry: ${ev.title}`, [
-				`${r.name} <${r.email}> registered at ${r.created_at} but has not confirmed their email address.`,
-				`Their ${r.attendance === 'in_person' ? (r.place === 'place' ? 'held in-person place' : 'waiting-list request') : 'remote registration'} will be deleted at ${r.hold_expires_at} unless they confirm.`,
-			]));
+			// Marked first: a failed send must not block the deletions below or repeat every five minutes.
 			await env.DB.prepare('UPDATE registrations SET hold_warned_at=? WHERE id=?').bind(nowS, r.id).run();
-			report.holdsWarned++;
+			try {
+				const ev = await getEvent(env, r.event_id);
+				await sendEmail(env, notification(brand(env), `Unconfirmed registration half way to expiry: ${ev.title}`, [
+					`${r.name} registered at ${r.created_at} but has not confirmed their email address.`,
+					`Their ${r.attendance === 'in_person' ? (r.place === 'place' ? 'held in-person place' : 'waiting-list request') : 'remote registration'} will be deleted at ${r.hold_expires_at} unless they confirm.`,
+				]));
+				report.holdsWarned++;
+			} catch (e) { console.error('hold warning failed', r.id, e); }
 		}
 	}
 
@@ -714,6 +746,7 @@ export async function runScheduled(env: Env, now = Date.now()) {
 	const r = await env.DB.prepare(`DELETE FROM registrations WHERE event_id IN (SELECT id FROM events WHERE ends_at <= ?)`).bind(cutoff).run();
 	report.retentionDeleted = r.meta.changes ?? 0;
 	await env.DB.prepare(`DELETE FROM host_snapshots WHERE session_id IN (SELECT s.id FROM sessions s JOIN events e ON e.id = s.event_id WHERE e.ends_at <= ?)`).bind(cutoff).run();
+	await env.DB.prepare(`UPDATE sessions SET host_name = NULL, host_email = NULL WHERE event_id IN (SELECT id FROM events WHERE ends_at <= ?)`).bind(cutoff).run();
 	await env.DB.prepare('DELETE FROM dev_outbox WHERE created_at <= ?').bind(cutoff).run();
 	return report;
 }
