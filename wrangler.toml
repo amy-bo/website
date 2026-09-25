@@ -17,7 +17,7 @@ ACCESS_AUD = "REPLACE_WITH_ACCESS_APPLICATION_AUD_TAG"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "amybo-rsvp"
+database_name = "amybo-rsvp-eu"
 database_id = "REPLACE_WITH_D1_DATABASE_ID"
 migrations_dir = "eventsandeye/migrations"
 

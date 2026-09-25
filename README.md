@@ -80,15 +80,33 @@ The 13 November 2026 get-together page is `src/content/docs/events/2026-11-13-lo
 
 ## Deploying from GitHub (the quick route)
 
-`.github/workflows/deploy.yml` deploys everything from GitHub Actions on every push to `launch-2026` or `main`, so nothing has to run on a laptop: it builds the site, creates the D1 database if it is missing and writes its id into the configs, applies the migrations and the event seed (both safe to rerun), creates the Pages project if it is missing, sets the secrets, deploys the site with its Functions, and deploys the cron Worker. One-off set-up in the Cloudflare dashboard and on GitHub:
+`.github/workflows/deploy.yml` deploys everything from GitHub Actions on every push to `launch-2026` or `main`, so nothing has to run on a laptop. It has two jobs:
 
-1. **Cloudflare API token** (My Profile → API Tokens → Create Token → Custom): permissions *Account: Cloudflare Pages: Edit*, *Account: D1: Edit*, *Account: Workers Scripts: Edit*, for this account. Copy the token and the **Account ID** (right-hand column of any zone's overview page).
-2. **Turnstile** (dashboard → Turnstile → Add widget): hostnames `amybo.org` and `amybo.pages.dev`, managed mode. Copy the site key and the secret key.
-3. **Resend**: add the domain `amybo.org`, add the DNS records it shows in Cloudflare DNS (proxy off), click Verify, create an API key with sending access.
-4. **GitHub** (repository → Settings → Secrets and variables → Actions). Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `TOKEN_SECRET` (output of `openssl rand -hex 32`; keep it stable), `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`. Variables: `PUBLIC_TURNSTILE_SITE_KEY`, and later `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` once the Access application exists (step 6 below); until then the admin page refuses everyone, which is safe.
-5. Push, or run the workflow by hand from the Actions tab. The site appears at `https://amybo.pages.dev` (production branch = the branch that first created the project). Add `amybo.org` as a custom domain in the Pages project when ready to cut over.
+- **build** has no secrets at all: it installs, builds the site and hands it on as an artifact.
+- **deploy** runs in the `production` GitHub Environment and installs without running package scripts before it touches the Cloudflare token. It creates the D1 database in the **EU jurisdiction** if it is missing (`amybo-rsvp-eu`), applies the migrations and the insert-only seed, sets the secrets, deploys the site with its Functions and deploys the cron Worker.
 
-The manual steps below do the same things with the dashboard and `wrangler` on a laptop.
+Only the Pages project's production branch touches the live database and the cron Worker; other branches get a preview of the static site. The first push to `main` makes `main` the production branch, so merging the launch PR hands production over automatically.
+
+One-off set-up:
+
+1. **Cloudflare API token** (My Profile → API Tokens → Create Token → Custom): *Account: Cloudflare Pages: Edit*, *Account: D1: Edit*, *Account: Workers Scripts: Edit*, for this account only. Copy it and the **Account ID**.
+2. **Turnstile** (dashboard → Turnstile → Add widget): hostnames `amybo.org`, `www.amybo.org` and `amybo-4p1.pages.dev` (the project's own pages.dev address; `amybo.pages.dev` belongs to someone else), managed mode.
+3. **Resend**: add the domain `amybo.org` in the EU region, add the DNS records it shows (proxy off), verify, create an API key with sending access only.
+4. **GitHub** (repository → Settings → Secrets and variables → Actions). Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `TOKEN_SECRET` (`openssl rand -hex 32`; never paste it anywhere else), `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`. Variables: `PUBLIC_TURNSTILE_SITE_KEY`; `SITE_URL` (the address emails link to: `https://amybo-4p1.pages.dev` until amybo.org is attached, then `https://amybo.org`); `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` once step 6 below is done.
+5. **Environment** (Settings → Environments → `production`): add yourself as a required reviewer and restrict deployment branches to `launch-2026` and `main`. Every deploy then waits for an approval from a two-factor-authenticated GitHub account.
+6. **Cloudflare Access** for the admin page, with **two-factor sign-in**: see step 6 of the manual set-up below. The admin page refuses any sign-in whose token does not report a second factor.
+
+## Two-factor authentication on the logins that reach other people's data
+
+These accounts can reach every registrant's details, so each needs two-factor authentication:
+
+| Login | Why | Where to turn it on |
+| --- | --- | --- |
+| Cloudflare (every member of the account) | D1 database, Pages secrets, Access policy | My Profile → Authentication → Two-factor; Manage Account → Members → require 2FA |
+| GitHub (amy-bo organisation) | pushes deploy to the live database | Organisation settings → Authentication security → Require two-factor authentication |
+| Resend | delivery logs list every recipient | Settings → Account → Two-factor authentication |
+| Google account for hello@amybo.org | receives organiser notifications and BCC exports | Google Account → Security → 2-Step Verification |
+| The admin page itself | every registration | Cloudflare Access policy with MFA (enforced in code as well) |
 
 ## Setting up Cloudflare (first deploy)
 
@@ -98,19 +116,19 @@ You need a Cloudflare account with the amybo.org zone (already there, since DNS 
 
    ```sh
    npx wrangler login
-   npx wrangler d1 create amybo-rsvp
+   npx wrangler d1 create amybo-rsvp-eu --jurisdiction eu
    ```
 
    Put the printed `database_id` into both `wrangler.toml` and `workers/cron/wrangler.toml`, commit, then create the tables and the 13 November event:
 
    ```sh
-   npx wrangler d1 migrations apply amybo-rsvp --remote
-   npx wrangler d1 execute amybo-rsvp --remote --file seed/2026-11-13-london.sql
+   npx wrangler d1 migrations apply amybo-rsvp-eu --remote
+   npx wrangler d1 execute amybo-rsvp-eu --remote --file seed/2026-11-13-london.sql
    ```
 
 2. **Connect GitHub.** In the Cloudflare dashboard: Workers & Pages → Create → Pages → Connect to Git. When GitHub asks, install the Cloudflare Pages app on the **amy-bo** organisation and give it access to **only** the `website` repository. Choose `amy-bo/website`, production branch `main`, framework preset Astro, build command `npm run build`, output directory `dist`. Add the build variable `NODE_VERSION` = `22`. Pages reads the D1 binding and variables from `wrangler.toml`.
 
-3. **Turnstile.** Dashboard → Turnstile → Add widget for `amybo.org` (and `amybo.pages.dev` for previews), managed mode. Add the **site key** as the Pages build variable `PUBLIC_TURNSTILE_SITE_KEY` (the build fails without it, so a test key can never reach the live site), and the **secret key** as the secret `TURNSTILE_SECRET_KEY`.
+3. **Turnstile.** Dashboard → Turnstile → Add widget for `amybo.org` (and `amybo-4p1.pages.dev`, the project's own pages.dev address), managed mode. Add the **site key** as the Pages build variable `PUBLIC_TURNSTILE_SITE_KEY` (the build fails without it, so a test key can never reach the live site), and the **secret key** as the secret `TURNSTILE_SECRET_KEY`.
 
 4. **Resend.** In Resend, add the domain `amybo.org`. Resend shows a few DNS records (an MX and a TXT record on a `send` subdomain, and a DKIM TXT record). Add them in Cloudflare DNS with the proxy **off** (DNS only), then click Verify in Resend. These records sit on subdomains, so the existing Google mail for the domain keeps working. Create an API key with **sending access** only.
 
@@ -124,7 +142,7 @@ You need a Cloudflare account with the amybo.org zone (already there, since DNS 
 
    Never set `DEV_MODE` on Cloudflare.
 
-6. **Cloudflare Access for the admin page.** Zero Trust → Access → Applications → Add → Self-hosted. Add these destinations: `amybo.org/admin/*`, `amybo.org/api/admin/*`, `www.amybo.org/admin/*`, `www.amybo.org/api/admin/*`, `*.amybo.pages.dev/admin/*` and `*.amybo.pages.dev/api/admin/*`. Add a policy *Allow* for the admins' email addresses (one-time PIN login works without any extra setup). Save, then copy the application's **Audience (AUD) tag** into `ACCESS_AUD` in `wrangler.toml`, and your team domain (Zero Trust → Settings → Custom pages, e.g. `amybo.cloudflareaccess.com`) into `ACCESS_TEAM_DOMAIN`. Commit and push. The functions refuse admin requests without a valid Access token even if the Access policy is misconfigured.
+6. **Cloudflare Access for the admin page, with two-factor sign-in.** Zero Trust → Access → Applications → Add → Self-hosted. Add these destinations: `amybo.org/admin/*`, `amybo.org/api/admin/*`, `www.amybo.org/admin/*`, `www.amybo.org/api/admin/*`, `amybo-4p1.pages.dev/admin/*`, `amybo-4p1.pages.dev/api/admin/*`, `*.amybo-4p1.pages.dev/admin/*` and `*.amybo-4p1.pages.dev/api/admin/*`. Add a policy *Allow* for the admins' email addresses, and turn on **Require multi-factor authentication** for the policy (Access's own MFA: an authenticator app or security key), or use an identity provider that enforces MFA. The email one-time PIN alone is not a second factor, and the admin page refuses it: its error message names the methods the sign-in reported, which can be accepted with `ACCESS_MFA_METHODS` if Cloudflare reports them differently. Save, then copy the application's **Audience (AUD) tag** into `ACCESS_AUD` in `wrangler.toml`, and your team domain (Zero Trust → Settings → Custom pages, e.g. `amybo.cloudflareaccess.com`) into `ACCESS_TEAM_DOMAIN`. Commit and push. The functions refuse admin requests without a valid Access token even if the Access policy is misconfigured.
 
 7. **Cron Worker.** Deploy the scheduled-jobs Worker and give it the same secrets:
 
@@ -134,7 +152,7 @@ You need a Cloudflare account with the amybo.org zone (already there, since DNS 
    npx wrangler secret put RESEND_API_KEY --config workers/cron/wrangler.toml
    ```
 
-8. **Test on the preview URL** (`https://amybo.pages.dev`): register with your own email, confirm, change and cancel; open `/admin/rsvps/` and check it asks you to log in.
+8. **Test on the preview URL** (`https://amybo-4p1.pages.dev`): register with your own email, confirm, change and cancel; open `/admin/rsvps/` and check it asks you to log in.
 
 Local development of the functions: copy `.dev.vars.example` to `.dev.vars`, fill in `TOKEN_SECRET`, then `npm run build && npm run db:migrate:local && npm run pages:dev` and open http://localhost:8788. Emails, including calendar attachments, are printed to the console and stored in a local outbox instead of being sent.
 

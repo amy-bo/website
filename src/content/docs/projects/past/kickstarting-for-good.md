@@ -6,13 +6,13 @@ hugoPath: /docs/kickstartingforgood/
 sidebar:
   order: 9
   hidden: true
-provenance: "Moved from the old Docs section in the 2026 relaunch; text unchanged."
+provenance: "Moved from the old Docs section in the 2026 relaunch; text unchanged. The Vimeo embed gained Vimeo's do-not-track setting."
 ---
 
 ## Thank you
 For considering AMYBO for [Kickstarting for Good](https://provegincubator.com/kickstartingforgood/).  I've just recorded this bang up to date <9 minute introduction for you.  If the science bores you (starting 2m 55s in), feel free to skip to the finance section 7m 10s in:
 
-<iframe src="https://player.vimeo.com/video/950791780" title="Kickstarting for Good introduction" loading="lazy" allowfullscreen style="width:100%;aspect-ratio:16/9;border:0"></iframe>
+<iframe src="https://player.vimeo.com/video/950791780?dnt=1" title="Kickstarting for Good introduction" loading="lazy" allowfullscreen style="width:100%;aspect-ratio:16/9;border:0"></iframe>
 
 Forgive me for not fully customising the video for Kickstarting for Good.  I imagine you'd appreciate my making a fully recyclable video  as I thought we could do with a general-use pitch video...  If you'd like a fully customised version, lets arrange a time for a video call.
 

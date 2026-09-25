@@ -69,7 +69,7 @@ Totals: 10 amy, 17 new, 29 hugo.
 | [`/projects/past/experiments/electrolysis/`](/projects/past/experiments/electrolysis/) | Electrode optimisation | hugo | `/docs/experiments/electrolysis/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/past/experiments/hob-enrichment/`](/projects/past/experiments/hob-enrichment/) | HOB Enrichment | hugo | `/docs/experiments/hob-enrichment/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/past/experiments/spirulina-batch/`](/projects/past/experiments/spirulina-batch/) | Spirulina Batch | hugo | `/docs/experiments/spirulina-batch/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. Presentation: an absolute link to the old /docs/ URL made relative to its new page. |
-| [`/projects/past/kickstarting-for-good/`](/projects/past/kickstarting-for-good/) | Kickstarting for Good | hugo | `/docs/kickstartingforgood/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/kickstarting-for-good/`](/projects/past/kickstarting-for-good/) | Kickstarting for Good | hugo | `/docs/kickstartingforgood/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. The Vimeo embed gained Vimeo's do-not-track setting. |
 | [`/projects/pioflo/`](/projects/pioflo/) | PioFlo | hugo | `/docs/pioflo/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/pioflo/pioflo-v0-01/`](/projects/pioflo/pioflo-v0-01/) | Pioflo v0.01 | hugo | `/docs/pioflo/pioflo-v0.01/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 

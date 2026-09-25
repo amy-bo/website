@@ -6,7 +6,7 @@
  * tests mint their own Access JWTs with a throwaway RSA key.
  *
  * Configure with environment variables (defaults suit the amybo.org site):
- *   E2E_DB      D1 database name in wrangler.toml          (amybo-rsvp)
+ *   E2E_DB      D1 database name in wrangler.toml          (amybo-rsvp-eu)
  *   E2E_SEED    SQL file that creates the event under test  (seed/2026-11-13-london.sql)
  *   E2E_EVENT   event id                                    (2026-11-13-london)
  *   E2E_NOTIFY  NOTIFY_EMAIL configured in wrangler.toml    (hello@amybo.org)
@@ -20,7 +20,7 @@ import { existsSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 const PORT = 8788;
 const BASE = `http://127.0.0.1:${PORT}`;
 const PERSIST = '.wrangler/e2e-state';
-const DB = process.env.E2E_DB || 'amybo-rsvp';
+const DB = process.env.E2E_DB || 'amybo-rsvp-eu';
 const SEED = process.env.E2E_SEED || 'seed/2026-11-13-london.sql';
 const EVENT = process.env.E2E_EVENT || '2026-11-13-london';
 const NOTIFY = process.env.E2E_NOTIFY || 'hello@amybo.org';
@@ -229,11 +229,11 @@ try {
 	r = await register({ name: 'Alice again', email: alice });
 	check('duplicate returns the same generic success', r.status === 200 && r.data.ok);
 	m = await last(alice);
-	check('reminder confirms name, event, email and when registered, then the joining instructions', (await mailsTo(alice)).length === 3 && /already registered/.test(m.text_body) && /Name: Alice\. Email: alice@example\.org\. Registered: /.test(m.text_body) && /Draft schedule/.test(m.text_body));
+	check('reminder confirms name, event, email and when registered, then the joining instructions', (await mailsTo(alice)).length === 3 && /already registered/.test(m.text_body) && /Name: Alice\. Email: alice@example\.org\. Registered: /.test(m.text_body) && /Schedule \(UK time\)/.test(m.text_body));
 	check('reminder re-attaches the current calendar invitation (same sequence)', m.att.length === 1 && /SEQUENCE:0/.test(m.att[0].content));
 	await register({ name: 'Bob', email: bob });
 	m = await last(bob);
-	check('waitlisted duplicate gets a reminder of their status, no instructions or calendar', (await mailsTo(bob)).length === 3 && /already registered/.test(m.text_body) && /waiting list/.test(m.text_body) && !/Draft schedule/.test(m.text_body) && m.att.length === 0);
+	check('waitlisted duplicate gets a reminder of their status, no instructions or calendar', (await mailsTo(bob)).length === 3 && /already registered/.test(m.text_body) && /waiting list/.test(m.text_body) && !/Schedule \(UK time\)/.test(m.text_body) && m.att.length === 0);
 
 	console.log('\nRegistering again before confirming');
 	const frank = 'frank@example.org';

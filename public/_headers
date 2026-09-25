@@ -1,0 +1,19 @@
+# Security headers for every page and Function response served by Cloudflare Pages.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Cross-Origin-Opener-Policy: same-origin
+
+# Pages whose address carries a registration token: never send it on as a referrer, never cache.
+/events/confirm/*
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store
+/events/manage/*
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store
+/admin/*
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store
