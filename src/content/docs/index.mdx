@@ -17,7 +17,9 @@ footer: true
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 import { LinkButton, Aside } from "@astrojs/starlight/components";
+import { Image } from 'astro:assets';
 import YouTube from '../../components/YouTube.astro';
+import hobLoop from '../../assets/diagrams/hob-loop.svg';
 
 <Aside type="tip" title="AMYBO get-together, London – Friday 13 November 2026">
 Lab tours, talks and the pub at the Bezos Centre for Sustainable Protein, Imperial College White City. Free, in person or remote. [Find out more and register](/events/2026-11-13-london/).
@@ -38,7 +40,7 @@ Lab tours, talks and the pub at the Bezos Centre for Sustainable Protein, Imperi
         </div>
     </Card>
     <Card title="BUILD AN ELECTROPIOREACTOR" icon="setting">
-        Open designs, build guides and a Pioreactor plugin for growing hydrogen-oxidising bacteria with in-culture electrolysis. In use at Imperial College London and the University of Edinburgh.
+        Open designs, a build guide and a Pioreactor plugin for growing hydrogen-oxidising bacteria on hydrogen made right in the culture. In use at Imperial College London and the University of Edinburgh.
         <div class="card-actions">
             <LinkButton href="/projects/electropioreactor/" variant="primary">Designs, guides and code</LinkButton>
         </div>
@@ -53,7 +55,14 @@ Lab tours, talks and the pub at the Bezos Centre for Sustainable Protein, Imperi
 
 ## What AMYBO is
 
-AMYBO is a non-profit, open source community working out how people can grow their own nutritious, delicious and affordable protein. Our focus is hydrogen-oxidising bacteria: microbes that build protein from hydrogen, oxygen and carbon dioxide, which an electro-bioreactor can make from water and a gas cylinder. Everything we design, test and learn is published for anyone to use.
+AMYBO is a not-for-profit, open source community with one aim: that anyone, anywhere, should be able to grow their own nutritious, delicious and affordable protein. Our bet is on hydrogen-oxidising bacteria (HOB for short). Give them hydrogen, oxygen, carbon dioxide and a few salts and they make protein, and all four of those things can be produced on a benchtop from water, electricity and a SodaStream cylinder. No farmland, no feed crops, no sunlight.
+
+Companies are already doing this at industrial scale behind patents. We want to do it in the open, at a scale a university lab, a school or a keen amateur can afford, and to publish every design, protocol and result as we go.
+
+<figure class="photo">
+	<Image src={hobLoop} alt="Diagram: water plus electricity gives hydrogen and oxygen in the culture, carbon dioxide comes from a SodaStream cylinder, salts and ammonium come from the medium, and hydrogen-oxidising bacteria turn them into protein-rich biomass and water" width={900} />
+	<figcaption>What hydrogen-oxidising bacteria need, and what comes out. Our [electroPioreactor](/projects/electropioreactor/) makes the hydrogen and oxygen inside the culture, so there is never a cylinder of hydrogen in the room.</figcaption>
+</figure>
 
 <YouTube id="CfzGvK5tgiQ" title="New Year New Culture" />
 
@@ -61,33 +70,44 @@ AMYBO is a non-profit, open source community working out how people can grow the
 
 <CardGrid>
     <Card title="Aseptic electroPioreactor 0.2" icon="approve-check">
-        Kits for the second aseptic version shipped to Imperial College London and the University of Edinburgh in September 2026, under the CARMA Hub project. The build guide is being published step by step.
+        The second aseptic version. The first AEP 0.2 kits reached the University of Edinburgh in September 2026, with Imperial College London's to follow, under the CARMA Hub project. We are writing the build guide one step at a time, with a video for each step.
         <div class="card-actions">
             <LinkButton href="/projects/electropioreactor/aep/" variant="secondary">The AEP</LinkButton>
             <LinkButton href="/projects/carma-hub/" variant="minimal">CARMA Hub project</LinkButton>
         </div>
     </Card>
     <Card title="Get-together, 13 November 2026" icon="star">
-        A free day at Imperial's White City labs: tours of the electroPioreactors, talks, and the pub. Join in person or watch the talks online.
+        A free day at Imperial's White City labs: tours of the electroPioreactors, talks, and the pub afterwards. Come in person or watch the talks online.
         <div class="card-actions">
             <LinkButton href="/events/2026-11-13-london/" variant="secondary">Details and registration</LinkButton>
         </div>
     </Card>
     <Card title="The electroPioreactor plugin" icon="seti:config">
-        Runs electrolysis and CO₂ sparging from the Pioreactor web interface. Card bundles are making it simpler to install on a unit with no network.
+        Runs the electrolysis and the CO₂ sparging from the Pioreactor's own web page, and pauses both the electrolysis and the optical density readings while it sparges so bubbles don't spoil the numbers.
         <div class="card-actions">
             <LinkButton href="/projects/electropioreactor/#run-it-the-pioreactor-plugin" variant="secondary">The plugin</LinkButton>
         </div>
     </Card>
 </CardGrid>
 
+## On the forum
+
+Most of our thinking happens in public at [forum.amybo.org](https://forum.amybo.org/). A few threads to give you the flavour:
+
+- [Trial experiment on heterotrophic electrolysis](https://forum.amybo.org/t/trial-experiment-on-heterotrophic-electrolysis/163): first runs of the Aseptic electroPioreactor at Edinburgh.
+- [Current measurement experiment](https://forum.amybo.org/t/current-measurement-experiment/166): what the Pioreactor's LED channel actually does when you hang a pair of electrodes off it.
+- [Evaluating platinised electrodes for electrolysis](https://forum.amybo.org/t/evaluating-platinized-electrodes-for-electrolysis/71) and [alternative anode testing with graphite](https://forum.amybo.org/t/alternative-anode-testing-graphite/95).
+- [HOB culture medium ingredients](https://forum.amybo.org/t/hob-culture-medium-ingredients/53) and the [trace element solution](https://forum.amybo.org/t/trace-element-solution/56).
+- [CO₂ sparger drawback](https://forum.amybo.org/t/co2-sparger-drawback/52): the backflow problem that led to the venting solenoid.
+- [PioFlo.org: enabling affordable bioreactors at scale](https://forum.amybo.org/t/pioflo-org-enabling-affordable-bioreactors-at-scale/91).
+
 ## We need your help
 
 We need biotechnologists, chefs, coders, creatives, engineers, enthusiasts, environmentalists, makers, medics, microbiologists, nutritionists, others.
 
-- **Join the conversation** on the [forum](https://forum.amybo.org/), where experiments, questions and results are shared as they happen.
-- **Contribute** on [GitHub](https://github.com/amy-bo): every page of this site and every design in our repositories can be improved by pull request. See [how to contribute](/collaborate/contribute/).
-- **Follow along** on [YouTube](https://www.youtube.com/@AMYBO), or [get in touch](https://contact.andeye.com/?source=amybo.org&subject=Message%20from%20amybo.org&cb=Volunteering&cb=Running%20an%20experiment&cb=Building%20an%20electroPioreactor&cb=Funding%20or%20sponsorship&cb=Press%20or%20speaking&cb=Something%20else).
+- **Join the conversation** on the [forum](https://forum.amybo.org/). Questions are welcome, and so are results that didn't work.
+- **Build something** from our [GitHub](https://github.com/amy-bo). Every design and every page of this site can be improved with a pull request; see [how to contribute](/collaborate/contribute/).
+- **Follow along** on [YouTube](https://www.youtube.com/@AMYBO), or [drop us a line](https://contact.andeye.com/?source=amybo.org&subject=Message%20from%20amybo.org&cb=Volunteering&cb=Running%20an%20experiment&cb=Building%20an%20electroPioreactor&cb=Funding%20or%20sponsorship&cb=Press%20or%20speaking&cb=Something%20else). It's good to know people are reading this.
 
 ## Let's democratise food
 

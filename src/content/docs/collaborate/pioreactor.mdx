@@ -2,15 +2,21 @@
 title: Pioreactor
 description: The Pioreactor, the affordable open source bioreactor at the heart of AMYBO's research, and how we extend it.
 source: amy
-provenance: Title by Amy; her description rewritten for search results. Body is new launch text linking to migrated Hugo pages.
+provenance: Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch.
 ---
 
-The [Pioreactor](https://pioreactor.com) is an affordable, open source bioreactor built around a Raspberry Pi. It is our main community research tool.
+import { Image } from 'astro:assets';
+import pioreactors from '../projects/past/experiments/control-testing/pioreactors.jpg';
 
-We extend it for protein fermentation research:
+The [Pioreactor](https://pioreactor.com) is an affordable, open source bioreactor built around a Raspberry Pi. When we [surveyed the options in 2023](/projects/past/equipment/bioreactors/) it was the only one you could actually buy, it was clearly under active development, and its founder answered our questions. It has been our main research tool ever since, and most of what we've built is an extension of it.
 
-- The [electroPioreactor](/projects/electropioreactor/) adds electrolysis so hydrogen-oxidising bacteria can grow on hydrogen made in the vial. Its [plugin](https://github.com/amy-bo/pioreactor-electroPioreactor-plugin) runs it from the Pioreactor web interface.
-- [PioFlo](/projects/pioflo/) lets the Pioreactor software control flow-through fermenters of any size.
-- [OpenValve](/projects/other-hardware/openvalve/) is an affordable open source pinch valve.
+- The [electroPioreactor](/projects/electropioreactor/) adds electrolysis so hydrogen-oxidising bacteria can grow on hydrogen made in the vial. Its [plugin](https://github.com/amy-bo/electroPioreactor/tree/main/AEP-Plugin) runs it from the Pioreactor's own web interface.
+- [PioFlo](/projects/pioflo/) turns a Pioreactor into a flow-through cell, so its software can control a fermenter of any size.
+- [OpenValve](/projects/other-hardware/openvalve/) is an affordable open source pinch valve for the tubing.
 
-See also our notes on [bioreactors](/projects/past/equipment/bioreactors/) and the [experiments](/projects/past/experiments/) we have run.
+<figure class="photo">
+	<Image src={pioreactors} alt="Two Pioreactors standing side by side on a desk, each with a foil-covered vial, one connected to a Raspberry Pi 400 keyboard computer" width={900} widths={[480, 900]} sizes="(max-width: 50rem) 100vw, 45rem" />
+	<figcaption>Our first two Pioreactors in 2023, during the [control test](/projects/past/experiments/control-testing/). Photo: AMYBO, CC BY-SA 4.0.</figcaption>
+</figure>
+
+Our fixes to Pioreactor's software go back upstream through our [fork](https://github.com/amy-bo/pioreactor). Kits come from [LabCrafter](https://labcrafter.co.uk) in the UK and [Pioreactor](https://pioreactor.com) elsewhere. See also the [experiments](/projects/past/experiments/) we ran on the first units, including the [control test](/projects/past/experiments/control-testing/) to check that two Pioreactors agree with each other.

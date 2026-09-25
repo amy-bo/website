@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 380" width="900" height="380" role="img" aria-labelledby="t2 d2">
+  <title id="t2">What hydrogen-oxidising bacteria need</title>
+  <desc id="d2">Electricity splits water into hydrogen and oxygen inside the culture. Carbon dioxide is bubbled in from a cylinder. Salts and ammonium come from the growth medium. The bacteria turn these into protein-rich biomass, and the only other output is water.</desc>
+  <defs>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#175a00"/></marker>
+  </defs>
+  <style>
+    text { font-family: Arial, Helvetica, sans-serif; font-size: 16px; fill: #222; }
+    .h { font-weight: 700; fill: #175a00; font-size: 17px; }
+    .s { font-size: 13px; fill: #555; }
+    .box { fill: #e8f0e3; stroke: #175a00; stroke-width: 2; }
+    .a { stroke: #175a00; stroke-width: 3; fill: none; }
+  </style>
+  <rect x="30" y="40" width="230" height="86" rx="10" class="box"/>
+  <text x="145" y="70" text-anchor="middle" class="h">water + electricity</text>
+  <text x="145" y="94" text-anchor="middle">→ H₂ and O₂, made</text>
+  <text x="145" y="114" text-anchor="middle">right in the culture</text>
+
+  <rect x="30" y="150" width="230" height="70" rx="10" class="box"/>
+  <text x="145" y="180" text-anchor="middle" class="h">CO₂</text>
+  <text x="145" y="204" text-anchor="middle">from a SodaStream cylinder</text>
+
+  <rect x="30" y="244" width="230" height="86" rx="10" class="box"/>
+  <text x="145" y="274" text-anchor="middle" class="h">salts + ammonium</text>
+  <text x="145" y="298" text-anchor="middle">a chloride-free medium that</text>
+  <text x="145" y="318" text-anchor="middle">doubles as the electrolyte</text>
+
+  <path class="a" d="M260 83 H330" marker-end="url(#a2)"/>
+  <path class="a" d="M260 185 H330" marker-end="url(#a2)"/>
+  <path class="a" d="M260 287 H330" marker-end="url(#a2)"/>
+
+  <circle cx="450" cy="185" r="112" fill="#87BD25" opacity="0.25"/>
+  <circle cx="450" cy="185" r="90" fill="#87BD25" opacity="0.5"/>
+  <g fill="#175a00">
+    <rect x="410" y="150" width="34" height="14" rx="7" transform="rotate(-25 427 157)"/>
+    <rect x="455" y="140" width="38" height="14" rx="7" transform="rotate(20 474 147)"/>
+    <rect x="420" y="190" width="40" height="14" rx="7" transform="rotate(10 440 197)"/>
+    <rect x="465" y="205" width="34" height="14" rx="7" transform="rotate(-35 482 212)"/>
+  </g>
+  <text x="450" y="250" text-anchor="middle" class="h">hydrogen-oxidising</text>
+  <text x="450" y="270" text-anchor="middle" class="h">bacteria</text>
+
+  <path class="a" d="M565 160 H640" marker-end="url(#a2)"/>
+  <path class="a" d="M565 215 H640" marker-end="url(#a2)"/>
+  <rect x="640" y="118" width="230" height="86" rx="10" class="box"/>
+  <text x="755" y="150" text-anchor="middle" class="h">protein-rich biomass</text>
+  <text x="755" y="174" text-anchor="middle">roughly two thirds protein</text>
+  <text x="755" y="194" text-anchor="middle">by dry weight</text>
+  <rect x="640" y="222" width="230" height="56" rx="10" class="box"/>
+  <text x="755" y="246" text-anchor="middle" class="h">water</text>
+  <text x="755" y="266" text-anchor="middle">the other product</text>
+  <text x="450" y="366" text-anchor="middle" class="s">No farmland, no feed crops, no sunlight needed. AMYBO, CC BY-SA 4.0.</text>
+</svg>

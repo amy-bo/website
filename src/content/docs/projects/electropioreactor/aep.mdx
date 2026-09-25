@@ -1,7 +1,8 @@
 ---
 title: Aseptic electroPioreactor (AEP)
-description: The sealed, filtered electroPioreactor for single-strain research, developed with Imperial College London and the University of Edinburgh.
+description: The sealed, filtered electroPioreactor for single-strain research, built and tested with Imperial College London and the University of Edinburgh.
 source: new
+provenance: Written by Martin Currie with Claude for the 2026 relaunch, from the AsepticElectroPioreactor folder of the repository, including the November 2025 training write-up. Photos from the same repository.
 sidebar:
   order: 1
   label: Aseptic electroPioreactor
@@ -10,30 +11,59 @@ sidebar:
 import { LinkButton } from '@astrojs/starlight/components';
 import { Image } from 'astro:assets';
 import topStop from '../../../../assets/photos/electrode-top-stop.jpg';
+import anode1 from '../../../../assets/photos/anode-discoloured-aep01.jpg';
+import anodePt from '../../../../assets/photos/anode-platinised-titanium.jpg';
+import anodeSwab from '../../../../assets/photos/anode-swabbed.jpg';
 
-The Aseptic electroPioreactor keeps a defined culture defined: a sealed, parametric vial cap, 0.2 μm hydrophobic vent filters on the gas ports and luer-lock connections for feed and sampling, on top of the electrolysis and CO₂ sparging of every electroPioreactor. It is designed to be safe first, then accurate and repeatable, then automated, then good value.
+If you want to grow one particular strain of hydrogen-oxidising bacteria and be sure that what you're measuring is that strain, you need to keep everything else out. The Aseptic electroPioreactor is the [electroPioreactor](/projects/electropioreactor/) with that in mind: a sealed cap with a silicone septum that closes around each electrode and every port, 0.2 μm hydrophobic filters on the gas in and gas out, luer-lock connections for feeding and sampling, and parts that survive the autoclave.
+
+We designed it to be safe first, then accurate and repeatable, then automated, then good value, in that order. When two of those pull in different directions, the earlier one wins.
 
 <div class="card-actions">
 	<LinkButton href="https://github.com/amy-bo/electroPioreactor/tree/main/AsepticElectroPioreactor" variant="primary" icon="github">AEP on GitHub</LinkButton>
 	<LinkButton href="https://docs.electropioreactor.org/AEP" variant="secondary">AEP 0.2 build guide</LinkButton>
 </div>
 
-<figure class="photo">
-	<Image src={topStop} alt="A 3D-printed grey block with two screws, holding a pair of stainless electrodes with a red and a black wire, held in a hand over a cutting mat" width={900} widths={[480, 900]} sizes="(max-width: 50rem) 100vw, 45rem" />
-	<figcaption>The electrode top stop, added after the November 2025 training, holding an electrode pair. Photo: AMYBO, CC BY-SA 4.0.</figcaption>
-</figure>
-
 ## Versions
 
-- **AEP 0.1 and 0.1.1** (2025): six units built; Imperial and Edinburgh students trained on them at the University of Edinburgh on 18 to 21 November 2025. [Assembly instructions](https://github.com/amy-bo/electroPioreactor/blob/main/AsepticElectroPioreactor/CARMA_PumpPriming/Assembly/README.md).
-- **AEP 0.2** (2026): revised vial cap, GL45 media bottles and card bundles for installing the plugin offline (the card route needs a Pioreactor OS release with boot-partition plugin support; until then, use SSH). Kits shipped to both universities in September 2026. The step-by-step guide, with video and drawings for each step, is being published at [docs.electropioreactor.org/AEP](https://docs.electropioreactor.org/AEP) using [Docs&I](https://github.com/andeyePro/docsandeye).
+- **AEP 0.1 and 0.1.1** (2025). Six units built. Three of them were assembled by the students themselves at the [joint training](https://github.com/amy-bo/electroPioreactor/blob/main/AsepticElectroPioreactor/CARMA_PumpPriming/Results/AEP0.1%20Training/README.md) at the University of Edinburgh on 18 to 21 November 2025, one each, following the [assembly instructions](https://github.com/amy-bo/electroPioreactor/blob/main/AsepticElectroPioreactor/CARMA_PumpPriming/Assembly/README.md). The 0.1.1 changes came out of what we learned that week.
+- **AEP 0.2** (2026). A redesigned cap (septum instead of O-rings, and a proper clamp for the electrodes), GL45 media bottles instead of centrifuge tubes, mixed metal oxide anodes, and card bundles so the plugin can be installed on a unit that never sees the internet. The first kits reached Edinburgh in September 2026. The step-by-step guide, with a video and a drawing for each step, is going up at [docs.electropioreactor.org/AEP](https://docs.electropioreactor.org/AEP) as we make it.
+
+<figure class="photo">
+	<Image src={topStop} alt="A 3D-printed grey block with two screws, holding a pair of stainless electrodes with a red and a black wire, held in a hand over a cutting mat" width={900} widths={[480, 900]} sizes="(max-width: 50rem) 100vw, 45rem" />
+	<figcaption>The electrode top stop, added after the November 2025 training, holding an electrode pair. In AEP 0.2 it is part of the [parametric cap](https://github.com/amy-bo/electroPioreactor/tree/main/Components/Vial%20Cap). Photo: AMYBO, CC BY-SA 4.0.</figcaption>
+</figure>
+
+## What we learned from the first runs
+
+Honest results are the point of doing this in the open, so here is the November 2025 training week as it happened. Three students each built an AEP 0.1. The software set-up then ate most of a day because none of us could SSH into the units; it turned out to be a [bug in the Raspberry Pi Imager](https://github.com/raspberrypi/rpi-imager/issues/1170), which Cam at Pioreactor tracked down, and an older Imager fixed it. A heterotrophic culture of *Cupriavidus metallidurans* grew happily on gluconate. The first attempt at autotrophic growth, on hydrogen from the electrodes and CO₂ from the cylinder alone, did not. The write-up lists the suspects: the medium, too high a voltage, temperature control, whether the CO₂ sparging was actually clearing the oxygen, and the anodes discolouring.
+
+That list is what the plugin and AEP 0.2 were built to work through: intermittent sparging with the electrolysis paused, current limited rather than voltage set, and one variable at a time.
+
+<div class="photo-row">
+	<figure class="photo">
+		<Image src={anode1} alt="Close-up of a metal electrode rod with a shimmering band of gold, pink and green colours across its surface" width={600} widths={[400, 600]} sizes="(max-width: 50rem) 100vw, 20rem" />
+		<figcaption>An anode after a run: the discolouration everyone noticed.</figcaption>
+	</figure>
+	<figure class="photo">
+		<Image src={anodePt} alt="Macro photo of a platinised titanium rod with a rough grey coating and a patch where the coating has worn through" width={600} widths={[400, 600]} sizes="(max-width: 50rem) 100vw, 20rem" />
+		<figcaption>The platinised titanium anode we started with. AEP 0.2 moves to mixed metal oxide.</figcaption>
+	</figure>
+	<figure class="photo">
+		<Image src={anodeSwab} alt="Macro photo of a discoloured electrode rod with a smear where it has been wiped, showing brighter metal underneath" width={600} widths={[400, 600]} sizes="(max-width: 50rem) 100vw, 20rem" />
+		<figcaption>Swabbed: some of it wipes off. It looks like mineral scale rather than corrosion, but we're still checking.</figcaption>
+	</figure>
+</div>
+
+<p class="photo-credit">Photos: AMYBO, CC BY-SA 4.0. All of them, and more, are in the <a href="https://github.com/amy-bo/electroPioreactor/tree/main/AsepticElectroPioreactor/CARMA_PumpPriming/Results/Anode%20discolouration">results folder</a>.</p>
 
 ## In the repository
 
 - [Overview, design criteria and directory](https://github.com/amy-bo/electroPioreactor/tree/main/AsepticElectroPioreactor)
-- [Results](https://github.com/amy-bo/electroPioreactor/tree/main/AsepticElectroPioreactor/CARMA_PumpPriming/Results): AEP 0.1 training, anode discolouration, continuous versus intermittent CO₂ sparging
+- [Results](https://github.com/amy-bo/electroPioreactor/tree/main/AsepticElectroPioreactor/CARMA_PumpPriming/Results): the training write-up, the anode photos, and [continuous versus intermittent CO₂ sparging](https://github.com/amy-bo/electroPioreactor/blob/main/AsepticElectroPioreactor/CARMA_PumpPriming/Results/Gas%20sparging/Continuous%20or%20Intermittent%20CO2%20sparging.md)
 - [Meeting notes](https://github.com/amy-bo/electroPioreactor/blob/main/AsepticElectroPioreactor/CARMA_PumpPriming/Meetings.md) of the CARMA Hub project
-- [Components and bill of materials](https://github.com/amy-bo/electroPioreactor/tree/main/Components), including the [vial cap](https://github.com/amy-bo/electroPioreactor/tree/main/Components/Vial%20Cap) OpenSCAD source
+- [Components and bill of materials](https://github.com/amy-bo/electroPioreactor/tree/main/Components), including the [vial cap](https://github.com/amy-bo/electroPioreactor/tree/main/Components/Vial%20Cap) OpenSCAD source and the [GL45 bottle holder](https://github.com/amy-bo/electroPioreactor/tree/main/Components/GL45BottleHolder)
 - [The plugin](/projects/electropioreactor/#run-it-the-pioreactor-plugin) that runs it from the Pioreactor web interface
+- Edinburgh's first runs, written up on the forum: [trial experiment on heterotrophic electrolysis](https://forum.amybo.org/t/trial-experiment-on-heterotrophic-electrolysis/163)
 
-The AEP is the subject of the [CARMA Hub project](/projects/carma-hub/). Kits and parts come from [LabCrafter](https://labcrafter.co.uk) in the UK and [Pioreactor](https://pioreactor.com) elsewhere.
+The AEP is the subject of the [CARMA Hub project](/projects/carma-hub/). Kits and parts come from [LabCrafter](https://labcrafter.co.uk) in the UK and [Pioreactor](https://pioreactor.com) elsewhere. Come and see them running at the [get-together on 13 November](/events/2026-11-13-london/).

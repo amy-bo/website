@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" width="900" height="600" role="img" aria-labelledby="t d">
+  <title id="t">How an electroPioreactor works</title>
+  <desc id="d">A Pioreactor with a 20 ml vial. Two electrodes through the cap make hydrogen and oxygen in the medium. Carbon dioxide from a SodaStream cylinder passes through a regulator and a venting solenoid into the bottom of the vial. A vent filter lets gas out. The Pioreactor measures optical density from the side and stirs from below.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#333"/></marker>
+    <marker id="arrowg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#175a00"/></marker>
+  </defs>
+  <style>
+    text { font-family: Arial, Helvetica, sans-serif; font-size: 15px; fill: #222; }
+    .h { font-size: 17px; font-weight: 700; fill: #175a00; }
+    .s { font-size: 13px; fill: #555; }
+    .w { stroke: #333; stroke-width: 2; fill: none; }
+    .g { stroke: #175a00; stroke-width: 3; fill: none; }
+  </style>
+
+  <!-- CO2 train on the left -->
+  <rect x="60" y="250" width="70" height="230" rx="18" fill="#3a6fb0"/>
+  <rect x="78" y="228" width="34" height="30" rx="6" fill="#2b4f7d"/>
+  <text x="95" y="380" text-anchor="middle" style="fill:#fff" font-weight="700" transform="rotate(-90 95 380)">SodaStream CO₂</text>
+  <rect x="150" y="238" width="86" height="46" rx="6" fill="#e8f0e3" stroke="#175a00" stroke-width="2"/>
+  <text x="193" y="258" text-anchor="middle">regulator</text>
+  <text x="193" y="276" text-anchor="middle" class="s">1 to 2 bar</text>
+  <rect x="150" y="318" width="86" height="46" rx="6" fill="#e8f0e3" stroke="#175a00" stroke-width="2"/>
+  <text x="193" y="338" text-anchor="middle">3/2 venting</text>
+  <text x="193" y="356" text-anchor="middle">solenoid</text>
+  <path class="g" d="M95 250 V244 H150"/>
+  <path class="g" d="M193 284 V318"/>
+  <path class="g" d="M236 341 H300 V200 H392 V440" />
+  <path class="w" d="M170 364 V394" marker-end="url(#arrow)"/>
+  <text x="170" y="412" class="s" text-anchor="middle">vents to air</text>
+  <text x="300" y="192" class="s" text-anchor="middle">CO₂ sparge line</text>
+
+  <!-- Pioreactor body -->
+  <rect x="300" y="450" width="320" height="110" rx="12" fill="#1f1f1f"/>
+  <text x="460" y="520" text-anchor="middle" style="fill:#fff" font-weight="700">Pioreactor</text>
+  <text x="460" y="542" text-anchor="middle" style="fill:#ccc" class="s">stirring, heating, OD sensing, Raspberry Pi</text>
+  <rect x="440" y="436" width="40" height="8" rx="3" fill="#888"/>
+  <path class="w" d="M596 468 L484 442" marker-end="url(#arrow)"/>
+  <text x="602" y="474" class="s">stir bar</text>
+
+  <!-- Vial -->
+  <path d="M385 160 V430 a20 20 0 0 0 20 20 h110 a20 20 0 0 0 20 -20 V160" fill="#dff1fb" stroke="#4a7fa3" stroke-width="3"/>
+  <rect x="386" y="160" width="148" height="80" fill="#f4fbfe"/>
+  <line x1="386" y1="240" x2="534" y2="240" stroke="#8ec0dc" stroke-width="2" stroke-dasharray="6 5"/>
+  <text x="545" y="245" class="s">liquid level (medium)</text>
+
+  <!-- Cap -->
+  <rect x="372" y="128" width="176" height="40" rx="6" fill="#6c6c6c"/>
+  <rect x="380" y="118" width="160" height="14" rx="4" fill="#87BD25"/>
+  <text x="660" y="130" class="h">3D-printed cap</text>
+  <text x="660" y="150" class="s">silicone septum seals the vial mouth,</text>
+  <text x="660" y="166" class="s">the electrodes and every port</text>
+  <path class="w" d="M655 138 H552" marker-end="url(#arrow)"/>
+
+  <!-- Vent filter -->
+  <rect x="505" y="84" width="34" height="34" rx="6" fill="#fff" stroke="#333" stroke-width="2"/>
+  <line x1="522" y1="84" x2="522" y2="60" class="w"/>
+  <path class="w" d="M522 62 H560" marker-end="url(#arrow)"/>
+  <text x="570" y="66">exhaust through a 0.2 μm vent filter</text>
+
+  <!-- Feed / sample port -->
+  <rect x="412" y="98" width="16" height="22" rx="3" fill="#fff" stroke="#333" stroke-width="2"/>
+  <text x="420" y="90" text-anchor="middle" class="s">luer ports: feed, sample</text>
+
+  <!-- Electrodes -->
+  <line x1="470" y1="132" x2="470" y2="400" stroke="#8a5a1e" stroke-width="7" stroke-linecap="round"/>
+  <line x1="500" y1="132" x2="500" y2="400" stroke="#9a9a9a" stroke-width="7" stroke-linecap="round"/>
+  <!-- bubbles -->
+  <g fill="#fff" stroke="#4a7fa3" stroke-width="1.5">
+    <circle cx="462" cy="300" r="4"/><circle cx="478" cy="330" r="3"/><circle cx="463" cy="360" r="5"/><circle cx="479" cy="385" r="3"/>
+    <circle cx="508" cy="290" r="3"/><circle cx="492" cy="320" r="4"/><circle cx="509" cy="350" r="3"/><circle cx="493" cy="380" r="4"/>
+    <circle cx="398" cy="420" r="4"/><circle cx="406" cy="400" r="3"/><circle cx="396" cy="378" r="5"/><circle cx="408" cy="352" r="3"/><circle cx="399" cy="325" r="4"/>
+  </g>
+  <text x="660" y="300" class="h">anode (+)</text>
+  <text x="660" y="318" class="s">iridium-tantalum oxide on titanium,</text>
+  <text x="660" y="334" class="s">making O₂</text>
+  <path class="w" d="M655 306 H478" marker-end="url(#arrow)"/>
+  <text x="660" y="375" class="h">cathode (−)</text>
+  <text x="660" y="393" class="s">stainless steel, making H₂</text>
+  <path class="w" d="M655 381 H508" marker-end="url(#arrow)"/>
+  <text x="660" y="430" class="h">CO₂ bubbles</text>
+  <text x="660" y="448" class="s">carbon for the bacteria, and they</text>
+  <text x="660" y="464" class="s">carry away the surplus O₂</text>
+  <path class="w" d="M655 436 H560 V412 H412" marker-end="url(#arrow)"/>
+
+  <!-- OD sensing -->
+  <path class="w" d="M336 300 H378" marker-end="url(#arrow)"/>
+  <text x="330" y="296" text-anchor="end" class="s">IR light in</text>
+  <path class="w" d="M384 340 L340 382" marker-end="url(#arrow)"/>
+  <text x="330" y="398" text-anchor="end" class="s">scattered light out,</text>
+  <text x="330" y="414" text-anchor="end" class="s">read as optical density</text>
+
+  <!-- power -->
+  <path class="w" d="M300 500 H240 V150 H372" marker-end="url(#arrow)"/>
+  <text x="228" y="140" text-anchor="end" class="s">constant current from an</text>
+  <text x="228" y="156" text-anchor="end" class="s">LED channel on the Pioreactor</text>
+
+  <text x="450" y="588" text-anchor="middle" class="s">Not to scale. AMYBO, CC BY-SA 4.0.</text>
+</svg>

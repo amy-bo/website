@@ -19,7 +19,7 @@ Totals: 10 amy, 17 new, 29 hugo.
 | [`/`](/) | SUSTAINABLE PROTEIN FOR ALL | amy | `/` | Hero, tagline and the first three cards by Amy (her one-line description rewritten for search results) (forest photo by Ozark Drones on Unsplash). The event banner, the electroPioreactor card and the 'What we are doing now' section are new. Below that, 'We need your help' and 'Let's democratise food' are the Hugo homepage's words; its 2023 lines about fortnightly videos and editable pages were rewritten. |
 | [`/404/`](/404/) | Page not found | new | – |  |
 | [`/about/`](/about/) | About AMYBO | hugo | `/about/` | Verbatim from Hugo, except the 'Get involved' heading added so headings nest, and the paragraph about the Docsy porridge photo removed (the photo is not used on this site). |
-| [`/background/`](/background/) | Background | new | – |  |
+| [`/background/`](/background/) | Background | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
 | [`/background/overview/`](/background/overview/) | Overview (2023) | hugo | `/docs/overview/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/background/plan-2023/`](/background/plan-2023/) | Next steps (2023 plan) | hugo | `/docs/overview/plan/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/background/proteins/`](/background/proteins/) | Proteins | hugo | `/docs/proteins/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. Presentation: the 'closed source' note promoted from h3 to h2 so headings nest, and three absolute links to the old /docs/ URLs made relative to their new pages. |
@@ -28,34 +28,34 @@ Totals: 10 amy, 17 new, 29 hugo.
 | [`/background/proteins/single-cell-protein/`](/background/proteins/single-cell-protein/) | Single-Cell Protein | hugo | `/docs/proteins/single-cell-protein/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/collaborate/brand/`](/collaborate/brand/) | Our name & Logo | hugo | `/docs/contribution-guidelines/brand/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/collaborate/contribute/`](/collaborate/contribute/) | Contribute to this site | hugo | `/docs/contribution-guidelines/` | 'Reach out to us' and 'Editing AMYBO.org' are verbatim from Hugo (email addresses replaced by the contact form). 'Web stack' onwards is new, replacing the Hugo, Docsy and Netlify instructions for the Astro site. Moved from the old Docs section in the 2026 relaunch. |
-| [`/collaborate/fund_us/`](/collaborate/fund_us/) | Fund us | amy | – | Title by Amy; her description rewritten for search results. Body is new launch text. |
-| [`/collaborate/pioreactor/`](/collaborate/pioreactor/) | Pioreactor | amy | – | Title by Amy; her description rewritten for search results. Body is new launch text linking to migrated Hugo pages. |
+| [`/collaborate/fund_us/`](/collaborate/fund_us/) | Fund us | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch. |
+| [`/collaborate/pioreactor/`](/collaborate/pioreactor/) | Pioreactor | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch. |
 | [`/collaborate/safety-and-legal/`](/collaborate/safety-and-legal/) | Safety and legal | hugo | `/docs/legal/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/collaborate/safety-and-legal/disclaimer/`](/collaborate/safety-and-legal/disclaimer/) | Disclaimer | hugo | `/docs/legal/disclaimer/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/collaborate/safety-and-legal/risk-management/`](/collaborate/safety-and-legal/risk-management/) | Risk management | hugo | `/docs/risk-assessments/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/collaborate/volunteer/`](/collaborate/volunteer/) | Get involved | amy | – | Title by Amy; her description rewritten for search results. Body is new launch text; the list of skills is from the Hugo homepage. |
-| [`/contact/`](/contact/) | Contact AMYBO | amy | – | Title by Amy (capitalised as AMYBO); her description rewritten for search results. Body is new launch text; the legal details are new, from Companies House. |
-| [`/events/`](/events/) | Events | new | – |  |
+| [`/collaborate/volunteer/`](/collaborate/volunteer/) | Get involved | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch; the list of skills is from the Hugo homepage. |
+| [`/contact/`](/contact/) | Contact AMYBO | amy | – | Title by Amy (capitalised as AMYBO); her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch; the legal details are from Companies House. |
+| [`/events/`](/events/) | Events | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
 | [`/events/2026-11-13-london/`](/events/2026-11-13-london/) | AMYBO get-together, London – Friday 13 November 2026 | new | – |  |
 | [`/events/confirm/`](/events/confirm/) | Complete your registration | new | – |  |
 | [`/events/manage/`](/events/manage/) | Manage your registration | new | – |  |
-| [`/experiments/community_experiments/`](/experiments/community_experiments/) | Community Experiments | amy | – | Title by Amy; her description rewritten for search results. Body is new launch text linking to the migrated Hugo experiment pages. |
-| [`/experiments/hardware/`](/experiments/hardware/) | Hardware | amy | – | Title by Amy; her description rewritten for search results. Body is new launch text linking to migrated Hugo pages. |
-| [`/experiments/protocols/`](/experiments/protocols/) | Experimental protocols | amy | – | Title corrected from Amy's 'Experiments Protocols'; her description rewritten for search results. Body is new launch text linking to migrated Hugo pages. |
-| [`/experiments/submit/`](/experiments/submit/) | Submit an Experiment | amy | – | Title by Amy; her description rewritten for search results. Body is new launch text. |
-| [`/mission/`](/mission/) | Why AMYBO | amy | – | Title by Amy (capitalised as AMYBO); her description rewritten for search results. Body is new launch text drawing on the Hugo Overview and About pages, which are linked. |
+| [`/experiments/community_experiments/`](/experiments/community_experiments/) | Community Experiments | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch, linking the migrated Hugo experiment pages. |
+| [`/experiments/hardware/`](/experiments/hardware/) | Hardware | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch, linking the migrated Hugo pages. |
+| [`/experiments/protocols/`](/experiments/protocols/) | Experimental protocols | amy | – | Title corrected from Amy's 'Experiments Protocols'; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch. |
+| [`/experiments/submit/`](/experiments/submit/) | Submit an Experiment | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch. |
+| [`/mission/`](/mission/) | Why AMYBO | amy | – | Title by Amy (capitalised as AMYBO). Body written by Martin Currie with Claude for the 2026 relaunch, drawing on the Hugo Overview and About pages. |
 | [`/privacy/`](/privacy/) | Privacy notice | new | – |  |
-| [`/projects/`](/projects/) | Projects | new | – |  |
-| [`/projects/carma-hub/`](/projects/carma-hub/) | CARMA Hub project | new | – |  |
-| [`/projects/electropioreactor/`](/projects/electropioreactor/) | electroPioreactor | new | – |  |
-| [`/projects/electropioreactor/aep/`](/projects/electropioreactor/aep/) | Aseptic electroPioreactor (AEP) | new | – |  |
-| [`/projects/electropioreactor/mep/`](/projects/electropioreactor/mep/) | Mixed-culture electroPioreactor (MEP) | new | – |  |
-| [`/projects/literature/`](/projects/literature/) | Literature | new | – |  |
-| [`/projects/media/`](/projects/media/) | Growth medium | new | – |  |
-| [`/projects/methods/`](/projects/methods/) | Methods | new | – |  |
-| [`/projects/other-hardware/`](/projects/other-hardware/) | Other hardware | new | – |  |
+| [`/projects/`](/projects/) | Projects | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
+| [`/projects/carma-hub/`](/projects/carma-hub/) | CARMA Hub project | new | – | Written by Martin Currie with Claude for the 2026 relaunch, from the repository's AsepticElectroPioreactor README and results. |
+| [`/projects/electropioreactor/`](/projects/electropioreactor/) | electroPioreactor | new | – | Written by Martin Currie with Claude for the 2026 relaunch, from the electroPioreactor repository and the forum. The diagram was drawn for this page. |
+| [`/projects/electropioreactor/aep/`](/projects/electropioreactor/aep/) | Aseptic electroPioreactor (AEP) | new | – | Written by Martin Currie with Claude for the 2026 relaunch, from the AsepticElectroPioreactor folder of the repository, including the November 2025 training write-up. Photos from the same repository. |
+| [`/projects/electropioreactor/mep/`](/projects/electropioreactor/mep/) | Mixed-culture electroPioreactor (MEP) | new | – | Written by Martin Currie with Claude for the 2026 relaunch, from the MixedElectroPioreactor folder of the repository. |
+| [`/projects/literature/`](/projects/literature/) | Literature | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
+| [`/projects/media/`](/projects/media/) | Growth medium | new | – | Written by Martin Currie with Claude for the 2026 relaunch, from the repository's Media folder. |
+| [`/projects/methods/`](/projects/methods/) | Methods | new | – | Written by Martin Currie with Claude for the 2026 relaunch, from the repository's Methodologies folder. |
+| [`/projects/other-hardware/`](/projects/other-hardware/) | Other hardware | new | – | Written by Martin Currie with Claude for the 2026 relaunch, from the repository's Components and PastResearch folders. |
 | [`/projects/other-hardware/openvalve/`](/projects/other-hardware/openvalve/) | OpenValve | hugo | `/docs/openvalve/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/projects/past/`](/projects/past/) | Past projects and early notes | new | – |  |
+| [`/projects/past/`](/projects/past/) | Past projects and early notes | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
 | [`/projects/past/electropioreactor-2024/`](/projects/past/electropioreactor-2024/) | electroPioreactor (2024 notes) | hugo | `/docs/electropioreactor/` | Verbatim from Hugo, plus a note at the top pointing to the current project page. Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/past/electropioreactor-v0-02/`](/projects/past/electropioreactor-v0-02/) | electroPioreactor v0.02 (2024) | hugo | `/docs/electropioreactor/electropioreactor-v0.02/` | Title had a stray '.md' on the Hugo site; corrected. Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/past/equipment/`](/projects/past/equipment/) | Equipment notes (2023) | hugo | `/docs/equipment/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
