@@ -14,6 +14,8 @@ export const apiMiddleware = async (ctx: Ctx) => {
 		// Browsers also say where a request came from; anything but this site (or no browser at all) is refused.
 		const site = ctx.request.headers.get('sec-fetch-site');
 		if (site && site !== 'same-origin' && site !== 'none') return bad('Cross-site request refused', 403);
+		// Every browser sends at least one of the two on a write; a request with neither did not come from the admin page.
+		if (!origin && !site) return bad('Admin changes must come from the admin page', 403);
 		const hasBody = ctx.request.method !== 'DELETE' || ctx.request.headers.has('content-length');
 		if (hasBody && (ctx.request.headers.get('content-type') ?? '').split(';')[0].trim() !== 'application/json') return bad('Admin changes must be sent as JSON', 415);
 	}

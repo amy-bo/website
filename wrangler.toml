@@ -14,6 +14,8 @@ EVENTSANDEYE_URL = "https://github.com/andeyePro/eventsandeye"
 # Cloudflare Access application for /admin/* and /api/admin/* (see README):
 ACCESS_TEAM_DOMAIN = "REPLACE_WITH_TEAM.cloudflareaccess.com"
 ACCESS_AUD = "REPLACE_WITH_ACCESS_APPLICATION_AUD_TAG"
+# Only these Access identities may use the admin page, whatever the Access policy says (comma-separated).
+ADMIN_EMAILS = "hello@amybo.org"
 
 [[d1_databases]]
 binding = "DB"

@@ -6,8 +6,10 @@
 #           deploy waits for a two-factor-authenticated approval), installs without running package scripts, and only
 #           then uses the Cloudflare token, scoped to the steps that need it.
 #
-# Only the Pages project's production branch touches the live database and the cron Worker; any other branch gets a
-# preview deployment of the static site. Pushing to main makes main the production branch (the one-way switch at merge).
+# Only the Pages project's production branch touches the live database and the cron Worker, and only it deploys the
+# Functions. Any other branch gets a preview of the static pages alone, deployed from an empty directory so that neither
+# ./functions nor wrangler.toml (with its database binding) comes along. Pushing to main makes main the production branch
+# (the one-way switch at merge).
 #
 # Needs GitHub Actions secret values for the API token, the account id, TOKEN_SECRET, the Resend key and the Turnstile
 # secret key, and variables PUBLIC_TURNSTILE_SITE_KEY (required), SITE_URL, ACCESS_TEAM_DOMAIN and ACCESS_AUD (optional).
@@ -118,7 +120,8 @@ jobs:
           ACCESS_TEAM_DOMAIN: ${{ vars.ACCESS_TEAM_DOMAIN }}
           ACCESS_AUD: ${{ vars.ACCESS_AUD }}
 
-      - name: Create the EU D1 database if it does not exist, and put its id in the configs
+      - name: Create the EU D1 database if it does not exist, and put its id in the configs (production only)
+        if: steps.prod.outputs.is_prod == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -155,11 +158,23 @@ jobs:
             v="V_$n"; printf '%s' "${!v}" | npx wrangler pages secret put "$n" --project-name "$PROJECT"
           done
 
-      - name: Deploy the site and its Functions
+      - name: Deploy the site and its Functions (production)
+        if: steps.prod.outputs.is_prod == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler pages deploy dist --project-name "$PROJECT" --branch "$GITHUB_REF_NAME" --commit-dirty=true
+
+      - name: Deploy a static preview, without Functions or bindings (other branches)
+        if: steps.prod.outputs.is_prod != 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          empty=$(mktemp -d)
+          cp -r dist "$empty/dist"
+          cd "$empty"
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" pages deploy dist --project-name "$PROJECT" --branch "$GITHUB_REF_NAME" --commit-dirty=true
 
       - name: Deploy the cron Worker and its secrets (production only)
         if: steps.prod.outputs.is_prod == 'true'

@@ -58,7 +58,9 @@ export function parseLatest(data, limit = 6) {
 	const out = [];
 	for (const t of topics) {
 		if (!t || typeof t !== 'object') continue;
-		if (t.pinned === true || t.archived === true || t.visible === false) continue;
+		// Only open, listed topics. Titles are public forum content, rendered as escaped text by Astro and never as HTML.
+		if (t.pinned === true || t.archived === true || t.visible === false || t.closed === true || t.unlisted === true) continue;
+		if (typeof t.title === 'string' && t.title.length > 200) continue;
 		const id = Number(t.id);
 		const title = typeof t.title === 'string' ? t.title.trim() : '';
 		const slug = typeof t.slug === 'string' ? t.slug : '';

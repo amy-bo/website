@@ -85,7 +85,7 @@ The 13 November 2026 get-together page is `src/content/docs/events/2026-11-13-lo
 - **build** has no secrets at all: it installs, builds the site and hands it on as an artifact.
 - **deploy** runs in the `production` GitHub Environment and installs without running package scripts before it touches the Cloudflare token. It creates the D1 database in the **EU jurisdiction** if it is missing (`amybo-rsvp-eu`), applies the migrations and the insert-only seed, sets the secrets, deploys the site with its Functions and deploys the cron Worker.
 
-Only the Pages project's production branch touches the live database and the cron Worker; other branches get a preview of the static site. The first push to `main` makes `main` the production branch, so merging the launch PR hands production over automatically.
+Only the Pages project's production branch touches the live database and the cron Worker, and only it deploys the registration Functions. Other branches get a preview of the static pages alone, with no Functions and no database binding, so preview code can never reach live registrations. The first push to `main` makes `main` the production branch, so merging the launch PR hands production over automatically.
 
 One-off set-up:
 

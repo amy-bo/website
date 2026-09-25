@@ -14,7 +14,7 @@
  * The seed must define a 'tour' choice group with at least two sessions, and hybrid core sessions.
  */
 import { spawn, execFileSync } from 'node:child_process';
-import { generateKeyPairSync, sign, randomUUID, randomBytes } from 'node:crypto';
+import { generateKeyPairSync, sign, randomUUID, randomBytes, createHmac } from 'node:crypto';
 import { existsSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 
 const PORT = 8788;
@@ -36,24 +36,28 @@ const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 20
 const { privateKey: otherKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const jwk = { ...publicKey.export({ format: 'jwk' }), kid: 'e2e', alg: 'RS256' };
 const devVarsBackup = existsSync('.dev.vars') ? readFileSync('.dev.vars', 'utf8') : null;
+const TOKEN_SECRET = randomBytes(32).toString('hex');
 writeFileSync('.dev.vars', [
 	'DEV_MODE=true',
 	`SITE_URL=${BASE}`,
-	`TOKEN_SECRET=${randomBytes(32).toString('hex')}`,
+	`TOKEN_SECRET=${TOKEN_SECRET}`,
 	'TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA',
 	'ACCESS_AUD=e2e-aud',
 	'ACCESS_TEAM_DOMAIN=e2e.cloudflareaccess.com',
+	'ADMIN_EMAILS=admin@example.org',
 	`ACCESS_JWKS_JSON=${JSON.stringify({ keys: [jwk] })}`,
 	'',
 ].join('\n'));
 
+/** A link token as the server makes it, with a chosen expiry (unix seconds), to test that expired links are refused. */
+const tokenWithExpiry = (purpose, id, expS) => { const exp = expS.toString(36); return `${id}.${exp}.${createHmac('sha256', TOKEN_SECRET).update(`${purpose}:${id}:${exp}`).digest('base64url')}`; };
 const b64u = (b) => Buffer.from(b).toString('base64url');
-function jwt({ key = privateKey, kid = 'e2e', aud = 'e2e-aud', exp = Math.floor(Date.now() / 1000) + 600, email = 'admin@example.org', amr = ['pwd', 'mfa'] } = {}) {
+function jwt({ key = privateKey, kid = 'e2e', aud = 'e2e-aud', exp = Math.floor(Date.now() / 1000) + 600, email = 'admin@example.org', amr = ['pwd', 'mfa'], type = 'app', iat = Math.floor(Date.now() / 1000) } = {}) {
 	const h = b64u(JSON.stringify({ alg: 'RS256', kid, typ: 'JWT' }));
-	const p = b64u(JSON.stringify({ aud: [aud], email, exp, iat: Math.floor(Date.now() / 1000), iss: 'https://e2e.cloudflareaccess.com', ...(amr ? { amr } : {}) }));
+	const p = b64u(JSON.stringify({ aud: [aud], email, exp, iat, iss: 'https://e2e.cloudflareaccess.com', type, ...(amr ? { amr } : {}) }));
 	return `${h}.${p}.${b64u(sign('RSA-SHA256', Buffer.from(`${h}.${p}`), key))}`;
 }
-const ADMIN = { 'cf-access-jwt-assertion': jwt() };
+const ADMIN = { 'cf-access-jwt-assertion': jwt(), origin: BASE };
 
 // ---- fresh local database ----
 rmSync(PERSIST, { recursive: true, force: true });
@@ -137,6 +141,9 @@ try {
 		check(`${p} with garbage JWT → 401`, (await req('GET', p, undefined, { 'cf-access-jwt-assertion': 'a.b.c' })).status === 401);
 		check(`${p} with a malformed key id and signature → 401, not 500`, (await req('GET', p, undefined, { 'cf-access-jwt-assertion': `${b64u('{"alg":"RS256","kid":"e2e"}')}.${b64u('{}')}.%%%` })).status === 401);
 		check(`${p} signed in with a one-time PIN only (no second factor) → 401`, (await req('GET', p, undefined, { 'cf-access-jwt-assertion': jwt({ amr: ['email'] }) })).status === 401);
+		check(`${p} signed in as someone not on ADMIN_EMAILS → 401`, (await req('GET', p, undefined, { 'cf-access-jwt-assertion': jwt({ email: 'someone@example.org' }) })).status === 401);
+		check(`${p} with a service or identity token, not an app token → 401`, (await req('GET', p, undefined, { 'cf-access-jwt-assertion': jwt({ type: 'org' }) })).status === 401);
+		check(`${p} signed in more than 12 hours ago → 401`, (await req('GET', p, undefined, { 'cf-access-jwt-assertion': jwt({ iat: Math.floor(Date.now() / 1000) - 13 * 3600 }) })).status === 401);
 		check(`${p} with no authentication methods reported → 401`, (await req('GET', p, undefined, { 'cf-access-jwt-assertion': jwt({ amr: null }) })).status === 401);
 		check(`${p} with valid JWT → 200`, (await req('GET', p, undefined, ADMIN)).status === 200);
 	}
@@ -144,6 +151,7 @@ try {
 	check('admin page is HTML with the sessions editor', typeof page.data === 'string' && /id="sessions-form"/.test(page.data) && /Events&amp;I/.test(page.data));
 	check('admin POST without JWT → 401', (await req('POST', '/api/admin/settings', { event: EVENT, in_person_max: 999 })).status === 401);
 	check('admin POST from another origin → 403', (await req('POST', '/api/admin/settings', { event: EVENT }, { ...ADMIN, origin: 'https://evil.example' })).status === 403);
+	check('admin POST with neither Origin nor Sec-Fetch-Site → 403', (await req('POST', '/api/admin/settings', { event: EVENT }, { 'cf-access-jwt-assertion': jwt() })).status === 403);
 	check('admin POST marked cross-site by the browser → 403', (await req('POST', '/api/admin/settings', { event: EVENT }, { ...ADMIN, 'sec-fetch-site': 'cross-site' })).status === 403);
 	check('admin POST as a form, not JSON → 415', (await fetch(`${BASE}/api/admin/settings`, { method: 'POST', headers: { ...ADMIN, 'content-type': 'application/x-www-form-urlencoded' }, body: 'event=x' })).status === 415);
 
@@ -201,6 +209,9 @@ try {
 	aliceManage = await manageOf(alice);
 	check('manage link arrives with the joining instructions', !!aliceManage);
 	check('manage token cannot confirm', (await req('POST', '/api/rsvp/confirm', { t: aliceManage })).status === 404);
+	{ const aid = aliceManage.split('.')[0];
+	  check('a manage link with a valid signature but past its expiry is refused', (await req('GET', `/api/rsvp/manage?t=${encodeURIComponent(tokenWithExpiry('manage', aid, Math.floor(Date.now() / 1000) - 60))}`)).status === 404);
+	  check('the same link before its expiry works', (await req('GET', `/api/rsvp/manage?t=${encodeURIComponent(tokenWithExpiry('manage', aid, Math.floor(Date.now() / 1000) + 3600))}`)).status === 200); }
 	let m = await last(alice);
 	check('Alice receives joining instructions v1', /Joining instructions/.test(m.subject) && /You have an in-person place/.test(m.text_body));
 	check('…with exactly one calendar invitation', m.att.length === 1 && m.att[0].filename === 'invite.ics' && /method=REQUEST/.test(m.att[0].content_type), JSON.stringify(m.att.map((a) => a.filename)));

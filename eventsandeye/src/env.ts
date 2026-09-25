@@ -31,6 +31,10 @@ export interface Env {
 	ACCESS_REQUIRE_MFA?: string;
 	/** Comma-separated `amr` values accepted as a second factor; see access.ts. */
 	ACCESS_MFA_METHODS?: string;
+	/** Comma-separated admin email addresses; when set, no other Access identity is admitted. */
+	ADMIN_EMAILS?: string;
+	/** Maximum age of an admin sign-in in hours (default 12). */
+	ACCESS_MAX_AGE_HOURS?: string;
 	DEV_MODE?: string;
 	/** Local development only: JSON Web Key Set used instead of the Access certs URL, for tests. */
 	ACCESS_JWKS_JSON?: string;

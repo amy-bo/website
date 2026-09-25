@@ -54,10 +54,14 @@ export function mdToHtml(md: string): string {
 
 function inline(text: string): string {
 	let s = escapeHtml(text);
+	// Links are taken out first, so a * or ` inside a URL cannot be turned into emphasis or code; their labels still
+	// get emphasis and code below.
+	const hrefs: string[] = [];
+	s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, (_m, label, href) => `\u0000L${hrefs.push(href) - 1}\u0000${label}\u0000E\u0000`);
 	s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
 	s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 	s = s.replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>');
-	s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, (_m, label, href) => `<a href="${href}">${label}</a>`);
+	s = s.replace(/\u0000L(\d+)\u0000/g, (_m, i) => `<a href="${hrefs[Number(i)]}">`).replace(/\u0000E\u0000/g, '</a>');
 	return s;
 }
 
