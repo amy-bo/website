@@ -6,7 +6,7 @@ import { bad } from '../../util';
 /** Defence in depth behind the Cloudflare Access policy: every admin API call must carry a valid Access JWT. */
 export const apiMiddleware = async (ctx: Ctx) => {
 	const r = await checkAccess(ctx.env, ctx.request);
-	if (r.email === null) return bad(`Not authorised: ${r.reason}.`, 401);
+	if (r.email === null) return bad(`Not authorised: ${r.reason}. To sign in again, open /cdn-cgi/access/logout and then the admin page.`, 401);
 	const email = r.email;
 	if (ctx.request.method !== 'GET' && ctx.request.method !== 'HEAD') {
 		const origin = ctx.request.headers.get('origin');
@@ -31,7 +31,11 @@ export const apiMiddleware = async (ctx: Ctx) => {
 export const pageMiddleware = async (ctx: Ctx) => {
 	const r = await checkAccess(ctx.env, ctx.request);
 	if (r.email === null) {
-		return new Response(`Not authorised: ${r.reason}. This page is protected by Cloudflare Access with two-factor sign-in.`, { status: 401, headers: { 'content-type': 'text/plain', 'x-robots-tag': 'noindex' } });
+		const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+		const body = `<!doctype html><html lang="en-GB"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Sign in again</title>
+<body style="font-family:Arial,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem"><h1>Not authorised</h1><p>${esc(r.reason)}.</p>
+<p>This page is protected by Cloudflare Access with two-factor sign-in. <a href="/cdn-cgi/access/logout">Sign out of Access</a>, then open <a href="/admin/rsvps/">the admin page</a> to sign in again.</p></body></html>`;
+		return new Response(body, { status: 401, headers: { 'content-type': 'text/html; charset=utf-8', 'x-robots-tag': 'noindex' } });
 	}
 	const res = await ctx.next();
 	const out = new Response(res.body, res);

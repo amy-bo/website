@@ -147,6 +147,8 @@ try {
 		check(`${p} with no authentication methods reported → 401`, (await req('GET', p, undefined, { 'cf-access-jwt-assertion': jwt({ amr: null }) })).status === 401);
 		check(`${p} with valid JWT → 200`, (await req('GET', p, undefined, ADMIN)).status === 200);
 	}
+	{ const refused = await req('GET', '/admin/rsvps/', undefined, { 'cf-access-jwt-assertion': jwt({ iat: Math.floor(Date.now() / 1000) - 13 * 3600 }) });
+	  check('a refused admin page explains why and links to sign in again', refused.status === 401 && /sign-in too old/.test(refused.data) && /\/cdn-cgi\/access\/logout/.test(refused.data), String(refused.data).slice(0, 200)); }
 	const page = await req('GET', '/admin/rsvps/', undefined, ADMIN);
 	check('admin page is HTML with the sessions editor', typeof page.data === 'string' && /id="sessions-form"/.test(page.data) && /Events&amp;I/.test(page.data));
 	check('admin POST without JWT → 401', (await req('POST', '/api/admin/settings', { event: EVENT, in_person_max: 999 })).status === 401);
