@@ -7,6 +7,8 @@ Open work on amybo.org. Done work is in [CHANGELOG.md](CHANGELOG.md). Abandoned 
 - [ ] **Cut over from Netlify to Cloudflare Pages.** Follow the "Setting up Cloudflare" and "Cut-over" sections of the README; the calendar-invitation check with real sends to Gmail and Outlook is a gate, not a tick-box.
 - [ ] **Check the site in a real browser** at phone, tablet (1024 px) and desktop widths, light and dark: the header breakpoints, the hero over the forest photo, the dropdown menus and the registration form were reasoned about from the CSS, not seen. The axe scan runs in jsdom and cannot check colour contrast (ratios were computed by hand for Amy's palette and pass AA).
 - [ ] **Event page facts** to confirm before opening registration: times, room and entrance, session hosts, the two Google Meet links, tour capacities and the registration deadline (all set on the admin page).
+- [ ] **Training photos.** The side and top views of the assembled AEP 0.1 in the training README are on GitHub's image host; add them to the repository so the AEP page can use them.
+- [ ] **Forum feed.** forum.amybo.org refuses connections from the build container, so the homepage's forum threads are a hand-picked list; a build-time fetch of latest.json would keep it fresh once the site builds on Cloudflare.
 - [ ] **Programme:** add talks under `src/content/talks/` once speakers have agreed to be named (announced on 28 September).
 - [ ] **Radicle mirror** of amy-bo/electroPioreactor is behind GitHub (last seen 15 August against a 24 September main); the Projects page links it as a mirror.
 - [ ] **docs.electropioreactor.org**: the AEP 0.2 guide is linked as in progress; confirm the URL scheme for MEP (and BAEP, if that is a variant) before adding links.

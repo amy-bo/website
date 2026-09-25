@@ -1,6 +1,6 @@
 ---
 title: SUSTAINABLE PROTEIN FOR ALL
-description: AMYBO is a non-profit open source community growing sustainable protein with hydrogen-oxidising bacteria and affordable open hardware. Sustainable protein for all.
+description: AMYBO is a not-for-profit open source community growing sustainable protein with hydrogen-oxidising bacteria and affordable open hardware. Sustainable protein for all.
 source: amy
 hugoPath: /
 provenance: Hero, tagline and the first three cards by Amy (her one-line description rewritten for search results) (forest photo by Ozark Drones on Unsplash). The event banner, the electroPioreactor card and the 'What we are doing now' section are new. Below that, 'We need your help' and 'Let's democratise food' are the Hugo homepage's words; its 2023 lines about fortnightly videos and editable pages were rewritten.
@@ -17,7 +17,6 @@ footer: true
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 import { LinkButton, Aside } from "@astrojs/starlight/components";
-import { Image } from 'astro:assets';
 import YouTube from '../../components/YouTube.astro';
 import hobLoop from '../../assets/diagrams/hob-loop.svg';
 
@@ -55,12 +54,12 @@ Lab tours, talks and the pub at the Bezos Centre for Sustainable Protein, Imperi
 
 ## What AMYBO is
 
-AMYBO is a not-for-profit, open source community with one aim: that anyone, anywhere, should be able to grow their own nutritious, delicious and affordable protein. Our bet is on hydrogen-oxidising bacteria (HOB for short). Give them hydrogen, oxygen, carbon dioxide and a few salts and they make protein, and all four of those things can be produced on a benchtop from water, electricity and a SodaStream cylinder. No farmland, no feed crops, no sunlight.
+AMYBO is a not-for-profit, open source community with one aim: that anyone, anywhere, should be able to grow their own nutritious, delicious and affordable protein. Our bet is on hydrogen-oxidising bacteria (HOB for short). Give them hydrogen, oxygen, carbon dioxide and a few salts and they make protein. The three gases can all be made on a benchtop from water, electricity and a SodaStream cylinder, and the salts come in a jar.
 
-Companies are already doing this at industrial scale behind patents. We want to do it in the open, at a scale a university lab, a school or a keen amateur can afford, and to publish every design, protocol and result as we go.
+A few companies are already scaling this up, behind patents. We want to do it in the open, at a scale a university lab, a school or a keen amateur can afford, and to publish every design, protocol and result as we go.
 
 <figure class="photo">
-	<Image src={hobLoop} alt="Diagram: water plus electricity gives hydrogen and oxygen in the culture, carbon dioxide comes from a SodaStream cylinder, salts and ammonium come from the medium, and hydrogen-oxidising bacteria turn them into protein-rich biomass and water" width={900} />
+	<img src={hobLoop.src} alt="Diagram: water plus electricity gives hydrogen and oxygen in the culture, carbon dioxide comes from a SodaStream cylinder, salts and ammonium come from the medium, and hydrogen-oxidising bacteria turn them into protein-rich biomass and water" width="900" height="380" loading="lazy" />
 	<figcaption>What hydrogen-oxidising bacteria need, and what comes out. Our [electroPioreactor](/projects/electropioreactor/) makes the hydrogen and oxygen inside the culture, so there is never a cylinder of hydrogen in the room.</figcaption>
 </figure>
 
@@ -85,7 +84,7 @@ Companies are already doing this at industrial scale behind patents. We want to 
     <Card title="The electroPioreactor plugin" icon="seti:config">
         Runs the electrolysis and the CO₂ sparging from the Pioreactor's own web page, and pauses both the electrolysis and the optical density readings while it sparges so bubbles don't spoil the numbers.
         <div class="card-actions">
-            <LinkButton href="/projects/electropioreactor/#run-it-the-pioreactor-plugin" variant="secondary">The plugin</LinkButton>
+            <LinkButton href="/projects/electropioreactor/#the-pioreactor-plugin" variant="secondary">The plugin</LinkButton>
         </div>
     </Card>
 </CardGrid>

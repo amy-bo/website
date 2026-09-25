@@ -44,8 +44,8 @@
   <path class="a" d="M565 215 H640" marker-end="url(#a2)"/>
   <rect x="640" y="118" width="230" height="86" rx="10" class="box"/>
   <text x="755" y="150" text-anchor="middle" class="h">protein-rich biomass</text>
-  <text x="755" y="174" text-anchor="middle">roughly two thirds protein</text>
-  <text x="755" y="194" text-anchor="middle">by dry weight</text>
+  <text x="755" y="174" text-anchor="middle">single-cell protein, harvested</text>
+  <text x="755" y="194" text-anchor="middle">from the culture</text>
   <rect x="640" y="222" width="230" height="56" rx="10" class="box"/>
   <text x="755" y="246" text-anchor="middle" class="h">water</text>
   <text x="755" y="266" text-anchor="middle">the other product</text>

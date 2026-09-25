@@ -3,6 +3,19 @@ title: Aseptic electroPioreactor (AEP)
 description: The sealed, filtered electroPioreactor for single-strain research, built and tested with Imperial College London and the University of Edinburgh.
 source: new
 provenance: Written by Martin Currie with Claude for the 2026 relaunch, from the AsepticElectroPioreactor folder of the repository, including the November 2025 training write-up. Photos from the same repository.
+head:
+  - tag: meta
+    attrs:
+      property: og:image
+      content: https://amybo.org/og-electropioreactor.png
+  - tag: meta
+    attrs:
+      property: og:image:alt
+      content: Cross-section diagram of an electroPioreactor
+  - tag: meta
+    attrs:
+      name: twitter:image
+      content: https://amybo.org/og-electropioreactor.png
 sidebar:
   order: 1
   label: Aseptic electroPioreactor
@@ -27,7 +40,7 @@ We designed it to be safe first, then accurate and repeatable, then automated, t
 ## Versions
 
 - **AEP 0.1 and 0.1.1** (2025). Six units built. Three of them were assembled by the students themselves at the [joint training](https://github.com/amy-bo/electroPioreactor/blob/main/AsepticElectroPioreactor/CARMA_PumpPriming/Results/AEP0.1%20Training/README.md) at the University of Edinburgh on 18 to 21 November 2025, one each, following the [assembly instructions](https://github.com/amy-bo/electroPioreactor/blob/main/AsepticElectroPioreactor/CARMA_PumpPriming/Assembly/README.md). The 0.1.1 changes came out of what we learned that week.
-- **AEP 0.2** (2026). A redesigned cap (septum instead of O-rings, and a proper clamp for the electrodes), GL45 media bottles instead of centrifuge tubes, mixed metal oxide anodes, and card bundles so the plugin can be installed on a unit that never sees the internet. The first kits reached Edinburgh in September 2026. The step-by-step guide, with a video and a drawing for each step, is going up at [docs.electropioreactor.org/AEP](https://docs.electropioreactor.org/AEP) as we make it.
+- **AEP 0.2** (2026). A redesigned cap (a silicone septum instead of O-rings, and an M3 clamp for the electrodes), mixed metal oxide anodes, and card bundles so the plugin can go onto a unit that never sees the internet. The first kits reached Edinburgh in September 2026. The step-by-step guide, with a video and a drawing for each step, is going up at [docs.electropioreactor.org/AEP](https://docs.electropioreactor.org/AEP) as we make it.
 
 <figure class="photo">
 	<Image src={topStop} alt="A 3D-printed grey block with two screws, holding a pair of stainless electrodes with a red and a black wire, held in a hand over a cutting mat" width={900} widths={[480, 900]} sizes="(max-width: 50rem) 100vw, 45rem" />
@@ -36,7 +49,7 @@ We designed it to be safe first, then accurate and repeatable, then automated, t
 
 ## What we learned from the first runs
 
-Honest results are the point of doing this in the open, so here is the November 2025 training week as it happened. Three students each built an AEP 0.1. The software set-up then ate most of a day because none of us could SSH into the units; it turned out to be a [bug in the Raspberry Pi Imager](https://github.com/raspberrypi/rpi-imager/issues/1170), which Cam at Pioreactor tracked down, and an older Imager fixed it. A heterotrophic culture of *Cupriavidus metallidurans* grew happily on gluconate. The first attempt at autotrophic growth, on hydrogen from the electrodes and CO₂ from the cylinder alone, did not. The write-up lists the suspects: the medium, too high a voltage, temperature control, whether the CO₂ sparging was actually clearing the oxygen, and the anodes discolouring.
+Here's how the November 2025 training week went. Three students each built an AEP 0.1. The software set-up then took a long time to diagnose because none of us could SSH into the units; it turned out to be a [bug in the Raspberry Pi Imager](https://github.com/raspberrypi/rpi-imager/issues/1170), which Cam Davidson-Pilon of Pioreactor tracked down, and an older Imager fixed it. A heterotrophic culture of *Cupriavidus metallidurans* was established on gluconate. The first attempt at autotrophic growth, on hydrogen from the electrodes and CO₂ from the cylinder alone, showed no growth in 17 hours. Also that week: new crocodile clips kept falling off the electrodes, which is where the top stop came from; the SodaStream cylinders moved from the middle of the raft to the back, which made the bottles easier to see and the tubing shorter; and a vial dropped and smashed, so now we carry boxed spares. The write-up lists the suspects: the medium, too high a voltage, temperature control, whether the CO₂ sparging was actually clearing the oxygen, and the anodes discolouring.
 
 That list is what the plugin and AEP 0.2 were built to work through: intermittent sparging with the electrolysis paused, current limited rather than voltage set, and one variable at a time.
 
@@ -46,7 +59,7 @@ That list is what the plugin and AEP 0.2 were built to work through: intermitten
 		<figcaption>An anode after a run: the discolouration everyone noticed.</figcaption>
 	</figure>
 	<figure class="photo">
-		<Image src={anodePt} alt="Macro photo of a platinised titanium rod with a rough grey coating and a patch where the coating has worn through" width={600} widths={[400, 600]} sizes="(max-width: 50rem) 100vw, 20rem" />
+		<Image src={anodePt} alt="Macro photo of a platinised titanium rod with a rough grey coating, with a smoother patch near one end" width={600} widths={[400, 600]} sizes="(max-width: 50rem) 100vw, 20rem" />
 		<figcaption>The platinised titanium anode we started with. AEP 0.2 moves to mixed metal oxide.</figcaption>
 	</figure>
 	<figure class="photo">
@@ -63,7 +76,7 @@ That list is what the plugin and AEP 0.2 were built to work through: intermitten
 - [Results](https://github.com/amy-bo/electroPioreactor/tree/main/AsepticElectroPioreactor/CARMA_PumpPriming/Results): the training write-up, the anode photos, and [continuous versus intermittent CO₂ sparging](https://github.com/amy-bo/electroPioreactor/blob/main/AsepticElectroPioreactor/CARMA_PumpPriming/Results/Gas%20sparging/Continuous%20or%20Intermittent%20CO2%20sparging.md)
 - [Meeting notes](https://github.com/amy-bo/electroPioreactor/blob/main/AsepticElectroPioreactor/CARMA_PumpPriming/Meetings.md) of the CARMA Hub project
 - [Components and bill of materials](https://github.com/amy-bo/electroPioreactor/tree/main/Components), including the [vial cap](https://github.com/amy-bo/electroPioreactor/tree/main/Components/Vial%20Cap) OpenSCAD source and the [GL45 bottle holder](https://github.com/amy-bo/electroPioreactor/tree/main/Components/GL45BottleHolder)
-- [The plugin](/projects/electropioreactor/#run-it-the-pioreactor-plugin) that runs it from the Pioreactor web interface
+- [The plugin](/projects/electropioreactor/#the-pioreactor-plugin) that runs it from the Pioreactor web interface
 - Edinburgh's first runs, written up on the forum: [trial experiment on heterotrophic electrolysis](https://forum.amybo.org/t/trial-experiment-on-heterotrophic-electrolysis/163)
 
-The AEP is the subject of the [CARMA Hub project](/projects/carma-hub/). Kits and parts come from [LabCrafter](https://labcrafter.co.uk) in the UK and [Pioreactor](https://pioreactor.com) elsewhere. Come and see them running at the [get-together on 13 November](/events/2026-11-13-london/).
+The AEP is the subject of the [CARMA Hub project](/projects/carma-hub/). Kits and parts come from [LabCrafter](https://labcrafter.co.uk) in the UK and [Pioreactor](https://pioreactor.com) elsewhere. Come and see electroPioreactors running at the [get-together on 13 November](/events/2026-11-13-london/).

@@ -3,6 +3,7 @@
 //   public/og.png        1200x630, brand gradient, logo and strapline (site-wide default)
 //   public/og-event.jpg  1200x630, AMYBO photo behind the 13 November 2026 event title
 //   public/logo.png      512x512, the AMYBO mark on white, for the Organization structured data
+//   public/og-electropioreactor.png  1200x630, the electroPioreactor diagram on white, for the project pages
 import sharp from 'sharp';
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -48,3 +49,13 @@ await write('public/og-event.jpg', `<svg xmlns="http://www.w3.org/2000/svg" widt
   <text x="80" y="480" font-family="${FONT}" font-size="28" fill="#dfe9d6">Lab tours, talks and discussion at Imperial College White City. Free.</text>
   <text x="80" y="540" font-family="${FONT}" font-size="28" fill="#dfe9d6">amybo.org/events</text>
 </svg>`, 'src/assets/photos/aep01-anode-discolouration.jpg');
+
+// The electroPioreactor cross-section, letterboxed on white for the project pages' sharing image.
+{
+	const diagram = readFileSync('src/assets/diagrams/electropioreactor.svg', 'utf8').replace(/<\?xml[^>]*>/, '').replace(/ width="900" height="600"/, '').replace(/<svg /, '<svg x="180" y="15" width="840" height="560" ');
+	await write('public/og-electropioreactor.png', `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">
+  <rect width="1200" height="630" fill="#ffffff"/>
+  ${diagram}
+  ${readFileSync('src/assets/amybo.svg', 'utf8').replace(/<\?xml[^>]*>|<!DOCTYPE[^>]*>/g, '').replace(/<svg width="7087px" height="4905px"/, '<svg viewBox="0 0 7087 4905" x="20" y="20" width="140" height="96" preserveAspectRatio="xMidYMid meet"')}
+</svg>`);
+}

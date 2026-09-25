@@ -7,7 +7,7 @@ Built with [Astro](https://astro.build) and [Starlight](https://starlight.astro.
 ## Credits
 
 - **Design and structure:** Amy Andrews, whose 2025 Astro redesign (originally [myndrws/amybo](https://github.com/myndrws/amybo)) is the base of this repository, with its full history.
-- **Content:** carried over from the previous Hugo/Docsy site ([amy-bo/pages](https://github.com/amy-bo/pages), private until it is archived) and its contributors.
+- **Text:** the site's own pages are written by Martin Currie with Claude; the pages marked `source: hugo` are carried over verbatim from the previous Hugo/Docsy site ([amy-bo/pages](https://github.com/amy-bo/pages), private until it is archived), whose contributors are credited in LICENSE-CONTENT.md.
 - **Homepage photo:** [Ozark Drones](https://unsplash.com/@ozarkdrones?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash) on [Unsplash](https://unsplash.com/photos/birds-eye-view-photo-of-trees-jeV-LUEyJoE?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash), edited.
 
 Every page's frontmatter records where its text came from (`source: amy | hugo | new`). [REVIEW.md](REVIEW.md) lists every page with its source and confirms each old Hugo URL still works.
@@ -36,6 +36,7 @@ src/content/docs/        pages: Amy's section pages, projects/ (electroPioreacto
 src/content/talks/       talks for event pages (one markdown file per talk)
 src/components/          Amy's Hero and Header overrides, footer, click-to-play YouTube embed, talks list
 src/assets/photos/       AMYBO photos from amy-bo/electroPioreactor (CC BY-SA 4.0), resized by Astro at build time
+src/assets/diagrams/     SVG diagrams drawn for the site (CC BY-SA 4.0); scripts/og.mjs also turns one into a sharing image
 scripts/                 og.mjs (Open Graph images), review.mjs (REVIEW.md), a11y.mjs (axe-core scan)
 public/                  robots.txt, og.png and og-event.jpg, _redirects
 eventsandeye/            Events&I registration system (AGPL-3.0): server code, admin page, cron worker, schema, tests, Astro components

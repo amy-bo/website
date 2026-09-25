@@ -19,13 +19,15 @@
   <text x="95" y="380" text-anchor="middle" style="fill:#fff" font-weight="700" transform="rotate(-90 95 380)">SodaStream CO₂</text>
   <rect x="150" y="238" width="86" height="46" rx="6" fill="#e8f0e3" stroke="#175a00" stroke-width="2"/>
   <text x="193" y="258" text-anchor="middle">regulator</text>
-  <text x="193" y="276" text-anchor="middle" class="s">1 to 2 bar</text>
+  <text x="193" y="276" text-anchor="middle" class="s">set to 1 bar</text>
   <rect x="150" y="318" width="86" height="46" rx="6" fill="#e8f0e3" stroke="#175a00" stroke-width="2"/>
   <text x="193" y="338" text-anchor="middle">3/2 venting</text>
   <text x="193" y="356" text-anchor="middle">solenoid</text>
   <path class="g" d="M95 250 V244 H150"/>
   <path class="g" d="M193 284 V318"/>
   <path class="g" d="M236 341 H300 V200 H392 V440" />
+  <rect x="286" y="250" width="28" height="28" rx="5" fill="#fff" stroke="#333" stroke-width="2"/>
+  <text x="278" y="269" class="s" text-anchor="end">inlet filter</text>
   <path class="w" d="M170 364 V394" marker-end="url(#arrow)"/>
   <text x="170" y="412" class="s" text-anchor="middle">vents to air</text>
   <text x="300" y="192" class="s" text-anchor="middle">CO₂ sparge line</text>
@@ -86,9 +88,9 @@
   <!-- OD sensing -->
   <path class="w" d="M336 300 H378" marker-end="url(#arrow)"/>
   <text x="330" y="296" text-anchor="end" class="s">IR light in</text>
-  <path class="w" d="M384 340 L340 382" marker-end="url(#arrow)"/>
-  <text x="330" y="398" text-anchor="end" class="s">scattered light out,</text>
-  <text x="330" y="414" text-anchor="end" class="s">read as optical density</text>
+  <path class="w" d="M384 360 L340 424" marker-end="url(#arrow)"/>
+  <text x="330" y="442" text-anchor="end" class="s">scattered light out,</text>
+  <text x="330" y="458" text-anchor="end" class="s">read as optical density</text>
 
   <!-- power -->
   <path class="w" d="M300 500 H240 V150 H372" marker-end="url(#arrow)"/>
