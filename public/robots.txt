@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /events/confirm/
+Disallow: /events/manage/
+Sitemap: https://amybo.org/sitemap-index.xml

@@ -8,6 +8,8 @@ sidebar:
 ---
 
 import { LinkButton } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import topStop from '../../../../assets/photos/electrode-top-stop.jpg';
 
 The Aseptic electroPioreactor keeps a defined culture defined: a sealed, parametric vial cap, 0.2 μm hydrophobic vent filters on the gas ports and luer-lock connections for feed and sampling, on top of the electrolysis and CO₂ sparging of every electroPioreactor. It is designed to be safe first, then accurate and repeatable, then automated, then good value.
 
@@ -15,6 +17,11 @@ The Aseptic electroPioreactor keeps a defined culture defined: a sealed, paramet
 	<LinkButton href="https://github.com/amy-bo/electroPioreactor/tree/main/AsepticElectroPioreactor" variant="primary" icon="github">AEP on GitHub</LinkButton>
 	<LinkButton href="https://docs.electropioreactor.org/AEP" variant="secondary">AEP 0.2 build guide</LinkButton>
 </div>
+
+<figure class="photo">
+	<Image src={topStop} alt="A 3D-printed grey block with two screws, holding a pair of stainless electrodes with a red and a black wire, held in a hand over a cutting mat" width={900} widths={[480, 900]} sizes="(max-width: 50rem) 100vw, 45rem" />
+	<figcaption>The electrode top stop, a new part in AEP 0.2, holding an electrode pair. Photo: AMYBO, CC BY-SA 4.0.</figcaption>
+</figure>
 
 ## Versions
 

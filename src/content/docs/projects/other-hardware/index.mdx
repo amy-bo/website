@@ -7,6 +7,9 @@ sidebar:
   label: Overview
 ---
 
+import { Image } from 'astro:assets';
+import valves from '../../../../assets/photos/brown-valve-internals.png';
+
 Besides the electroPioreactor itself, the project has produced and studied several smaller pieces of open hardware.
 
 - [**OpenValve**](/projects/other-hardware/openvalve/): a 3D-printable solenoid pinch valve. Designed by Harvey Mudd College's clinic team ([valve team files](https://github.com/amy-bo/electroPioreactor/tree/main/PastResearch/HMC-Clinic/ValveTeamFiles)) and now being revived by LabCrafter.
@@ -15,3 +18,8 @@ Besides the electroPioreactor itself, the project has produced and studied sever
 - [**CO₂ sparger backflow**](https://github.com/amy-bo/electroPioreactor/tree/main/PastResearch/Brown-HarrisLab): diagnosis and a revised-component fix by Eli Silver at Brown University's Harris Lab.
 - [**Holders and small parts**](https://github.com/amy-bo/electroPioreactor/tree/main/Components): the GL45 bottle holder, pinch slider and electrode top stop.
 - [Equipment notes from 2023](/projects/past/equipment/): autoclaves, microscopes, DNA sequencing and the bioreactor survey that led us to the Pioreactor.
+
+<figure class="photo">
+	<Image src={valves} alt="Two disassembled solenoid valves on a blue cutting mat, labelled Clippard valve and FZone valve internals, each showing a brass body and a sprung plunger" width={900} widths={[480, 900]} sizes="(max-width: 50rem) 100vw, 45rem" />
+	<figcaption>Clippard and FZone solenoid valve internals compared during the sparger backflow work at Brown University's Harris Lab. Photo: AMYBO, CC BY-SA 4.0.</figcaption>
+</figure>

@@ -22,3 +22,18 @@
   font-size: var(--sl-text-xs);
   color: var(--sl-color-gray-3);
 }
+
+/* Amy's full-bleed hero is 100vw wide, which is wider than the page when a scrollbar shows. Clip the excess
+   without turning the page into a scroll container (overflow-x: hidden would break sticky positioning). */
+.page {
+  overflow-x: clip;
+}
+
+@media print {
+  .hero, .header, .right-sidebar, .sidebar-pane, .mobile-menu, .card-actions, .register-link { display: none !important; }
+}
+
+/* Photos on project and event pages (Astro <Image>, credited in the caption). */
+.sl-markdown-content figure.photo { margin: 1.5rem 0; }
+.sl-markdown-content figure.photo img { width: 100%; height: auto; border-radius: 0.5rem; display: block; }
+.sl-markdown-content figure.photo figcaption { margin-top: 0.5rem; font-size: var(--sl-text-sm); color: var(--sl-color-gray-3); }

@@ -10,13 +10,14 @@ Every page carries `source:` in its frontmatter:
 
 `provenance:` explains pages that mix sources. To see exactly what changed on a Hugo page, compare it with the Hugo original in git history of [amy-bo/pages](https://github.com/amy-bo/pages).
 
-Totals: 10 amy, 29 hugo, 16 new.
+Totals: 10 amy, 17 new, 29 hugo.
 
 ## Pages
 
 | URL | Title | Source | Old Hugo URL | Notes |
 | --- | --- | --- | --- | --- |
-| [`/`](/) | SUSTAINABLE PROTEIN FOR ALL | amy | `/` | Hero, tagline and three cards by Amy (forest photo by Ozark Drones on Unsplash). The event banner and the electroPioreactor card are new. The video and the sections below the cards come from the Hugo homepage. |
+| [`/`](/) | SUSTAINABLE PROTEIN FOR ALL | amy | `/` | Hero, tagline and the first three cards by Amy (forest photo by Ozark Drones on Unsplash). The event banner, the electroPioreactor card and the 'What we are doing now' section are new. Below that, 'We need your help' and 'Let's democratise food' are the Hugo homepage's words; its 2023 lines about fortnightly videos and editable pages were rewritten. |
+| [`/404/`](/404/) | Page not found | new | – |  |
 | [`/about/`](/about/) | About AMYBO | hugo | `/about/` | Verbatim from Hugo, except the 'Get involved' heading added so headings nest, and the paragraph about the Docsy porridge photo removed (the photo is not used on this site). |
 | [`/background/`](/background/) | Background | new | – |  |
 | [`/background/overview/`](/background/overview/) | Overview (2023) | hugo | `/docs/overview/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |

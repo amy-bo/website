@@ -10,6 +10,8 @@ tableOfContents:
 ---
 
 import { Aside, LinkButton } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import solenoid from '../../../../assets/photos/venting-solenoid-on-regulator.jpg';
 
 The electroPioreactor is a [Pioreactor](https://pioreactor.com) adapted to grow hydrogen-oxidising bacteria (HOB). Electrodes in the culture make hydrogen and oxygen from the medium as they are needed, and a relay-driven solenoid sparges CO₂, so the bacteria can fix carbon without any stored hydrogen. Everything is designed, documented and version-controlled in the open at [amy-bo/electroPioreactor](https://github.com/amy-bo/electroPioreactor).
 
@@ -18,6 +20,11 @@ The electroPioreactor is a [Pioreactor](https://pioreactor.com) adapted to grow 
 	<LinkButton href="https://github.com/amy-bo/electroPioreactor/releases" variant="secondary">Releases and downloads</LinkButton>
 	<LinkButton href="https://forum.amybo.org/" variant="minimal">Ask on the forum</LinkButton>
 </div>
+
+<figure class="photo">
+	<Image src={solenoid} alt="A CO₂ regulator with two pressure gauges and a small black solenoid valve fitted to its outlet, on a bench" width={720} widths={[480, 720]} sizes="(max-width: 50rem) 100vw, 36rem" />
+	<figcaption>A venting solenoid on the CO₂ regulator: part of the gas train that sparges the culture. Photo: AMYBO, CC BY-SA 4.0.</figcaption>
+</figure>
 
 There are two variants, each with its own page:
 
