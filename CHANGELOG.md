@@ -2,6 +2,10 @@
 
 Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
+## 2026-10-01
+
+- [x] **Pre-invitation content pass** — About page: stray lead line, typo, the 2023 lines about editable pages and fortnightly videos, and an empty closing heading removed or corrected; Cam Davidson-Pilon spelt as on the AEP page. The Harvey Mudd clinic teams on the electrode and OpenValve pages named as the college's teams working with AMYBO, and the 2023 "results here soon" promise replaced. Three typos on Gerrit Niezen's control-test page and one on PioFlo. Registration consent line matches the privacy notice on backups; the privacy notice says Turnstile checks the IP address and that it is not stored.
+
 ## 2026-09-25
 
 - [x] **Third pass** — a refused admin sign-in explains why and links to the Access sign-out to sign in again; README documents ADMIN_EMAILS, ACCESS_MAX_AGE_HOURS, a session of 12 hours or less, and turning off preview builds on the manual Git route; email markdown strips NUL and renders links atomically; `npm run test:unit` adds renderer tests.

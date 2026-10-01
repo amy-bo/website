@@ -6,7 +6,7 @@ hugoPath: /docs/pioflo/
 sidebar:
   order: 1
   label: PioFlo
-provenance: "Moved from the old Docs section in the 2026 relaunch; text unchanged."
+provenance: "Moved from the old Docs section in the 2026 relaunch; text unchanged apart from one typo."
 ---
 
 ## Affordable, infinitely scaleable bioreactors
@@ -15,4 +15,4 @@ The basic concept of Pioflo is that we turn the tried-and-tested [Pioreactor](ht
 
 ![Pioflo TRL4 Sketch](./Pioflo_v0_01_sketch.png)
 
-Lets discuss next steps at [forum.amybo.org](https://forum.amybo.org/t/pioflo-org-enabling-affordable-bioreactors-at-scale/91) - and check out the write up to date below:
+Let's discuss next steps at [forum.amybo.org](https://forum.amybo.org/t/pioflo-org-enabling-affordable-bioreactors-at-scale/91) - and check out the write up to date below:
