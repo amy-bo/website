@@ -21,7 +21,7 @@ INSERT OR IGNORE INTO instructions (event_id, version, subject, body_md, change_
   ('2026-11-13-london', 1, 'Joining instructions: AMYBO get-together, 13 November 2026',
 'Thank you for registering for the AMYBO get-together on **Friday 13 November 2026**.
 
-**Where:** Bezos Centre for Sustainable Protein, Imperial College White City campus, 84 Wood Lane, London W12 0BZ. Room and entrance details will follow in an update before the day.
+**Where:** Bezos Centre for Sustainable Protein, Imperial College White City campus, 84 Wood Lane, London W12 0BZ, room 516. Entrance and visitor sign-in details will follow in an update before the day.
 
 **Getting there:** Wood Lane station (Hammersmith & City and Circle lines) is a few minutes'' walk away.
 

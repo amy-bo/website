@@ -42,7 +42,7 @@ A few things that took us a while to learn:
 
 There are two variants, each with its own page:
 
-- [**Aseptic electroPioreactor (AEP).**](/projects/electropioreactor/aep/) Sealed cap with a silicone septum, 0.2 μm vent filters and luer-lock ports, for keeping a single strain pure. Six AEP 0.1 units were built, and Imperial and Edinburgh students trained on them at the University of Edinburgh in November 2025. The AEP 0.2 kits started arriving in September 2026. This is the subject of the [CARMA Hub Pump Priming](https://carmahub.co.uk/about-us/pump-priming-projects/) project led by Sonja Billerbeck (Imperial College London) and Chris French (University of Edinburgh), with AMYBO as design and training partner and [LabCrafter](https://labcrafter.co.uk) supplying the kits.
+- [**Aseptic electroPioreactor (AEP).**](/projects/electropioreactor/aep/) Sealed cap with a silicone septum, 0.2 μm vent filters and luer-lock ports, for keeping a single strain pure. Six AEP 0.1 units were built, and Imperial and Edinburgh students trained on them at the University of Edinburgh in November 2025. The AEP 0.2 kits started arriving in September 2026. This is the subject of the [CARMA Hub Pump Priming](https://carmahub.co.uk/about-us/pump-priming-projects/) project led by Dr Sonja Billerbeck (Imperial College London) in collaboration with Prof. Chris French (University of Edinburgh), with AMYBO as design and training partner and [LabCrafter](https://labcrafter.co.uk) supplying the kits.
 - [**Mixed-culture electroPioreactor (MEP).**](/projects/electropioreactor/mep/) The original, cheaper version, for enrichment cultures from environmental samples and for teaching. Two went to the University of Edinburgh for the 2026 MSc industrial projects.
 
 ## Build one
@@ -62,7 +62,7 @@ Kits and parts come from [LabCrafter](https://labcrafter.co.uk) in the UK and [P
 
 The [electroPioreactor plugin](https://github.com/amy-bo/electroPioreactor/tree/main/AEP-Plugin) adds one background job to the Pioreactor's web interface. It drives the electrolysis at a power you choose, opens the CO₂ solenoid for a set number of seconds at a set interval, pauses the electrolysis while it sparges, and pauses the optical density readings for the sparge plus a settle time so bubbles don't get counted as growth. All four settings can be changed live while it runs.
 
-- [Install it over SSH, or from the SD card](https://github.com/amy-bo/electroPioreactor/tree/main/AEP-Plugin#installation). The card route needs a Pioreactor OS release with boot-partition plugin support, which Pioreactor accepted in principle on 24 September 2026; until that ships, use SSH. The [card bundles](https://github.com/amy-bo/electroPioreactor/releases) are on the releases page.
+- [Install it over SSH, or from the SD card](https://github.com/amy-bo/electroPioreactor/tree/main/AEP-Plugin#installation). The card route needs a Pioreactor OS release with boot-partition plugin support, which is [proposed to Pioreactor](https://github.com/Pioreactor/CustoPiZer/pull/21); until it ships, use SSH. The [card bundles](https://github.com/amy-bo/electroPioreactor/releases) are on the releases page.
 - Needs Pioreactor 26.5.0 or later. Run `pio update` on older units.
 - Our fixes to Pioreactor's own software go upstream through our [amy-bo/pioreactor](https://github.com/amy-bo/pioreactor) and [amy-bo/CustoPiZer](https://github.com/amy-bo/CustoPiZer) forks.
 
