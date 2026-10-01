@@ -4,8 +4,10 @@ Open work on amybo.org. Done work is in [CHANGELOG.md](CHANGELOG.md). Abandoned 
 
 ## Open
 
+- [ ] **Photo credits:** Gerrit Niezen said at the 25 September meeting that many site photos are his; confirm who took each photo in `src/assets/photos/` and credit accordingly.
+- [ ] **One origin story:** "Why AMYBO" and About both tell it (raised by Gerrit on 25 September); merge them.
 - [ ] **Rewrite pushed history** (needs Martin's force-push approval): eight photos with GPS in f167580 and the Termly screenshot (src/content/docs/collaborate/safety-and-legal/Xnip2023-07-06_16-30-59.png, unused) are in pushed history; also fixes the attribution trailer on bf0e81e. Then ask GitHub Support to purge PR #1's cached refs, and check the old Hugo site's copies of the photos.
-- [ ] **Delete the old North America database** `amybo-rsvp` once the EU one (`amybo-rsvp-eu`) is live (it holds only seed rows).
+- [ ] **Delete the old North America database** `amybo-rsvp`: the EU one (`amybo-rsvp-eu`) went live with the 1 October deploy, so the old one (seed rows only) can go once registration is tested.
 - [ ] **Two-factor on every login in the README table** (Cloudflare members, amy-bo GitHub organisation, Resend, the hello@amybo.org Google account) and MFA on the Access policy.
 - [ ] **Cut over from Netlify to Cloudflare Pages.** Follow the "Setting up Cloudflare" and "Cut-over" sections of the README; the calendar-invitation check with real sends to Gmail and Outlook is a gate, not a tick-box.
 - [ ] **Check the site in a real browser** at phone, tablet (1024 px) and desktop widths, light and dark: the header breakpoints, the hero over the forest photo, the dropdown menus and the registration form were reasoned about from the CSS, not seen. The axe scan runs in jsdom and cannot check colour contrast (ratios were computed by hand for Amy's palette and pass AA).
