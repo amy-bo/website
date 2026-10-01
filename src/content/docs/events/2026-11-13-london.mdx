@@ -2,6 +2,8 @@
 title: AMYBO get-together, London – Friday 13 November 2026
 description: A free day of lab tours, talks and discussion at the Bezos Centre for Sustainable Protein, Imperial College White City, followed by the pub. Join in person or watch the talks remotely.
 source: new
+eventStart: 2026-11-13T10:30:00Z
+eventSummary: Lab tours, talks and the pub at the Bezos Centre for Sustainable Protein, Imperial College White City. Free, in person or remote.
 sidebar:
   label: 13 Nov 2026 – London get-together
   order: 1
@@ -29,6 +31,7 @@ head:
 import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
 import RsvpForm from '../../../../eventsandeye/astro/RsvpForm.astro';
 import Talks from '../../../components/events/Talks.astro';
+import UpcomingEvents from '../../../components/events/UpcomingEvents.astro';
 import { Image } from 'astro:assets';
 import anode from '../../../assets/photos/aep01-anode-discolouration.jpg';
 
@@ -53,7 +56,7 @@ All times are UK time (GMT).
 | --- | --- |
 | 10:30 | Arrival. First optional lab tour (10:30 to 11:15). |
 | 11:15 | Second optional lab tour (11:15 to 12:00), and networking. |
-| 12:00 | Welcome from Martin Currie, then talks. |
+| 12:00 | Welcome from [Martin Currie](https://amy.bo/~martin), then talks. |
 | 13:00 | Lunch. |
 | 14:00 | Talks and discussion. |
 | 16:30 | Close. |
@@ -108,6 +111,10 @@ There are 20 places in person and 10 on each lab tour; remote places are unlimit
 <RsvpForm event="2026-11-13-london" controller="AMYBO (andeye Ltd)" contactHref="https://contact.andeye.com/?source=amybo.org&subject=AMYBO%20get-together%2C%2013%20November%202026&cb=A%20question%20about%20registration&cb=Remote%20attendance&cb=Access%20needs&cb=Something%20else" />
 
 Staying on for the weekend? The form asks whether you'd like to do something together on Saturday 14 November, and what you fancy. Not ready to register? Put **6 November**, the registration deadline, in your calendar. Questions? [Send us a message](https://contact.andeye.com/?source=amybo.org&subject=AMYBO%20get-together%2C%2013%20November%202026&cb=A%20question%20about%20registration&cb=Remote%20attendance&cb=Access%20needs&cb=Something%20else). We use your details only to run this event: see our [privacy notice](/privacy/).
+
+## More AMYBO events
+
+<UpcomingEvents exclude="events/2026-11-13-london" />
 
 <style>{`
 .register-link { display: inline-block; background: #0069a0; color: #fff !important; text-decoration: none; font-weight: 700; padding: 0.7rem 1.6rem; border-radius: 999px; }

@@ -20,7 +20,7 @@ const rendered = await Promise.all(talks.map(async (t) => ({ t, Content: (await 
 					{t.data.headshot && <Image src={t.data.headshot} alt={t.data.headshotAlt ?? `Photo of ${t.data.speaker}`} width={120} height={120} class="headshot" />}
 					<div>
 						<h3>{t.data.start && <span class="time">{t.data.start} </span>}{t.data.title}</h3>
-						<p class="speaker">{t.data.speaker}{t.data.affiliation && <>, {t.data.affiliation}</>}</p>
+						<p class="speaker">{t.data.speakerUrl ? <a href={t.data.speakerUrl}>{t.data.speaker}</a> : t.data.speaker}{t.data.affiliation && <>, {t.data.affiliation}</>}</p>
 						<Content />
 					</div>
 				</li>

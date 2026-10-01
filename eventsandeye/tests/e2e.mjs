@@ -131,6 +131,11 @@ try {
 		const r = await fetch(BASE + p);
 		check(`GET ${p} → 200`, r.status === 200, String(r.status));
 	}
+	{
+		const r = await req('GET', '/events/next');
+		const loc = r.headers.get('location') || '';
+		check('/events/next redirects to the next event page', r.status === 302 && /\/events\/[^/]+\/$/.test(new URL(loc, BASE).pathname) && !new URL(loc, BASE).pathname.endsWith('/events/next/'), `${r.status} ${loc}`);
+	}
 
 	console.log('\nAdmin protection (Cloudflare Access JWT)');
 	for (const p of ['/admin/rsvps/', `/api/admin/summary?event=${EVENT}`, `/api/admin/export?format=csv&event=${EVENT}`, `/api/admin/sent-log?event=${EVENT}`]) {

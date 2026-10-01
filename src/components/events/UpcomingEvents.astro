@@ -1,0 +1,33 @@
+---
+// Upcoming events from event pages' `eventStart` frontmatter (as of the last build), and an invitation to host one.
+// /events/next always redirects to the soonest event live, from the registration database.
+import { getCollection } from 'astro:content';
+
+interface Props {
+	/** Leave out this page (the event the visitor is already on). */
+	exclude?: string;
+	heading?: string;
+}
+const { exclude, heading } = Astro.props;
+const now = new Date();
+const events = (await getCollection('docs', (e) => e.data.eventStart && e.data.eventStart > now && e.id !== exclude)).sort(
+	(a, b) => +a.data.eventStart! - +b.data.eventStart!,
+);
+const hostHref =
+	'https://contact.andeye.com/?source=amybo.org&subject=Hosting%20an%20AMYBO%20event&message=I%20would%20like%20to%20host%20an%20AMYBO%20event%20near%20me.%20Where%3A%20%0AWhen%3A%20%0AWhat%20sort%20of%20event%3A%20';
+---
+
+<section class="upcoming">
+	{heading && events.length > 0 && <h2>{heading}</h2>}
+	{events.length > 0 && (
+		<ul>
+			{events.map((e) => (
+				<li>
+					<a href={`/${e.id}/`}><strong>{e.data.title}</strong></a>
+					{e.data.eventSummary && <>: {e.data.eventSummary}</>}
+				</li>
+			))}
+		</ul>
+	)}
+	<p><strong>Want to host an AMYBO event near you?</strong> A lab tour, a talk, a build day or just the pub: <a href={hostHref}>tell us about it</a>.</p>
+</section>

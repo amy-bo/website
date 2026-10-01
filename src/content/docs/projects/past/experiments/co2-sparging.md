@@ -10,7 +10,7 @@ provenance: "Moved from the old Docs section in the 2026 relaunch; text unchange
 
 Describes how to get started with CO2 sparging on the Pioreactor.
 
-*Photos: Gerrit Niezen.*
+*Photos: [Gerrit Niezen](https://amy.bo/~gerrit).*
 
 ## Kit List
 

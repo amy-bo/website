@@ -17,6 +17,9 @@ export const collections = {
 				provenance: z.string().optional(),
 				/** Path of the equivalent page on the old Hugo site, e.g. `/docs/overview/`. */
 				hugoPath: z.string().optional(),
+				/** Event pages only: when it starts and a one-line summary, for the upcoming-events list. */
+				eventStart: z.coerce.date().optional(),
+				eventSummary: z.string().optional(),
 			}),
 		}),
 	}),
@@ -28,6 +31,7 @@ export const collections = {
 				event: z.string(),
 				title: z.string(),
 				speaker: z.string(),
+				speakerUrl: z.string().url().optional(),
 				affiliation: z.string().optional(),
 				headshot: image().optional(),
 				headshotAlt: z.string().optional(),
