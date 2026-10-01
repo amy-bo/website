@@ -1,6 +1,6 @@
 # Photos
 
-Photographs copied from the [amy-bo/electroPioreactor](https://github.com/amy-bo/electroPioreactor) repository, taken by AMYBO and licensed CC BY-SA 4.0 (see LICENSE-CONTENT.md). Astro resizes and converts them at build time, without metadata.
+Photographs copied from the [amy-bo/electroPioreactor](https://github.com/amy-bo/electroPioreactor) repository, licensed CC BY-SA 4.0. Camera data shows Martin Currie took the anode photos (iPhone, January 2026); the electrode top stop and pinch slider photos are probably his; who took the two venting-solenoid photos is still to be confirmed with Gerrit Niezen (see LICENSE-CONTENT.md). Astro resizes and converts them at build time, without metadata.
 
 | File | Source in the repository |
 | --- | --- |
