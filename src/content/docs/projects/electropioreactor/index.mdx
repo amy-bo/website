@@ -2,20 +2,7 @@
 title: electroPioreactor
 description: A Pioreactor that makes its own hydrogen and oxygen. Designs, build guide, plugin, medium, methods and results, all on GitHub.
 source: new
-provenance: Written by Martin Currie with Claude for the 2026 relaunch, from the electroPioreactor repository and the forum. The diagram was drawn for this page.
-head:
-  - tag: meta
-    attrs:
-      property: og:image
-      content: https://amybo.org/og-electropioreactor.png
-  - tag: meta
-    attrs:
-      property: og:image:alt
-      content: Cross-section diagram of an electroPioreactor
-  - tag: meta
-    attrs:
-      name: twitter:image
-      content: https://amybo.org/og-electropioreactor.png
+provenance: Written by Martin Currie with Claude for the 2026 relaunch, from the electroPioreactor repository and the forum.
 sidebar:
   order: 0
   label: Overview
@@ -25,7 +12,6 @@ tableOfContents:
 
 import { Aside, LinkButton } from '@astrojs/starlight/components';
 import { Image } from 'astro:assets';
-import diagram from '../../../../assets/diagrams/electropioreactor.svg';
 import solenoid from '../../../../assets/photos/venting-solenoid-on-regulator.jpg';
 import imager from '../../../../assets/photos/imager-app-options.png';
 
@@ -41,12 +27,7 @@ We built it because hydrogen-oxidising bacteria are a very promising sustainable
 
 ## How it works
 
-<figure class="photo">
-	<img src={diagram.src} alt="Cross-section of an electroPioreactor: a 20 ml vial on a Pioreactor base, with an anode and a cathode through a 3D-printed cap, a CO₂ line from a SodaStream cylinder through a regulator and a venting solenoid to the bottom of the vial, a vent filter on the cap, and infrared light measured from the side for optical density" width="900" height="600" loading="lazy" />
-	<figcaption>An Aseptic electroPioreactor, not to scale. The mixed-culture version is the same idea without the septum, filters and luer ports.</figcaption>
-</figure>
-
-A few things that took us a while to learn, and that the diagram doesn't show:
+A few things that took us a while to learn:
 
 - **The electrodes run at constant current, not constant voltage.** We drive them from one of the Pioreactor's LED channels. Its driver holds the current steady (as long as the cell voltage stays well below the Pi's 5 V rail), so the rate of hydrogen production is set by the current and nothing else. Details in the [current measurement experiment](https://forum.amybo.org/t/current-measurement-experiment/166) on the forum.
 - **The medium is also the electrolyte.** Most standard HOB media contain chloride, which electrolysis turns into hypochlorite, which kills the culture. Ours is chloride-free and phosphate-buffered; see the [growth medium](/projects/media/) page.

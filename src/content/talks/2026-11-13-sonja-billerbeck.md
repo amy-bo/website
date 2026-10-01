@@ -6,4 +6,4 @@ affiliation: Imperial College London, Bezos Centre for Sustainable Protein
 order: 2
 published: true
 ---
-Three projects turning air, water and electricity into food.
+Air-to-food research at Imperial, which also uses Pioreactors.

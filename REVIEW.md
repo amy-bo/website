@@ -18,7 +18,7 @@ Totals: 10 amy, 17 new, 29 hugo.
 | --- | --- | --- | --- | --- |
 | [`/`](/) | SUSTAINABLE PROTEIN FOR ALL | amy | `/` | Hero, tagline and the first three cards by Amy (her one-line description rewritten for search results) (forest photo by Ozark Drones on Unsplash). The event banner, the electroPioreactor card and the 'What we are doing now' section are new. Below that, 'We need your help' and 'Let's democratise food' are the Hugo homepage's words; its 2023 lines about fortnightly videos and editable pages were rewritten. |
 | [`/404/`](/404/) | Page not found | new | – |  |
-| [`/about/`](/about/) | About AMYBO | hugo | `/about/` | Verbatim from Hugo, except that a stray lead line, a typo, the 'all pages are editable' line, the 2023 note about fortnightly videos and an empty closing heading were removed or corrected in the relaunch; also the 'Get involved' heading added so headings nest, and the paragraph about the Docsy porridge photo removed (the photo is not used on this site). |
+| [`/about/`](/about/) | About AMYBO | hugo | `/about/` | Verbatim from Hugo, except for these relaunch changes. Removed: a stray lead line, the 'all pages are editable' line, the 2023 note about fortnightly videos, an empty closing heading, Amanda Lake's line (at Martin's request, 25 September 2026) and the paragraph about the Docsy porridge photo (not used on this site). Corrected: a typo and Cam Davidson-Pilon's name. Added: the 'Get involved' heading so headings nest. |
 | [`/background/`](/background/) | Background | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
 | [`/background/overview/`](/background/overview/) | Overview (2023) | hugo | `/docs/overview/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/background/plan-2023/`](/background/plan-2023/) | Next steps (2023 plan) | hugo | `/docs/overview/plan/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
@@ -47,7 +47,7 @@ Totals: 10 amy, 17 new, 29 hugo.
 | [`/privacy/`](/privacy/) | Privacy notice | new | – |  |
 | [`/projects/`](/projects/) | Projects | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
 | [`/projects/carma-hub/`](/projects/carma-hub/) | CARMA Hub project | new | – | Written by Martin Currie with Claude for the 2026 relaunch, from the repository's AsepticElectroPioreactor README and results. |
-| [`/projects/electropioreactor/`](/projects/electropioreactor/) | electroPioreactor | new | – | Written by Martin Currie with Claude for the 2026 relaunch, from the electroPioreactor repository and the forum. The diagram was drawn for this page. |
+| [`/projects/electropioreactor/`](/projects/electropioreactor/) | electroPioreactor | new | – | Written by Martin Currie with Claude for the 2026 relaunch, from the electroPioreactor repository and the forum. |
 | [`/projects/electropioreactor/aep/`](/projects/electropioreactor/aep/) | Aseptic electroPioreactor (AEP) | new | – | Written by Martin Currie with Claude for the 2026 relaunch, from the AsepticElectroPioreactor folder of the repository, including the November 2025 training write-up. Photos from the same repository. |
 | [`/projects/electropioreactor/mep/`](/projects/electropioreactor/mep/) | Mixed-culture electroPioreactor (MEP) | new | – | Written by Martin Currie with Claude for the 2026 relaunch, from the MixedElectroPioreactor folder of the repository. |
 | [`/projects/literature/`](/projects/literature/) | Literature | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |

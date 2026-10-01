@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-10-01
 
+- [x] **Changes agreed at the 25 September meeting** — the two diagrams drawn for the site (and the sharing image made from one) removed, as Martin and Gerrit agreed; the 2023 control-test photo on the Pioreactor page credited to Gerrit Niezen; Amanda Lake's line removed from the About page; talks set from the meeting: Martin's "Sustainable Protein for All?" straight after the 12:00 welcome, Sonja Billerbeck on Air2Food, Hydrocow and Solar Spoon, Gerrit Niezen on the design of the AEP as open hardware; `.github/CODEOWNERS` makes Martin the reviewer for every file.
 - [x] **Pre-invitation content pass** — About page: stray lead line, typo, the 2023 lines about editable pages and fortnightly videos, and an empty closing heading removed or corrected; Cam Davidson-Pilon spelt as on the AEP page. The Harvey Mudd clinic teams on the electrode and OpenValve pages named as the college's teams working with AMYBO, and the 2023 "results here soon" promise replaced. Three typos on Gerrit Niezen's control-test page and one on PioFlo. Registration consent line matches the privacy notice on backups; the privacy notice says Turnstile checks the IP address and that it is not stored.
 
 ## 2026-09-25

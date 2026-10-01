@@ -1,9 +1,9 @@
 ---
 event: 2026-11-13-london
-title: Open hardware and the AEP 0.2
+title: "Open hardware: the design of the AEP"
 speaker: Gerrit Niezen
 affiliation: LabCrafter
 order: 3
 published: true
 ---
-The second Aseptic electroPioreactor, and why it is open hardware.
+The design of the Aseptic electroPioreactor, and why it is open hardware.

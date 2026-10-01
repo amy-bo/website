@@ -38,7 +38,6 @@ src/content/talks/       talks for event pages (one markdown file per talk)
 src/components/          Amy's Hero and Header overrides, footer, click-to-play YouTube embed, talks list, forum feed
 src/lib/forum.mjs        fetches forum.amybo.org/latest.json at build time; FORUM_FEED=off skips it, FORUM_FIXTURE=<file> stands in for the forum
 src/assets/photos/       AMYBO photos from amy-bo/electroPioreactor (CC BY-SA 4.0), resized by Astro at build time
-src/assets/diagrams/     SVG diagrams drawn for the site (CC BY-SA 4.0); scripts/og.mjs also turns one into a sharing image
 scripts/                 og.mjs (Open Graph images), review.mjs (REVIEW.md), a11y.mjs (axe-core scan)
 public/                  robots.txt, og.png and og-event.jpg, _redirects
 eventsandeye/            Events&I registration system (AGPL-3.0): server code, admin page, cron worker, schema, tests, Astro components
