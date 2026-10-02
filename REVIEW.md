@@ -65,13 +65,13 @@ Totals: 10 amy, 17 new, 29 hugo.
 | [`/projects/past/equipment/microscopes/`](/projects/past/equipment/microscopes/) | Microscopes | hugo | `/docs/equipment/microscopes/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/past/experiments/`](/projects/past/experiments/) | First experiments (2023 to 2024) | hugo | `/docs/experiments/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/past/experiments/co2-sparging/`](/projects/past/experiments/co2-sparging/) | CO2 Sparging | hugo | `/docs/experiments/co2-sparging/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/projects/past/experiments/control-testing/`](/projects/past/experiments/control-testing/) | Control Testing | hugo | `/docs/experiments/control-testing/` | Moved from the old Docs section in the 2026 relaunch; text unchanged apart from three typos. Presentation: an absolute link to the old /docs/ URL made relative to its new page. |
+| [`/projects/past/experiments/control-testing/`](/projects/past/experiments/control-testing/) | Control Testing | hugo | `/docs/experiments/control-testing/` | Moved from the old Docs section in the 2026 relaunch; text unchanged apart from three typos and the results link. Presentation: an absolute link to the old /docs/ URL made relative to its new page. |
 | [`/projects/past/experiments/electrolysis/`](/projects/past/experiments/electrolysis/) | Electrode optimisation | hugo | `/docs/experiments/electrolysis/` | Moved from the old Docs section in the 2026 relaunch. Team named as Harvey Mudd College's with AMYBO, and the 2023 'results here soon' promise replaced. |
 | [`/projects/past/experiments/hob-enrichment/`](/projects/past/experiments/hob-enrichment/) | HOB Enrichment | hugo | `/docs/experiments/hob-enrichment/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/past/experiments/spirulina-batch/`](/projects/past/experiments/spirulina-batch/) | Spirulina Batch | hugo | `/docs/experiments/spirulina-batch/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. Presentation: an absolute link to the old /docs/ URL made relative to its new page. |
 | [`/projects/past/kickstarting-for-good/`](/projects/past/kickstarting-for-good/) | Kickstarting for Good | hugo | `/docs/kickstartingforgood/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. The Vimeo embed gained Vimeo's do-not-track setting. |
 | [`/projects/pioflo/`](/projects/pioflo/) | PioFlo | hugo | `/docs/pioflo/` | Moved from the old Docs section in the 2026 relaunch; text unchanged apart from one typo. |
-| [`/projects/pioflo/pioflo-v0-01/`](/projects/pioflo/pioflo-v0-01/) | Pioflo v0.01 | hugo | `/docs/pioflo/pioflo-v0.01/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/pioflo/pioflo-v0-01/`](/projects/pioflo/pioflo-v0-01/) | Pioflo v0.01 | hugo | `/docs/pioflo/pioflo-v0.01/` | Moved from the old Docs section in the 2026 relaunch; text unchanged, plus a link to the trial's raw data. |
 
 ## Every old Hugo page and its counterpart
 

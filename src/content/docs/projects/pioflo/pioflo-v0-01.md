@@ -6,7 +6,7 @@ hugoPath: /docs/pioflo/pioflo-v0.01/
 sidebar:
   order: 2
   label: PioFlo v0.01
-provenance: "Moved from the old Docs section in the 2026 relaunch; text unchanged."
+provenance: "Moved from the old Docs section in the 2026 relaunch; text unchanged, plus a link to the trial's raw data."
 ---
 
 ## First attempt
@@ -39,3 +39,5 @@ provenance: "Moved from the old Docs section in the 2026 relaunch; text unchange
 
 ### Initial Results
 ![A screenshot of the initial Pioflo test with Kombucha fermenting in a standard 1L beaker.](./PiofloKombucha001.png)
+
+The raw data from the 1 L kombucha trial (August 2024) is [available as CSV files on GitHub](https://github.com/amy-bo/results/tree/main/pioFlo/Kombucha%20TRL4).

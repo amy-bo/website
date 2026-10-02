@@ -4,7 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-10-02
 
-- [x] **Control-test data link restored** — amy-bo/results is public again (scanned first: no personal data in files or history beyond commit author emails); the link says it is a 2023 archive of early results.
+- [x] **Control-test data link restored** — amy-bo/results is public again (scanned first: no personal data in files or history beyond commit author emails); the control-test page links its own folder, and the PioFlo v0.01 page now links the raw data of its 1 L kombucha trial.
 
 ## 2026-10-01
 
