@@ -63,7 +63,7 @@ for (const f of readdirSync('db/links').filter((f) => f.endsWith('.sql')).sort()
 // Twice, as on every deploy: the schema and seeds must be safe to re-run.
 for (const f of readdirSync('db/links').filter((f) => f.endsWith('.sql')).sort()) wr(['d1', 'execute', DB, '--local', '--persist-to', PERSIST, '--file', `db/links/${f}`]);
 
-const server = spawn('npx', ['wrangler', 'pages', 'dev', './dist', '--port', String(PORT), '--ip', '127.0.0.1', '--persist-to', PERSIST], {
+const server = spawn('npx', ['wrangler', 'pages', 'dev', './dist', '--port', String(PORT), '--ip', '127.0.0.1', '--persist-to', PERSIST, '--r2', 'LINKS_BUCKET'], {
 	stdio: ['ignore', 'pipe', 'pipe'],
 	env: { ...process.env, CI: '1' },
 	detached: true,
@@ -271,8 +271,25 @@ try {
 		check('a name is required', (await req('PUT', '/api/links/profile', { name: ' ' }, C)).status === 400);
 		await req('PUT', '/api/links/profile', { name: 'Vee', basic_mode: true }, C);
 		check('basic mode drops the map', !(await req('GET', '/~vee')).text.includes('class="mapsvg"'));
-		const up = await fetch(`${BASE}/api/links/upload`, { method: 'POST', headers: { ...C, 'content-type': 'image/png' }, body: new Uint8Array([137, 80, 78, 71]) });
-		check('uploads say clearly when the bucket is not there yet', up.status === 503, up.status);
+		const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+		const upload = async () => {
+			const r = await fetch(`${BASE}/api/links/upload`, { method: 'POST', headers: { ...C, 'user-agent': UA, 'content-type': 'image/png' }, body: png });
+			return { status: r.status, data: await r.json() };
+		};
+		const up = await upload();
+		check('uploads go to the bucket under their own folder', up.status === 200 && /^r2:vee\/[A-Za-z0-9_-]+\.png$/.test(up.data.value), JSON.stringify(up.data));
+		const media = await fetch(`${BASE}${up.data.url}`);
+		check('and are served with a long cache', media.status === 200 && /immutable/.test(media.headers.get('cache-control') || ''), media.status);
+		check('uploads refuse other types', (await fetch(`${BASE}/api/links/upload`, { method: 'POST', headers: { ...C, 'content-type': 'text/html' }, body: '<p>' })).status === 415);
+		await req('PUT', '/api/links/profile', { name: 'Vee', photo: up.data.value }, C);
+		check('a page can use its upload as its photo', (await req('GET', '/~vee')).text.includes(up.data.url));
+		await req('PUT', '/api/links/profile', { name: 'Vee', photo: '' }, C);
+		await sleep(400);
+		check('replacing it deletes the old image', (await fetch(`${BASE}${up.data.url}`)).status === 404);
+		const orphan = await upload();
+		const sw = await req('POST', '/api/admin/links/sweep', { minAgeHours: 0 }, ADMIN);
+		check('the admin sweep removes uploads nothing uses', sw.status === 200 && sw.data.removed >= 1 && (await fetch(`${BASE}${orphan.data.url}`)).status === 404, sw.text);
+		check('the sweep needs Access', (await req('POST', '/api/admin/links/sweep', {}, { origin: BASE })).status === 401);
 		const pr = await req('GET', `/api/links/propose?url=${encodeURIComponent('http://127.0.0.1:8789/')}`, undefined, { cookie: `lp_s=${cookie}` });
 		check('suggestions refuse private addresses', pr.status === 400, pr.status);
 		const pm = await req('GET', `/api/links/propose?url=${encodeURIComponent('mailto:vee@example.org')}`, undefined, { cookie: `lp_s=${cookie}` });

@@ -62,6 +62,8 @@ ${links.map(({ n, s, all }) => `<tr><td>${esc(n.label)}</td><td>${s.d7}</td><td>
 <p id="msg" role="status"></p>
 <h2>Pages</h2>
 <table><thead><tr><th>Page</th><th>Name</th><th>Email</th><th>Status</th><th>Last sign-in</th><th>Views 30 days</th><th></th></tr></thead><tbody>${peopleTable}</tbody></table>
+<h2>Images</h2>
+<p>Pictures people replace or remove are deleted straight away. This also clears uploads that never got used (older than a day). <button id="sweep">Tidy images</button></p>
 <h2>Views and clicks</h2>
 <p>People only: crawlers and link previews are skipped. Nothing is stored about visitors except the page, the link and the time. "Before" is the count carried over from Linktree.</p>
 ${stats}
@@ -69,6 +71,7 @@ ${stats}
 const msg=document.getElementById('msg');
 const post=(path,body)=>fetch(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}).then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.statusText);return j;});
 document.getElementById('invite').addEventListener('submit',e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));msg.textContent='Sending…';post('/api/admin/links/invite',f).then(()=>{msg.textContent='Invitation sent to '+f.email+'.';setTimeout(()=>location.reload(),1200)}).catch(err=>msg.textContent=err.message)});
+document.getElementById('sweep').addEventListener('click',()=>{msg.textContent='Tidying…';post('/api/admin/links/sweep',{}).then(r=>msg.textContent='Removed '+r.removed+' unused image'+(r.removed===1?'':'s')+'; '+r.kept+' in use.').catch(err=>msg.textContent=err.message)});
 document.querySelectorAll('td button').forEach(b=>b.addEventListener('click',()=>{let email;if(b.dataset.act==='email'){email=prompt('New sign-in email for this page',b.dataset.email.endsWith('.invalid')?'':b.dataset.email);if(!email)return;}msg.textContent='Working…';post('/api/admin/links/person',{id:Number(b.dataset.id),action:b.dataset.act,email}).then(()=>location.reload()).catch(err=>msg.textContent=err.message)}));
 </script></html>`;
 	return new Response(body, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } });

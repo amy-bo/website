@@ -18,6 +18,26 @@ const body = async <T>(req: Request): Promise<T | null> => {
 };
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
+// ---- uploaded images: delete the ones nothing uses any more ----
+
+const r2Key = (v: string | null | undefined) => (v && v.startsWith('r2:') ? v.slice(3) : null);
+
+/** Every uploaded image a person's page still uses (photo and items). */
+async function imagesInUse(db: D1Database, personId: number): Promise<Set<string>> {
+	const [person, nodes] = await db.batch([
+		db.prepare('SELECT photo FROM lp_people WHERE id = ?').bind(personId),
+		db.prepare(`SELECT image FROM lp_nodes WHERE person_id = ? AND image LIKE 'r2:%'`).bind(personId),
+	]);
+	const keys = [...(person.results as { photo: string }[]).map((r) => r.photo), ...(nodes.results as { image: string }[]).map((r) => r.image)].map(r2Key);
+	return new Set(keys.filter((k): k is string => !!k));
+}
+
+/** After a save: removes from the bucket the images that were in use before and aren't now. Best effort. */
+function forgetImages(ctx: Ctx, before: Set<string>, after: Set<string>) {
+	const gone = [...before].filter((k) => !after.has(k));
+	if (gone.length && ctx.env.LINKS_BUCKET) ctx.waitUntil(ctx.env.LINKS_BUCKET.delete(gone).catch((e) => console.error('image tidy failed', e)));
+}
+
 async function signedIn(ctx: Ctx): Promise<SessionPerson | Response> {
 	const bad = checkOrigin(ctx);
 	if (bad) return bad;
@@ -92,9 +112,11 @@ export async function saveProfile(ctx: Ctx): Promise<Response> {
 	const photo = str(b.photo, 300);
 	if (!okImage(photo, p.handle)) return fail('That photo is not one of your uploads');
 	const diaryDefault = b.diary_default === 'highlights' ? 'highlights' : 'all';
+	const before = await imagesInUse(ctx.env.DB, p.id);
 	await ctx.env.DB.prepare('UPDATE lp_people SET name = ?, bio = ?, photo = ?, basic_mode = ?, diary_default = ?, updated_at = ? WHERE id = ?')
 		.bind(name, str(b.bio, 300), photo, b.basic_mode ? 1 : 0, diaryDefault, nowIso(), p.id)
 		.run();
+	forgetImages(ctx, before, await imagesInUse(ctx.env.DB, p.id));
 	return json({ ok: true });
 }
 
@@ -214,12 +236,14 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 			);
 	});
 	const deletes = existing.filter((r) => !keep.has(r.id)).map((r) => db.prepare('DELETE FROM lp_nodes WHERE id = ? AND person_id = ?').bind(r.id, p.id));
+	const imagesBefore = await imagesInUse(db, p.id);
 	try {
 		await db.batch([...updates, ...deletes, db.prepare('UPDATE lp_people SET updated_at = ? WHERE id = ?').bind(nowIso(), p.id)]);
 	} catch (e) {
 		if (fresh.length) await db.batch(fresh.map((n) => db.prepare('DELETE FROM lp_nodes WHERE id = ? AND person_id = ?').bind(idOf.get(n.key)!, p.id))).catch(() => {});
 		throw e;
 	}
+	forgetImages(ctx, imagesBefore, await imagesInUse(db, p.id));
 	return json({ ok: true, ids: Object.fromEntries(idOf) });
 }
 
@@ -463,6 +487,32 @@ export async function adminPerson(ctx: Ctx): Promise<Response> {
 		await sendLink(ctx.env, p, 'invite', orgName(ctx.env));
 	} else return fail('Unknown action');
 	return json({ ok: true });
+}
+
+/** POST /api/admin/links/sweep: deletes uploads no page uses (older than a day, so nothing mid-edit goes). */
+export async function adminSweep(ctx: Ctx): Promise<Response> {
+	const bucket = ctx.env.LINKS_BUCKET;
+	if (!bucket) return fail('No image bucket is bound yet', 503);
+	const b = await body<{ minAgeHours?: number }>(ctx.request);
+	const minAge = Math.max(0, Number(b?.minAgeHours ?? 24)) * 36e5;
+	const db = ctx.env.DB;
+	const [people, nodes] = await db.batch([
+		db.prepare(`SELECT photo AS v FROM lp_people WHERE photo LIKE 'r2:%'`),
+		db.prepare(`SELECT image AS v FROM lp_nodes WHERE image LIKE 'r2:%'`),
+	]);
+	const used = new Set([...(people.results as { v: string }[]), ...(nodes.results as { v: string }[])].map((r) => r.v.slice(3)));
+	let cursor: string | undefined;
+	let removed = 0;
+	let kept = 0;
+	do {
+		const page = await bucket.list({ cursor, limit: 1000 });
+		const stale = page.objects.filter((o) => !used.has(o.key) && Date.now() - o.uploaded.getTime() >= minAge).map((o) => o.key);
+		kept += page.objects.length - stale.length;
+		if (stale.length) await bucket.delete(stale);
+		removed += stale.length;
+		cursor = page.truncated ? page.cursor : undefined;
+	} while (cursor);
+	return json({ ok: true, removed, kept });
 }
 
 export type { Env };
