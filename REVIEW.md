@@ -10,7 +10,7 @@ Every page carries `source:` in its frontmatter:
 
 `provenance:` explains pages that mix sources. To see exactly what changed on a Hugo page, compare it with the Hugo original in git history of [amy-bo/pages](https://github.com/amy-bo/pages).
 
-Totals: 10 amy, 17 new, 29 hugo.
+Totals: 10 amy, 17 new, 28 hugo.
 
 ## Pages
 
@@ -57,7 +57,7 @@ Totals: 10 amy, 17 new, 29 hugo.
 | [`/projects/other-hardware/openvalve/`](/projects/other-hardware/openvalve/) | OpenValve | hugo | `/docs/openvalve/` | Moved from the old Docs section in the 2026 relaunch. Team named as Harvey Mudd College's with AMYBO, and dated 2023. |
 | [`/projects/past/`](/projects/past/) | Past projects and early notes | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
 | [`/projects/past/electropioreactor-2024/`](/projects/past/electropioreactor-2024/) | electroPioreactor (2024 notes) | hugo | `/docs/electropioreactor/` | Verbatim from Hugo, plus a note at the top pointing to the current project page. Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/projects/past/electropioreactor-v0-02/`](/projects/past/electropioreactor-v0-02/) | electroPioreactor v0.02 (2024) | hugo | `/docs/electropioreactor/electropioreactor-v0.02/` | Title had a stray '.md' on the Hugo site; corrected. Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/electropioreactor-v0-02/`](/projects/past/electropioreactor-v0-02/) | electroPioreactor v0.02 (2024) | hugo | `/docs/electropioreactor/electropioreactor-v0.02/` | Title had a stray '.md' on the Hugo site; corrected. Moved from the old Docs section in the 2026 relaunch; text unchanged apart from first person singular made impersonal. |
 | [`/projects/past/equipment/`](/projects/past/equipment/) | Equipment notes (2023) | hugo | `/docs/equipment/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/past/equipment/autoclaves/`](/projects/past/equipment/autoclaves/) | Autoclaves | hugo | `/docs/equipment/autoclaves/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/past/equipment/bioreactors/`](/projects/past/equipment/bioreactors/) | Bioreactors: why we chose the Pioreactor | hugo | `/docs/equipment/bioreactors/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
@@ -68,10 +68,9 @@ Totals: 10 amy, 17 new, 29 hugo.
 | [`/projects/past/experiments/control-testing/`](/projects/past/experiments/control-testing/) | Control Testing | hugo | `/docs/experiments/control-testing/` | Moved from the old Docs section in the 2026 relaunch; text unchanged apart from three typos and the results link. Presentation: an absolute link to the old /docs/ URL made relative to its new page. |
 | [`/projects/past/experiments/electrolysis/`](/projects/past/experiments/electrolysis/) | Electrode optimisation | hugo | `/docs/experiments/electrolysis/` | Moved from the old Docs section in the 2026 relaunch. Team named as Harvey Mudd College's with AMYBO, and the 2023 'results here soon' promise replaced. |
 | [`/projects/past/experiments/hob-enrichment/`](/projects/past/experiments/hob-enrichment/) | HOB Enrichment | hugo | `/docs/experiments/hob-enrichment/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/projects/past/experiments/spirulina-batch/`](/projects/past/experiments/spirulina-batch/) | Spirulina Batch | hugo | `/docs/experiments/spirulina-batch/` | Moved from the old Docs section in the 2026 relaunch; text unchanged, plus a link to the raw data of the later turbidostat run. Presentation: an absolute link to the old /docs/ URL made relative to its new page. |
-| [`/projects/past/kickstarting-for-good/`](/projects/past/kickstarting-for-good/) | Kickstarting for Good | hugo | `/docs/kickstartingforgood/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. The Vimeo embed gained Vimeo's do-not-track setting. |
+| [`/projects/past/experiments/spirulina-batch/`](/projects/past/experiments/spirulina-batch/) | Spirulina Batch | hugo | `/docs/experiments/spirulina-batch/` | Moved from the old Docs section in the 2026 relaunch; text unchanged apart from first person singular made impersonal, plus a link to the raw data of the later turbidostat run. Presentation: an absolute link to the old /docs/ URL made relative to its new page. |
 | [`/projects/pioflo/`](/projects/pioflo/) | PioFlo | hugo | `/docs/pioflo/` | Moved from the old Docs section in the 2026 relaunch; text unchanged apart from one typo. |
-| [`/projects/pioflo/pioflo-v0-01/`](/projects/pioflo/pioflo-v0-01/) | Pioflo v0.01 | hugo | `/docs/pioflo/pioflo-v0.01/` | Moved from the old Docs section in the 2026 relaunch; text unchanged, plus a link to the trial's raw data. |
+| [`/projects/pioflo/pioflo-v0-01/`](/projects/pioflo/pioflo-v0-01/) | Pioflo v0.01 | hugo | `/docs/pioflo/pioflo-v0.01/` | Moved from the old Docs section in the 2026 relaunch; text unchanged apart from first person singular made impersonal, plus a link to the trial's raw data. |
 
 ## Every old Hugo page and its counterpart
 
@@ -94,7 +93,7 @@ All old Hugo URLs resolve on the new site.
 | `/docs/experiments/hob-enrichment/` | `src/content/docs/projects/past/experiments/hob-enrichment.mdx` | Redirects to `/projects/past/experiments/hob-enrichment/` | youtube shortcode -> YouTube component; title inferred as 'New Year New Culture' (same video id used elsewhere on the old site). |
 | `/docs/experiments/spirulina-batch/` | `src/content/docs/projects/past/experiments/spirulina-batch.mdx` | Redirects to `/projects/past/experiments/spirulina-batch/` | Two youtube shortcodes -> YouTube components; titles inferred from surrounding Setup/Results headings. |
 | `/docs/experiments/` | `src/content/docs/projects/past/experiments/index.md` | Redirects to `/projects/past/experiments/` |  |
-| `/docs/kickstartingforgood/` | `src/content/docs/projects/past/kickstarting-for-good.md` | Redirects to `/projects/past/kickstarting-for-good/` | hidden:true/toc_hide:true -> sidebar.hidden:true; vimeo shortcode -> raw <iframe> per spec (kept .md since no component import needed). |
+| `/docs/kickstartingforgood/` | – | Not carried over | A personal 2023 pitch letter; carried over at first, then removed on 2 October 2026 at Martin's request. The old URL redirects to /projects/past/. |
 | `/docs/legal/` | `src/content/docs/collaborate/safety-and-legal/index.md` | Redirects to `/collaborate/safety-and-legal/` | In-body H1 'DO NOT TRY THIS AT HOME' demoted to H2. |
 | `/docs/legal/disclaimer/` | `src/content/docs/collaborate/safety-and-legal/disclaimer.md` | Redirects to `/collaborate/safety-and-legal/disclaimer/` |  |
 | `/docs/openvalve/` | `src/content/docs/projects/other-hardware/openvalve.md` | Redirects to `/projects/other-hardware/openvalve/` |  |

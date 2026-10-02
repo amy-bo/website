@@ -107,9 +107,9 @@
   {
     "hugoFile": "content/en/docs/KickstartingForGood.md",
     "hugoUrl": "/docs/kickstartingforgood/",
-    "newFile": "src/content/docs/projects/past/kickstarting-for-good.md",
-    "newUrl": "/projects/past/kickstarting-for-good.md/",
-    "notes": "hidden:true/toc_hide:true -> sidebar.hidden:true; vimeo shortcode -> raw <iframe> per spec (kept .md since no component import needed)."
+    "newFile": null,
+    "newUrl": null,
+    "notes": "A personal 2023 pitch letter; carried over at first, then removed on 2 October 2026 at Martin's request. The old URL redirects to /projects/past/."
   },
   {
     "hugoFile": "content/en/docs/Legal/_index.md",

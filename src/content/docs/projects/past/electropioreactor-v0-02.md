@@ -6,7 +6,7 @@ hugoPath: /docs/electropioreactor/electropioreactor-v0.02/
 sidebar:
   order: 3
   label: electroPioreactor v0.02 (2024)
-provenance: "Title had a stray '.md' on the Hugo site; corrected. Moved from the old Docs section in the 2026 relaunch; text unchanged."
+provenance: "Title had a stray '.md' on the Hugo site; corrected. Moved from the old Docs section in the 2026 relaunch; text unchanged apart from first person singular made impersonal."
 ---
 
 ## Bill of Materials
@@ -74,5 +74,5 @@ provenance: "Title had a stray '.md' on the Hugo site; corrected. Moved from the
 1. 1x Needle-Nose Pliers: [Amazon.co.uk](https://amzn.eu/d/74U0lou)
 1. 1x PH0 Screwdriver: [Amazon.co.uk](https://amzn.eu/d/houYNco)
 
-[^1]: Could be improved, I got this as it is also a 90° bend, but mine is uncomfortably stiff to adjust
+[^1]: Could be improved: chosen as it is also a 90° bend, but this one is uncomfortably stiff to adjust
 [^2]: **[Harvey Mudd](https://forum.amybo.org/t/keeping-up-with-hmc-clinic-project/126/32) are currently working on a Pinch Valve that should significantly improve this**

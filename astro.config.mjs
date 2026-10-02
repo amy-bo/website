@@ -71,7 +71,6 @@ export default defineConfig({
 								{ label: 'First experiments (2023 to 2024)', autogenerate: { directory: 'projects/past/experiments' } },
 								{ label: 'electroPioreactor (2024 notes)', slug: 'projects/past/electropioreactor-2024' },
 								{ label: 'electroPioreactor v0.02 (2024)', slug: 'projects/past/electropioreactor-v0-02' },
-								{ label: 'Kickstarting for good', slug: 'projects/past/kickstarting-for-good' },
 							],
 						},
 					],

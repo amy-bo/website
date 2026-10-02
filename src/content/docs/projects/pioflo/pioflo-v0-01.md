@@ -6,7 +6,7 @@ hugoPath: /docs/pioflo/pioflo-v0.01/
 sidebar:
   order: 2
   label: PioFlo v0.01
-provenance: "Moved from the old Docs section in the 2026 relaunch; text unchanged, plus a link to the trial's raw data."
+provenance: "Moved from the old Docs section in the 2026 relaunch; text unchanged apart from first person singular made impersonal, plus a link to the trial's raw data."
 ---
 
 ## First attempt
@@ -32,9 +32,9 @@ provenance: "Moved from the old Docs section in the 2026 relaunch; text unchange
 1. Remove green tea bags
 1. Add M3 nut to end of two Pioreactor silicone tubes and submerge them in the tea
 1. connect one tube directly to the vial cap and the second via the peristaltic pump
-1. Seal the other Pioreactor vial cap ports (or run all four into the tea, as I did)
+1. Seal the other Pioreactor vial cap ports (or run all four into the tea, as in this trial)
 1. Add SCOBY
-1. Cover (I used [recycled tissue paper](https://amzn.eu/d/2mDAtCp) but will use a cloth next time) secured with a rubber band
+1. Cover ([recycled tissue paper](https://amzn.eu/d/2mDAtCp) in this trial, but a cloth would be better) secured with a rubber band
 1. Monitor optical density
 
 ### Initial Results

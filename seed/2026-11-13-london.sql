@@ -40,3 +40,37 @@ INSERT OR IGNORE INTO instructions (event_id, version, subject, body_md, change_
 **Joining remotely:** the talks are on Google Meet, and they are recorded. Your calendar entries carry the links once they are set up; we will send an update if they change.
 
 Calendar entries are attached to this email. To change or cancel your registration, use your personal link below.', 'First version', strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'setup');
+
+-- 2 October 2026: dinner becomes an opt-in session so numbers are known before booking. Runs once (optin = 0 guard),
+-- so later edits on the admin page are not overwritten.
+UPDATE sessions SET optin = 1, label = 'Dinner', location = 'The Broadcaster, 89 Wood Lane, London (to be booked)'
+  WHERE id = '2026-11-13-london-pub' AND optin = 0;
+
+-- Joining instructions version 2: room 516, in-person and remote sections, dinner sign-up. Insert-only.
+INSERT OR IGNORE INTO instructions (event_id, version, subject, body_md, change_note, created_at, created_by) VALUES
+  ('2026-11-13-london', 2, 'Joining instructions: AMYBO get-together, 13 November 2026',
+':::in-person
+**Where:** Room 516, Bezos Centre for Sustainable Protein, Imperial College White City campus, 84 Wood Lane, London W12 0BZ. Entrance and visitor sign-in details will follow before the day.
+
+**Getting there:** Wood Lane station (Hammersmith & City and Circle lines) is a few minutes'' walk away, and White City station (Central line) is also close.
+
+**Schedule (UK time):**
+
+- 10:30 First optional lab tour
+- 11:15 Second optional lab tour, and networking
+- 12:00 Welcome and talks
+- 13:00 Lunch
+- 14:00 Talks and discussion
+- 16:30 Close
+- 17:00 Dinner, for those who signed up
+
+If you booked the 10:30 tour, please arrive by 10:20. Closed shoes are needed in the labs.
+
+**Food:** attendance is free, and snacks and soft drinks are provided. Unless a sponsor comes forward, please buy or bring your own meals. The Works (Sir Michael Uren Hub, on campus) serves hot food at lunchtime. For dinner, we will try to book The Broadcaster (89 Wood Lane) for everyone who has signed up by 12 noon on Friday 6 November; you can sign up or change your mind with your personal link below.
+:::
+
+:::remote
+**Joining remotely:** the talks are on Google Meet from 12:00 to 13:00 and from 14:00 to 16:30 (UK time), and they are recorded. Your calendar entries carry the links once they are set up, and we will send an update if they change.
+:::
+
+Calendar entries are attached to this email. To change or cancel your registration, use your personal link below.', 'Room 516, separate in-person and remote sections, dinner sign-up', strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'setup');

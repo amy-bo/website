@@ -19,6 +19,8 @@ export const isCore = (s: SessionRow) => !s.choice_group && s.kind !== 'social';
  * - remote: one entry per online or hybrid core session, reminders a day, an hour and 10 minutes before;
  * - in person: one entry for the day, from their booked tour (or the first core session) to the last core session,
  *   reminders a week and a day before, "time to leave" (travel time + 15 minutes) and 15 minutes before.
+ * Most calendar apps ignore an invitation's own reminders and apply the attendee's defaults, so the entries carry
+ * them for the apps that honour them but no text promises them.
  * Nobody without a confirmed place gets entries (unconfirmed, or waiting for an in-person place).
  */
 export function entriesFor(env: Env, ev: EventRow, sessions: SessionRow[], reg: RegistrationRow): CalEntry[] {
@@ -54,7 +56,7 @@ export function entriesFor(env: Env, ev: EventRow, sessions: SessionRow[], reg: 
 		.map((s) => {
 			let note = '';
 			if (s.id === reg.tour_id) note = reg.tour_place === 'waitlist' ? ' (you are on the waiting list)' : ' (booked)';
-			if (s.kind === 'social') note = ` (optional${s.location ? `, ${s.location}` : ''})`;
+			if (s.kind === 'social') note = s.optin && reg.optins?.split(',').includes(s.id) ? ` (you signed up${s.location ? `, ${s.location}` : ''})` : ` (optional${s.location ? `, ${s.location}` : ''})`;
 			return `${hm(s.starts_at, tz)} ${s.label}${note}`;
 		});
 	const travel = ev.travel_minutes || 60;
@@ -67,7 +69,6 @@ export function entriesFor(env: Env, ev: EventRow, sessions: SessionRow[], reg: 
 		end: ends[ends.length - 1],
 		description: [
 			'Your day:', ...schedule, '',
-			`The "time to leave" reminder assumes about ${travel} minutes' travel; adjust it in your calendar if you need longer.`, '',
 			manage,
 		].join('\n'),
 		alarms: ['-P7D', '-P1D', `-PT${travel + 15}M`, '-PT15M'],

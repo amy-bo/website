@@ -2,7 +2,7 @@
 import type { Attachment, OutgoingEmail } from './email';
 import { type CalEntry, addLinks } from './ics';
 import { mdToHtml, mdToText } from './markdown';
-import { escapeHtml, ukDateTime } from './util';
+import { escapeHtml, ukDate, ukDateTime } from './util';
 
 export interface EventRow {
 	id: string;
@@ -35,6 +35,8 @@ export interface SessionRow {
 	capacity: number | null;
 	booking_deadline: string | null;
 	sort: number;
+	/** 1 for an optional session people sign up to without a capacity (e.g. dinner), so numbers are known. */
+	optin?: number;
 }
 
 export interface RegistrationRow {
@@ -46,6 +48,8 @@ export interface RegistrationRow {
 	affiliation: string | null;
 	needs: string | null;
 	extra_answer?: string | null;
+	/** Comma-separated ids of the opt-in sessions this person signed up to. */
+	optins?: string | null;
 	share_contact: number;
 	status: 'pending' | 'confirmed';
 	place: 'place' | 'waitlist' | null;
@@ -100,6 +104,31 @@ function button(href: string, label: string): string {
 	return `<p style="margin:24px 0"><a href="${escapeHtml(href)}" style="background:${BLUE};color:#fff;text-decoration:none;font-weight:bold;font-size:18px;padding:14px 24px;border-radius:6px;display:inline-block">${escapeHtml(label)}</a></p>`;
 }
 
+/**
+ * Joining instructions can carry sections for one kind of attendee only:
+ *   :::in-person            :::remote
+ *   …markdown…              …markdown…
+ *   :::                     :::
+ * Everything outside such a block goes to everyone.
+ */
+export function forAudience(md: string, attendance: 'in_person' | 'remote'): string {
+	const out: string[] = [];
+	let keep = true;
+	for (const line of md.split('\n')) {
+		const m = /^:::\s*(in-person|remote)?\s*$/.exec(line.trim());
+		if (m) { keep = !m[1] || (m[1] === 'in-person') === (attendance === 'in_person'); continue; }
+		if (keep) out.push(line);
+	}
+	return out.join('\n').replace(/\n{3,}/g, '\n\n');
+}
+
+/** The opt-in sessions (e.g. dinner) this registration signed up to. Only in-person registrations can. */
+export function optedIn(reg: Pick<RegistrationRow, 'attendance' | 'optins'>, sessions: SessionRow[]): SessionRow[] {
+	if (reg.attendance !== 'in_person' || !reg.optins) return [];
+	const ids = reg.optins.split(',');
+	return sessions.filter((s) => s.optin && ids.includes(s.id));
+}
+
 export function statusLines(reg: RegistrationRow, sessions: SessionRow[]): string[] {
 	const lines: string[] = [];
 	if (reg.attendance === 'remote') lines.push('You are registered to join the talks remotely.');
@@ -109,6 +138,7 @@ export function statusLines(reg: RegistrationRow, sessions: SessionRow[]): strin
 		const t = sessions.find((x) => x.id === reg.tour_id);
 		if (t) lines.push(reg.tour_place === 'waitlist' ? `You are on the waiting list for the ${t.label}.` : `You are booked on the ${t.label}.`);
 	}
+	for (const s of optedIn(reg, sessions)) lines.push(`You would like to join us for ${s.label.charAt(0).toLowerCase()}${s.label.slice(1)}.`);
 	return lines;
 }
 
@@ -119,12 +149,12 @@ function calendarHtml(cal: CalendarBlock | undefined, tz: string): string {
 		return `<li><strong>${escapeHtml(e.summary)}</strong>, ${escapeHtml(ukDateTime(e.start, tz))}<br>
 <span style="font-size:14px">Add to: <a href="${escapeHtml(l.google)}">Google</a> · <a href="${escapeHtml(l.outlook)}">Outlook.com</a> · <a href="${escapeHtml(l.office365)}">Office 365</a> · <a href="${escapeHtml(l.yahoo)}">Yahoo</a> · <a href="${escapeHtml(cal.icsUrl(e.key))}">Apple and others (.ics)</a></span></li>`;
 	}).join('');
-	return `<h2 style="font-size:18px">Your calendar</h2><p style="font-size:14px">Calendar invitations are attached; most email apps add them to your calendar automatically. Or use these links:</p><ul>${items}</ul>`;
+	return `<h2 style="font-size:18px">Your calendar</h2><p style="font-size:14px">Calendar invitations are attached; most email apps add them to your calendar automatically. Or use these links. Your calendar app decides which alerts you get, so add any reminders you need.</p><ul>${items}</ul>`;
 }
 
 function calendarText(cal: CalendarBlock | undefined, tz: string): string {
 	if (!cal || !cal.entries.length) return '';
-	return '\n\nYOUR CALENDAR (invitations attached)\n' + cal.entries.map((e) => {
+	return '\n\nYOUR CALENDAR (invitations attached; your calendar app decides which alerts you get, so add any reminders you need)\n' + cal.entries.map((e) => {
 		const l = addLinks(e);
 		return `- ${e.summary}, ${ukDateTime(e.start, tz)}\n  Google: ${l.google}\n  Outlook.com: ${l.outlook}\n  Office 365: ${l.office365}\n  Yahoo: ${l.yahoo}\n  Apple and others (.ics): ${cal.icsUrl(e.key)}`;
 	}).join('\n');
@@ -140,13 +170,13 @@ export function confirmEmail(b: Brand, ev: EventRow, reg: RegistrationRow, sessi
 		...statusLines(reg, sessions).map((l) => l.replace('You have an in-person place.', 'An in-person place is held for you.').replace('You are booked on', 'A place is held for you on')),
 		reg.share_contact ? 'You chose to share your email address with the hosts of the sessions you attend.' : 'Session hosts will see only your name and whether you have a place.',
 	];
-	const held = reg.attendance === 'in_person' ? 'your place' : 'your registration';
+	const held = reg.attendance === 'in_person' ? 'your place will be released' : 'your registration will be deleted';
 	const holdUntil = ukDateTime(reg.hold_expires_at ?? ev.deadline, ev.timezone);
 	const html = layout(b, subject, `
 <h1 style="font-size:22px;margin-top:0">Please complete your registration</h1>
 <p>Hello,</p>
 <p>Someone, hopefully you, registered this address for the <strong>${escapeHtml(ev.title)}</strong> on ${escapeHtml(ukDateTime(ev.starts_at, ev.timezone))}.</p>
-<p><strong>Your registration is not complete yet.</strong> Please confirm your email address by clicking the button below. If you don't complete your registration now, ${held} will be held until ${escapeHtml(holdUntil)} then deleted.</p>
+<p><strong>Your registration is not complete yet.</strong> Please click the button below now to confirm your email address. If you don't, ${held} on ${escapeHtml(holdUntil)}.</p>
 <p>You are confirming:</p><ul>${choices.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}</ul>
 ${button(confirmUrl, 'Complete registration')}
 <p style="font-size:14px">If the button does not work, copy this link into your browser:<br><a href="${escapeHtml(confirmUrl)}">${escapeHtml(confirmUrl)}</a></p>
@@ -156,10 +186,10 @@ ${button(confirmUrl, 'Complete registration')}
 
 Someone, hopefully you, registered this address for the ${ev.title} on ${ukDateTime(ev.starts_at, ev.timezone)}.
 
-YOUR REGISTRATION IS NOT COMPLETE YET. Please confirm your email address by opening this link and clicking "Complete registration":
+YOUR REGISTRATION IS NOT COMPLETE YET. Please open this link now and click "Complete registration" to confirm your email address:
 ${confirmUrl}
 
-If you don't complete your registration now, ${held} will be held until ${holdUntil} then deleted.
+If you don't, ${held} on ${holdUntil}.
 
 You are confirming:
 ${choices.map((l) => `- ${l}`).join('\n')}
@@ -175,14 +205,17 @@ export function instructionsEmail(
 	cal?: CalendarBlock, attachments?: Attachment[], intro?: { html: string; text: string },
 ): OutgoingEmail {
 	const st = statusLines(reg, sessions);
+	const thanks = `Thank you for registering for the ${ev.title}, on ${ukDate(ev.starts_at, ev.timezone)}.`;
+	const body = forAudience(instr.body_md, reg.attendance);
 	const html = layout(b, instr.subject, `
 <p>Hello ${escapeHtml(reg.name)},</p>
 ${intro?.html ?? ''}
+<p>${escapeHtml(thanks)}</p>
 ${st.map((l) => `<p><strong>${escapeHtml(l)}</strong></p>`).join('')}
-${mdToHtml(instr.body_md)}
+${mdToHtml(body)}
 ${calendarHtml(cal, ev.timezone)}
 ${button(manageUrl, 'Manage my registration')}`);
-	const text = `Hello ${reg.name},\n\n${intro ? `${intro.text}\n\n` : ''}${st.join('\n')}\n\n${mdToText(instr.body_md)}${calendarText(cal, ev.timezone)}\n\nView, change or cancel your registration: ${manageUrl}${textFooter(b)}`;
+	const text = `Hello ${reg.name},\n\n${intro ? `${intro.text}\n\n` : ''}${thanks}\n\n${st.join('\n')}\n\n${mdToText(body)}${calendarText(cal, ev.timezone)}\n\nView, change or cancel your registration: ${manageUrl}${textFooter(b)}`;
 	return { to: reg.email, subject: instr.subject, html, text, attachments };
 }
 

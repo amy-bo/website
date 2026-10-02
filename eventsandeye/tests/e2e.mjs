@@ -194,11 +194,14 @@ try {
 
 	console.log('\nConfirm → place, joining instructions and calendar invitation');
 	const alice = 'alice@example.org', bob = 'bob@example.org', carol = 'carol@example.org';
-	r = await register({ name: 'Alice', email: alice, tour_id: TOUR1, affiliation: 'Lab A', needs: 'Vegan', share_contact: true, extra_answer: 'A walk on Saturday' });
+	const DINNER = seeded.sessions.find((x) => x.optin)?.id;
+	check('the seed has an opt-in session (dinner)', !!DINNER);
+	check('public status lists opt-in sessions', ((await req('GET', `/api/rsvp/status?event=${EVENT}`)).data.optins || []).some((o) => o.id === DINNER));
+	r = await register({ name: 'Alice', email: alice, tour_id: TOUR1, affiliation: 'Lab A', needs: 'Vegan', share_contact: true, extra_answer: 'A walk on Saturday', optins: [DINNER, 'not-a-session'] });
 	check('Alice registers', r.status === 200 && r.data.ok, JSON.stringify(r.data));
 	let mails = await mailsTo(alice);
 	check('Alice gets one confirm-your-email message', mails.length === 1 && /Complete your registration/.test(mails[0].subject));
-	check('confirm email states until when the place is held', /your (place|registration) will be held until \w+day, \d+ \w+ 2026 at \d\d:\d\d then deleted/.test(mails[0].text_body), mails[0].text_body.slice(0, 400));
+	check('confirm email states until when the place is held', /If you don't, your place will be released on \w+day, \d+ \w+ 2026 at \d\d:\d\d\./.test(mails[0].text_body), mails[0].text_body.slice(0, 400));
 	check('confirm email says registration is not complete, and carries the Events&I beta footer', /NOT COMPLETE YET/.test(mails[0].text_body) && /Complete registration/.test(mails[0].html_body) && /Events&amp;I<\/a> \(beta\)/.test(mails[0].html_body) && /Events&I \(beta\)/.test(mails[0].text_body));
 	const aliceConfirm = tokenFrom(mails[0].text_body, 'confirm');
 	check('confirm link present; no manage link before the address is confirmed', !!aliceConfirm && !tokenFrom(mails[0].text_body, 'manage'));
@@ -220,7 +223,9 @@ try {
 	  check('a manage link with a valid signature but past its expiry is refused', (await req('GET', `/api/rsvp/manage?t=${encodeURIComponent(tokenWithExpiry('manage', aid, Math.floor(Date.now() / 1000) - 60))}`)).status === 404);
 	  check('the same link before its expiry works', (await req('GET', `/api/rsvp/manage?t=${encodeURIComponent(tokenWithExpiry('manage', aid, Math.floor(Date.now() / 1000) + 3600))}`)).status === 200); }
 	let m = await last(alice);
-	check('Alice receives joining instructions v1', /Joining instructions/.test(m.subject) && /You have an in-person place/.test(m.text_body));
+	check('Alice receives joining instructions', /Joining instructions/.test(m.subject) && /You have an in-person place/.test(m.text_body));
+	check('instructions open with thanks, then her status, including dinner', /Thank you for registering for the [^\n]+, on \w+day \d+ \w+ 2026\.\n\nYou have an in-person place\.\nYou are booked on the 10:30 lab tour\.\nYou would like to join us for dinner\./.test(m.text_body), JSON.stringify(m.text_body.slice(0, 400)));
+	check('in-person instructions carry the in-person section only', /Room 516/.test(m.text_body) && !/Joining remotely/.test(m.text_body) && !/:::/.test(m.text_body));
 	check('…with exactly one calendar invitation', m.att.length === 1 && m.att[0].filename === 'invite.ics' && /method=REQUEST/.test(m.att[0].content_type), JSON.stringify(m.att.map((a) => a.filename)));
 	let ics = m.att[0].content;
 	check('invitation: METHOD:REQUEST, SEQUENCE:0, Europe/London VTIMEZONE', /METHOD:REQUEST/.test(ics) && /SEQUENCE:0/.test(ics) && /TZID:Europe\/London/.test(ics));
@@ -291,7 +296,9 @@ try {
 	check('freed 10:30 tour place is not offered while someone waits for it', r.data.tours.find((t) => t.id === TOUR1).available === false);
 
 	console.log('\nRemote attendee: one calendar entry per online session');
-	const c = await registerAndConfirm({ name: 'Carol "CJ" Jones, PhD', email: carol, attendance: 'remote' });
+	const c = await registerAndConfirm({ name: 'Carol "CJ" Jones, PhD', email: carol, attendance: 'remote', optins: [DINNER] });
+	{ const cm = (await mailsTo(carol)).find((x) => /Joining instructions/.test(x.subject));
+	  check('remote instructions carry the remote section only, and no dinner sign-up', !!cm && /Joining remotely/.test(cm.text_body) && !/Room 516/.test(cm.text_body) && !/join us for dinner/.test(cm.text_body), cm?.text_body.slice(0, 600)); }
 	m = await last(carol);
 	const remoteIcs = m.att.map((a) => a.content);
 	check('two invitations, one per online session', m.att.length === 2 && m.att[0].filename === 'invite-1.ics', JSON.stringify(m.att.map((a) => a.filename)));
@@ -332,16 +339,17 @@ try {
 	check('promoting again is refused', (await req('POST', '/api/admin/promote', { id: bobId, what: 'event' }, ADMIN)).status === 400);
 
 	r = await req('POST', '/api/admin/instructions', { event: EVENT, subject: 'Joining instructions v2', body_md: 'Room **G01**, sign in at reception.\n\n- Bring ID', change_note: 'Added room' }, ADMIN);
-	check('new instructions version 2', r.data.ok && r.data.version === 2);
+	const V = r.data.version; // the seed may already carry several versions
+	check('new instructions version saved as the next number', r.data.ok && V >= 2);
 	n = (await outbox()).length;
 	check('saving a version emails nobody', (await outbox()).length === n);
-	r = await req('POST', '/api/admin/messages', { event: EVENT, dry_run: true, audience: { below_version: 2 } }, ADMIN);
+	r = await req('POST', '/api/admin/messages', { event: EVENT, dry_run: true, audience: { below_version: V } }, ADMIN);
 	check('dry run: 3 people on an older version', r.data.count === 3, JSON.stringify(r.data));
-	r = await req('POST', '/api/admin/messages', { event: EVENT, subject: 'Room confirmed', body_md: "What's changed: we are in room **G01**.", audience: { below_version: 2 }, marks_instructions_version: 2 }, ADMIN);
+	r = await req('POST', '/api/admin/messages', { event: EVENT, subject: 'Room confirmed', body_md: "What's changed: we are in room **G01**.", audience: { below_version: V }, marks_instructions_version: V }, ADMIN);
 	check('send now', r.data.ok && r.data.message.status === 'sent' && r.data.message.recipients_count === 3, JSON.stringify(r.data));
 	m = await last(alice);
 	check('each recipient gets a personal copy with their manage link and the beta footer', /Hello Alice A/.test(m.text_body) && /<strong>G01<\/strong>/.test(m.html_body) && m.text_body.includes('/events/manage/?t=') && /Events&I \(beta\)/.test(m.text_body));
-	check('recipients now recorded as having version 2', (await req('POST', '/api/admin/messages', { event: EVENT, dry_run: true, audience: { below_version: 2 } }, ADMIN)).data.count === 0);
+	check('recipients now recorded as having the new version', (await req('POST', '/api/admin/messages', { event: EVENT, dry_run: true, audience: { below_version: V } }, ADMIN)).data.count === 0);
 	check('filter by tour: 11:15 → 1 person', (await req('POST', '/api/admin/messages', { event: EVENT, dry_run: true, audience: { tour_id: TOUR2 } }, ADMIN)).data.count === 1);
 	check('HTML in messages is escaped', !/<script>/.test((await req('POST', '/api/admin/preview', { body_md: '<script>alert(1)</script>' }, ADMIN)).data.html));
 	const inAnHour = new Date(Date.now() + 3600_000).toISOString();
@@ -360,7 +368,7 @@ try {
 	r = await req('GET', `/api/admin/messages?event=${EVENT}`, undefined, ADMIN);
 	check('sent log lists sent, scheduled and cancelled messages', r.data.messages.some((x) => x.id === schedId && x.status === 'sent') && r.data.messages.some((x) => x.status === 'cancelled'));
 	r = await req('GET', `/api/admin/sent-log?event=${EVENT}`, undefined, ADMIN);
-	check('markdown sent log includes versions, sessions and messages', typeof r.data === 'string' && /Version 2/.test(r.data) && /Room confirmed/.test(r.data) && /Version 2: 3 confirmed/.test(r.data) && /## Sessions/.test(r.data) && /online link set/.test(r.data));
+	check('markdown sent log includes versions, sessions and messages', typeof r.data === 'string' && r.data.includes(`Version ${V}`) && /Room confirmed/.test(r.data) && r.data.includes(`Version ${V}: 3 confirmed`) && /## Sessions/.test(r.data) && /online link set/.test(r.data));
 
 	console.log('\nExports');
 	await register({ name: '=HYPERLINK("http://x")', email: 'formula@example.org', attendance: 'remote' });

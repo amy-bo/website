@@ -184,6 +184,7 @@ async function load() {
 		stat('remote confirmed', c.remote),
 		stat('unconfirmed', c.pending),
 		...c.tours.map((t) => stat(t.label + ' (waiting ' + t.waiting + ')' + (t.open ? '' : ' – booking closed'), t.confirmed + ' / ' + (t.capacity ?? '∞'))),
+		...s.sessions.filter((x) => x.optin).map((x) => stat(x.label + ': signed up (confirmed, with a place)', s.registrations.filter((r) => r.status === 'confirmed' && r.attendance === 'in_person' && r.place === 'place' && (r.optins || '').split(',').includes(x.id)).length)),
 		stat('registration closes', uk(s.event.deadline)),
 	].join('');
 	$('s-max').value = s.event.in_person_max; $('s-deadline').value = isoToUkLocal(s.event.deadline); $('s-travel').value = s.event.travel_minutes;
@@ -211,7 +212,8 @@ async function load() {
 		const tour = tours.find((t) => t.id === r.tour_id);
 		const pend = r.status === 'pending' ? '<span class="tag pending">unconfirmed</span> ' : '';
 		const where = r.attendance === 'remote' ? 'Remote' : r.place === 'waitlist' ? '<span class="tag wait">in person: waiting since ' + esc(uk(r.waitlist_since)) + '</span>' : '<span class="tag ok">in person</span>';
-		const tourCell = tour ? (r.tour_place === 'waitlist' ? '<span class="tag wait">' + esc(tour.label) + ': waiting</span>' : esc(tour.label)) : '';
+		const opts = r.attendance === 'in_person' && r.optins ? s.sessions.filter((x) => x.optin && r.optins.split(',').includes(x.id)).map((x) => esc(x.label)) : [];
+		const tourCell = (tour ? (r.tour_place === 'waitlist' ? '<span class="tag wait">' + esc(tour.label) + ': waiting</span>' : esc(tour.label)) : '') + (opts.length ? (tour ? '<br>' : '') + 'Signed up: ' + opts.join(', ') : '');
 		const actions = [
 			r.status === 'confirmed' && r.place === 'waitlist' ? '<button data-promote="event" data-id="' + esc(r.id) + '">Promote to place</button>' : '',
 			r.status === 'confirmed' && r.tour_place === 'waitlist' ? '<button data-promote="tour" data-id="' + esc(r.id) + '">Promote to tour</button>' : '',

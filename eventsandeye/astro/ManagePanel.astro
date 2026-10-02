@@ -21,6 +21,10 @@
 			<label class="choice"><input type="radio" name="tour_id" value="none" /> No tour, thanks</label>
 			<div id="m-tours"></div>
 		</fieldset>
+		<fieldset class="field" id="m-optins-fieldset" hidden>
+			<legend>Also joining us for (in person only)</legend>
+			<div id="m-optins"></div>
+		</fieldset>
 		<div class="field">
 			<label for="m-affiliation">Organisation or affiliation (optional)</label>
 			<input id="m-affiliation" name="affiliation" type="text" maxlength="200" />
@@ -50,7 +54,7 @@
 	const out = document.getElementById('manage-result')!;
 	const tourFs = document.getElementById('m-tour-fs') as HTMLFieldSetElement;
 
-	type View = { ok: boolean; error?: string; event: { title: string; page_path: string }; tours: { id: string; label: string; available: boolean; open: boolean }[]; registration: Record<string, string | null | boolean>; calendar: { key: string; summary: string; start: string; url: string }[] };
+	type View = { ok: boolean; error?: string; event: { title: string; page_path: string }; tours: { id: string; label: string; available: boolean; open: boolean }[]; optins?: { id: string; label: string; starts_at: string; location: string | null }[]; registration: Record<string, string | null | boolean | string[]>; calendar: { key: string; summary: string; start: string; url: string }[] };
 
 	function describe(r: View['registration']) {
 		const parts: string[] = [];
@@ -58,12 +62,16 @@
 		if (r.attendance === 'remote') parts.push('Attending remotely.');
 		else parts.push(r.place === 'waitlist' ? 'On the in-person waiting list.' : 'In-person place.');
 		if (r.tour_label) parts.push(r.tour_place === 'waitlist' ? `Waiting list for the ${r.tour_label}.` : `Booked on the ${r.tour_label}.`);
+		if (Array.isArray(r.optin_labels) && r.optin_labels.length) parts.push(`Signed up for: ${r.optin_labels.join(', ')}.`);
 		return parts.join(' ');
 	}
 	function syncTour() {
 		const inPerson = (form.elements.namedItem('attendance') as RadioNodeList).value === 'in_person';
 		tourFs.disabled = !inPerson;
 		if (!inPerson) (form.querySelector('input[name=tour_id][value=none]') as HTMLInputElement).checked = true;
+		const optFs = document.getElementById('m-optins-fieldset') as HTMLFieldSetElement;
+		optFs.disabled = !inPerson;
+		if (!inPerson) optFs.querySelectorAll('input').forEach((el) => ((el as HTMLInputElement).checked = false));
 	}
 	function fill(v: View) {
 		const r = v.registration;
@@ -86,6 +94,17 @@
 		(form.querySelector(`input[name=attendance][value=${r.attendance}]`) as HTMLInputElement).checked = true;
 		(form.querySelector(`input[name=tour_id][value="${r.tour_id ?? 'none'}"]`) as HTMLInputElement).checked = true;
 		(document.getElementById('m-share') as HTMLInputElement).checked = !!r.share_contact;
+		const mine = Array.isArray(r.optins) ? r.optins : [];
+		document.getElementById('m-optins')!.replaceChildren(...(v.optins ?? []).map((o) => {
+			const l = document.createElement('label');
+			l.className = 'choice';
+			const i = document.createElement('input');
+			i.type = 'checkbox'; i.name = 'optins'; i.value = o.id; i.checked = mine.includes(o.id);
+			const time = new Date(o.starts_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
+			l.append(i, ` ${o.label}, ${time}${o.location ? `, ${o.location}` : ''}`);
+			return l;
+		}));
+		(document.getElementById('m-optins-fieldset') as HTMLFieldSetElement).hidden = !(v.optins ?? []).length;
 		const cal = document.getElementById('m-calendar')!;
 		cal.replaceChildren();
 		if (v.calendar?.length) {
@@ -121,6 +140,7 @@
 		if (!form.reportValidity()) return;
 		const fd: Record<string, unknown> = Object.fromEntries(new FormData(form).entries());
 		fd.share_contact = (document.getElementById('m-share') as HTMLInputElement).checked;
+		fd.optins = new FormData(form).getAll('optins').map(String);
 		try { fill(await call('POST', fd)); out.textContent = 'Your changes have been saved.'; } catch (err) { out.textContent = (err as Error).message; }
 	});
 	document.getElementById('m-cancel')!.addEventListener('click', async () => {

@@ -41,6 +41,12 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 		<div id="rsvp-tours"></div>
 	</fieldset>
 
+	<fieldset class="field" id="rsvp-optins-fieldset" hidden>
+		<legend>Also joining us for (in person only)</legend>
+		<p class="help">Optional. Tick so we know numbers in advance; you can change this later with the link in your emails.</p>
+		<div id="rsvp-optins"></div>
+	</fieldset>
+
 	<div class="field">
 		<label for="rsvp-affiliation">Organisation or affiliation (optional)</label>
 		<input id="rsvp-affiliation" name="affiliation" type="text" autocomplete="organization" maxlength="200" />
@@ -87,10 +93,13 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 	const avail = document.getElementById('rsvp-availability')!;
 	const toursBox = document.getElementById('rsvp-tours')!;
 	const tourFs = document.getElementById('rsvp-tour-fieldset') as HTMLFieldSetElement;
+	const optFs = document.getElementById('rsvp-optins-fieldset') as HTMLFieldSetElement;
 
 	function syncTour() {
 		const inPerson = (form.elements.namedItem('attendance') as RadioNodeList).value === 'in_person';
 		tourFs.disabled = !inPerson;
+		optFs.disabled = !inPerson;
+		if (!inPerson) optFs.querySelectorAll('input').forEach((el) => ((el as HTMLInputElement).checked = false));
 		if (!inPerson) (form.querySelector('input[name=tour_id][value=none]') as HTMLInputElement).checked = true;
 	}
 	form.addEventListener('change', syncTour);
@@ -122,6 +131,19 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 				label.append(input, ` ${t.label}${!t.open ? ' (booking closed)' : t.available ? '' : ' (full: waiting list)'}`);
 				toursBox.append(label);
 			}
+			for (const o of s.optins ?? []) {
+				const label = document.createElement('label');
+				label.className = 'choice';
+				const input = document.createElement('input');
+				input.type = 'checkbox';
+				input.name = 'optins';
+				input.value = o.id;
+				const time = new Date(o.starts_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
+				label.append(input, ` ${o.label}, ${time}${o.location ? `, ${o.location}` : ''}`);
+				(document.getElementById('rsvp-optins') as HTMLElement).append(label);
+			}
+			optFs.hidden = !(s.optins ?? []).length;
+			syncTour();
 		})
 		.catch(() => {
 			avail.textContent = `Could not check availability. You can still try to register, or contact us using the link below.`;
@@ -136,6 +158,7 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 		body.event = event;
 		body.consent = (document.getElementById('rsvp-consent') as HTMLInputElement).checked;
 		body.share_contact = (document.getElementById('rsvp-share') as HTMLInputElement).checked;
+		body.optins = fd.getAll('optins').map(String);
 		const btn = form.querySelector('button[type=submit]') as HTMLButtonElement;
 		btn.disabled = true;
 		try {

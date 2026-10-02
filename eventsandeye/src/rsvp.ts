@@ -6,7 +6,7 @@ import { syncHosts } from './hosts';
 import { buildIcs } from './ics';
 import {
 	alreadyRegisteredIntro, type Brand, calendarUpdateEmail, cancellationEmail, confirmEmail, type EventRow, instructionsEmail, messageEmail,
-	notification, type RegistrationRow, type SessionRow, waitlistReminderEmail,
+	notification, optedIn, type RegistrationRow, type SessionRow, waitlistReminderEmail,
 } from './templates';
 import { makeToken } from './tokens';
 import { cleanText, EMAIL_RE, nowIso, randomToken } from './util';
@@ -134,6 +134,7 @@ export interface RegistrationInput {
 	affiliation?: unknown;
 	needs?: unknown;
 	extra_answer?: unknown;
+	optins?: unknown;
 	consent?: unknown;
 	share_contact?: unknown;
 }
@@ -151,8 +152,10 @@ function parseCommon(input: RegistrationInput, sessions: SessionRow[]) {
 		if (!t) throw new UserError('Unknown tour.');
 		tour_id = t.id;
 	}
+	const asked = Array.isArray(input.optins) ? input.optins.map(String) : typeof input.optins === 'string' && input.optins ? input.optins.split(',') : [];
+	const optins = attendance === 'in_person' ? sessions.filter((s) => s.optin && asked.includes(s.id)).map((s) => s.id).join(',') || null : null;
 	return {
-		name, attendance, tour_id, affiliation: cleanText(input.affiliation, 200), needs: cleanText(input.needs, 1000), extra_answer: cleanText(input.extra_answer, 500),
+		name, attendance, tour_id, optins, affiliation: cleanText(input.affiliation, 200), needs: cleanText(input.needs, 1000), extra_answer: cleanText(input.extra_answer, 500),
 		share_contact: truthy(input.share_contact) ? 1 : 0,
 	} as const;
 }
@@ -197,9 +200,9 @@ export async function register(env: Env, eventId: string, input: RegistrationInp
 	const tour_place = tourCap ? (tourCap.available ? 'place' : 'waitlist') : null;
 	const id = randomToken(16);
 	await env.DB.prepare(
-		`INSERT INTO registrations (id, event_id, name, email, attendance, affiliation, needs, extra_answer, share_contact, status, place, tour_id, tour_place,
-			consent_at, created_at, updated_at, hold_expires_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-	).bind(id, ev.id, c.name, email, c.attendance, c.affiliation, c.needs, c.extra_answer, c.share_contact, 'pending', place, c.tour_id, tour_place,
+		`INSERT INTO registrations (id, event_id, name, email, attendance, affiliation, needs, extra_answer, optins, share_contact, status, place, tour_id, tour_place,
+			consent_at, created_at, updated_at, hold_expires_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+	).bind(id, ev.id, c.name, email, c.attendance, c.affiliation, c.needs, c.extra_answer, c.optins, c.share_contact, 'pending', place, c.tour_id, tour_place,
 		nowS, nowS, nowS, new Date(now + holdMs(ev, now)).toISOString()).run();
 	// D1 has no row locks: if two people took the last place at the same moment, the later one moves to the waiting list.
 	const after = await capacity(env, ev, sessions, nowS);
@@ -286,7 +289,7 @@ function confirmStatus(reg: RegistrationRow, sessions: SessionRow[]) {
 export function publicStatus(reg: RegistrationRow, sessions: SessionRow[]) {
 	const tour = reg.tour_id ? sessions.find((t) => t.id === reg.tour_id) : null;
 	return {
-		name: reg.name, email: reg.email, attendance: reg.attendance, affiliation: reg.affiliation, needs: reg.needs, extra_answer: reg.extra_answer ?? null, share_contact: !!reg.share_contact,
+		name: reg.name, email: reg.email, attendance: reg.attendance, affiliation: reg.affiliation, needs: reg.needs, extra_answer: reg.extra_answer ?? null, optins: reg.optins ? reg.optins.split(',') : [], optin_labels: optedIn(reg, sessions).map((s) => s.label), share_contact: !!reg.share_contact,
 		status: reg.status, place: reg.place, tour_id: reg.tour_id, tour_label: tour?.label ?? null, tour_place: reg.tour_place,
 		hold_expires_at: reg.status === 'pending' ? reg.hold_expires_at : null,
 	};
@@ -340,6 +343,7 @@ export async function manageView(env: Env, id: string) {
 		ok: true as const,
 		event: { id: ev.id, title: ev.title, starts_at: ev.starts_at, deadline: ev.deadline, page_path: ev.page_path, open: registrationOpen(ev) },
 		tours: cap.tours.map((t) => ({ id: t.id, label: t.label, available: t.available, open: t.open })),
+		optins: sessions.filter((s) => s.optin).map((s) => ({ id: s.id, label: s.label, starts_at: s.starts_at, location: s.location })),
 		registration: publicStatus(reg, sessions),
 		calendar: entriesFor(env, ev, sessions, reg).map((e) => ({ key: e.key, summary: e.summary, start: e.start, url: ics(e.key) })),
 	};
@@ -356,6 +360,8 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 	// tour_id means "unchanged" (only an explicit 'none' drops the tour), so other details can still be saved.
 	const c = { ...parseCommon(input, sessions) };
 	if (input.tour_id === undefined && c.attendance === 'in_person') c.tour_id = reg.tour_id;
+	// Likewise an absent optins list means "unchanged" (an empty list clears them); remote attendees have none.
+	if (input.optins === undefined && c.attendance === 'in_person') c.optins = reg.optins ?? null;
 	const now = nowIso();
 	const cap = await capacity(env, ev, sessions, now);
 
@@ -384,9 +390,9 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 		}
 	}
 	await env.DB.prepare(
-		`UPDATE registrations SET name=?, attendance=?, affiliation=?, needs=?, extra_answer=?, share_contact=?, place=?, waitlist_since=?, tour_id=?, tour_place=?,
+		`UPDATE registrations SET name=?, attendance=?, affiliation=?, needs=?, extra_answer=?, optins=?, share_contact=?, place=?, waitlist_since=?, tour_id=?, tour_place=?,
 			tour_waitlist_since=?, updated_at=? WHERE id=?`,
-	).bind(c.name, c.attendance, c.affiliation, c.needs, c.extra_answer, c.share_contact, place, waitlist_since, c.tour_id, tour_place, tour_waitlist_since, now, id).run();
+	).bind(c.name, c.attendance, c.affiliation, c.needs, c.extra_answer, c.optins, c.share_contact, place, waitlist_since, c.tour_id, tour_place, tour_waitlist_since, now, id).run();
 	if (reg.status === 'confirmed') {
 		const updated = (await getRegistration(env, id))!;
 		const newEvent = updated.place === 'waitlist' && reg.place !== 'waitlist';
@@ -676,13 +682,13 @@ export async function adminSummary(env: Env, eventId: string) {
 }
 
 export function registrationsCsv(regs: Omit<RegistrationRow, 'calendar_state'>[], sessions: SessionRow[]): string {
-	const cols = ['name', 'email', 'attendance', 'status', 'place', 'tour', 'tour_place', 'affiliation', 'needs', 'extra_answer', 'share_contact', 'instructions_version', 'created_at', 'confirmed_at'];
+	const cols = ['name', 'email', 'attendance', 'status', 'place', 'tour', 'tour_place', 'signed_up_for', 'affiliation', 'needs', 'extra_answer', 'share_contact', 'instructions_version', 'created_at', 'confirmed_at'];
 	const esc = (v: unknown) => {
 		let s = v == null ? '' : String(v).replace(/\t/g, ' ');
 		if (/^[\s]*[=+\-@]/.test(s) || /^[\r\n]/.test(s)) s = `'${s}`; // defuse spreadsheet formula injection
 		return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 	};
-	const rows = regs.map((r) => [r.name, r.email, r.attendance, r.status, r.place, sessions.find((t) => t.id === r.tour_id)?.label ?? '', r.tour_place,
+	const rows = regs.map((r) => [r.name, r.email, r.attendance, r.status, r.place, sessions.find((t) => t.id === r.tour_id)?.label ?? '', r.tour_place, optedIn(r, sessions).map((s) => s.label).join('; '),
 		r.affiliation, r.needs, r.extra_answer ?? '', r.share_contact ? 'yes' : 'no', r.instructions_version, r.created_at, r.confirmed_at].map(esc).join(','));
 	return [cols.join(','), ...rows].join('\r\n') + '\r\n';
 }
