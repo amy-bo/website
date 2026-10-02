@@ -42,7 +42,8 @@ const count = (ctx: Ctx, page: string, slug: string) => {
 export const goHandler = (page: LinkPage) => async (ctx: Ctx) => {
 	const slug = String(ctx.params.slug ?? '');
 	const link = allLinks(page).find((l) => l.slug === slug);
-	if (!link) return Response.redirect(new URL(`/~${page.handle}/`, ctx.request.url).toString(), 302);
+	// Relative, so it stays on amy.bo when the amy.bo Worker proxies the request here.
+	if (!link) return new Response(null, { status: 302, headers: { location: `/~${page.handle}/`, 'cache-control': 'no-store' } });
 	count(ctx, page.handle, slug);
 	return new Response(null, { status: 302, headers: { location: link.url, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer-when-downgrade' } });
 };
