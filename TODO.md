@@ -4,7 +4,7 @@ Open work on amybo.org. Done work is in [CHANGELOG.md](CHANGELOG.md). Abandoned 
 
 ## Open
 
-- [ ] **Photo credits:** Gerrit Niezen said at the 25 September meeting that many site photos are his; confirm who took each photo in `src/assets/photos/` and credit accordingly.
+- [ ] **Photo credits:** Gerrit Niezen said at the 25 September meeting that many site photos are his; confirm who took each photo in `src/assets/photos/` and credit accordingly. His credit is "Gerrit Niezen", CC BY-SA (2 Oct); still open: the two venting-solenoid photos, and who took the Imperial lab photo of him and Teo.
 - [ ] **One origin story:** "Why AMYBO" and About both tell it (raised by Gerrit on 25 September); merge them.
 - [ ] **Rewrite pushed history** (needs Martin's force-push approval): eight photos with GPS in f167580 and the Termly screenshot (src/content/docs/collaborate/safety-and-legal/Xnip2023-07-06_16-30-59.png, unused) are in pushed history; also fixes the attribution trailer on bf0e81e. Then ask GitHub Support to purge PR #1's cached refs, and check the old Hugo site's copies of the photos.
 - [ ] **Delete the old North America database** `amybo-rsvp`: the EU one (`amybo-rsvp-eu`) went live with the 1 October deploy, so the old one (seed rows only) can go once registration is tested.
