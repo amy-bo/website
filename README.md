@@ -77,6 +77,17 @@ The 13 November 2026 get-together page is `src/content/docs/events/2026-11-13-lo
 
 **Data retention.** A scheduled job deletes the event's registrations, their email records and host lists 30 days after the event ends. See the [privacy notice](https://amybo.org/privacy/).
 
+## Link pages (amy.bo/~name)
+
+Link-in-bio pages for AMYBO volunteers and supporters, and AMYBO's own at amy.bo/links. Each page is a twisty list of links with a map of the same links beside it; the map is a static drawing until someone touches it, and only then loads `public/link-assets/graph.js` (force-directed physics that stops when it settles). Volunteers get a diary with highlights; supporters a "How I support" note.
+
+- **Code:** `src/links/` (model, renderer, icons, API, editor), routes in `functions/[page]/` (`/~name`), `functions/links/` (`/links`), `functions/api/links/` and `functions/admin/links/`, the editor at `src/pages/links/edit/`. `public/_routes.json` limits Functions to the paths that need them; keep it in step with `functions/`.
+- **Data:** D1 tables `lp_*` and `link_events` (`db/links/`). Clicks and views store only the page, the link and the time.
+- **People:** by invitation from `/admin/links/` (behind Cloudflare Access). They sign in with an emailed single-use link; no passwords.
+- **Images:** uploads go to the R2 bucket `amybo-links` (EU). The deploy binds it as `LINKS_BUCKET` only if it exists, so uploads stay off until it is created.
+- **amy.bo:** the `amybo-redirects` Worker in `workers/amy-bo/` keeps the short links and serves `/~name` and `/links` from the Pages project under the amy.bo address. The deploy workflow deploys it once the repository variable `DEPLOY_AMYBO_WORKER` is `true` (the API token then also needs Workers Routes edit on the amy.bo zone). Until then, edit the Worker in the Cloudflare dashboard by pasting `workers/amy-bo/index.js`.
+- **Tests:** `npm run build:test && npm run test:links` (pages, clicks, invitations, sign-in, editing, diary, security checks and accessibility), and `node --test workers/amy-bo/index.test.mjs`.
+
 ## Deploying from GitHub (the quick route)
 
 `.github/workflows/deploy.yml` deploys everything from GitHub Actions on every push to `launch-2026` or `main`, so nothing has to run on a laptop. It has two jobs:

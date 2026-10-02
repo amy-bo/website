@@ -1,0 +1,15 @@
+# The amy.bo front door: short links, and the link pages (amy.bo/~name, amy.bo/links) served from the amybo Pages
+# project while keeping the amy.bo address. Replaces the dashboard-edited Worker of the same name.
+name = "amybo-redirects"
+main = "index.js"
+compatibility_date = "2026-09-01"
+workers_dev = false
+routes = [
+	{ pattern = "amy.bo/*", zone_name = "amy.bo" },
+	{ pattern = "www.amy.bo/*", zone_name = "amy.bo" },
+]
+
+[vars]
+# Where the link pages are served from (the Pages project). Its own address works before and after the amybo.org switch.
+PAGES_ORIGIN = "https://amybo-4p1.pages.dev"
+SITE = "https://amybo.org"

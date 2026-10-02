@@ -1,0 +1,16 @@
+{
+	"version": 1,
+	"description": "Which paths run Pages Functions; everything else is served as static files without invoking one. Keep in step with ./functions (the [page] catch-all would otherwise make every request a Function call).",
+	"include": [
+		"/~*",
+		"/links",
+		"/links/*",
+		"/admin/*",
+		"/api/*",
+		"/events/next"
+	],
+	"exclude": [
+		"/links/edit",
+		"/links/edit/*"
+	]
+}
