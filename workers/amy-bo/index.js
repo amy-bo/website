@@ -46,7 +46,11 @@ export default {
 		if (proxied(url.pathname)) {
 			const origin = new URL(env.PAGES_ORIGIN);
 			const target = new URL(url.pathname + url.search, origin);
-			const res = await fetch(new Request(target, request), { redirect: 'manual' });
+			const fwd = new Request(target, request);
+			// Nothing of the visitor's amy.bo credentials needs to reach the Pages project.
+			fwd.headers.delete('cookie');
+			fwd.headers.delete('authorization');
+			const res = await fetch(fwd, { redirect: 'manual' });
 			const out = new Response(res.body, res);
 			// Keep redirects on amy.bo: the Pages project answers with its own host or with relative paths.
 			const loc = res.headers.get('location');
@@ -58,6 +62,6 @@ export default {
 		}
 
 		// Anything else: the same path on the main site.
-		return Response.redirect(`https://amybo.org${path}${url.search}`, 302);
+		return Response.redirect(`https://amybo.org${url.pathname}${url.search}`, 302);
 	},
 };

@@ -2,7 +2,7 @@
 // Privacy: only the page, the link slug and the UTC time are stored. No IP, user agent, referrer or cookie.
 import type { Env as EventsEnv } from '../../eventsandeye/src/env';
 import { HANDLE_RE, loadDiary, loadPage, walk } from './model';
-import { renderDiary, renderPage } from './render';
+import { BOOT, renderDiary, renderPage } from './render';
 
 export interface Env extends EventsEnv {
 	LINKS_BUCKET?: R2Bucket;
@@ -26,7 +26,17 @@ const count = (ctx: Ctx, page: string, slug: string) => {
 	);
 };
 
-const html = (body: string, status = 200) =>
+// The page's one inline script (the map loader) is allowed by its hash; nothing else inline can run.
+let bootHash = '';
+async function scriptHash(): Promise<string> {
+	if (!bootHash) {
+		const d = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(BOOT)));
+		bootHash = `'sha256-${btoa(String.fromCharCode(...d))}'`;
+	}
+	return bootHash;
+}
+
+const html = async (body: string, status = 200) =>
 	new Response(body, {
 		status,
 		headers: {
@@ -34,14 +44,13 @@ const html = (body: string, status = 200) =>
 			'cache-control': 'no-cache',
 			'x-content-type-options': 'nosniff',
 			'referrer-policy': 'strict-origin-when-cross-origin',
-			'content-security-policy':
-				"default-src 'self'; img-src 'self' data: https:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'",
+			'content-security-policy': `default-src 'self'; img-src 'self' data: https:; style-src 'unsafe-inline'; script-src 'self' ${await scriptHash()}; base-uri 'none'; form-action 'self'; frame-ancestors 'self'`,
 		},
 	});
 
 const redirect = (location: string, status = 302) => new Response(null, { status, headers: { location, 'cache-control': 'no-store' } });
 
-function notFound(): Response {
+function notFound(): Promise<Response> {
 	return html(
 		`<!doctype html><html lang="en-GB"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Not found</title><body style="font-family:system-ui,sans-serif;max-width:30rem;margin:4rem auto;padding:0 1rem;text-align:center"><h1>No page here</h1><p>There's no link page at this address. <a href="https://amybo.org/">Visit AMYBO</a>.</p></body></html>`,
 		404,
@@ -50,11 +59,16 @@ function notFound(): Response {
 
 /** Serves /~<handle>/… (and /links/… for AMYBO). `rest` is the path after the page, already split. */
 export async function servePage(ctx: Ctx, handle: string, rest: string[]): Promise<Response> {
-	if (!HANDLE_RE.test(handle)) return notFound();
+	if (!HANDLE_RE.test(handle)) return await notFound();
 	const base = handle === 'amybo' ? '/links' : `/~${handle}`;
 	const [first, ...more] = rest;
 	if (first === 'go') {
-		const slug = decodeURIComponent(more[0] ?? '');
+		let slug = '';
+		try {
+			slug = decodeURIComponent(more[0] ?? '');
+		} catch {
+			return notFound();
+		}
 		const row = await ctx.env.DB.prepare(
 			`SELECT n.url FROM lp_nodes n JOIN lp_people p ON p.id = n.person_id WHERE p.handle = ? AND p.status = 'active' AND n.slug = ? AND n.kind = 'link'`,
 		)
@@ -96,7 +110,12 @@ const restOf = (ctx: Ctx) => ([] as string[]).concat(ctx.params.rest ?? []).filt
 
 /** Function entry for functions/[page]/…: only paths starting /~ are link pages; everything else falls through. */
 export const onTildeRequest = async (ctx: Ctx) => {
-	const page = decodeURIComponent(String(ctx.params.page ?? ''));
+	let page = '';
+	try {
+		page = decodeURIComponent(String(ctx.params.page ?? ''));
+	} catch {
+		return ctx.next();
+	}
 	if (!page.startsWith('~')) return ctx.next();
 	const handle = page.slice(1).toLowerCase();
 	const rest = restOf(ctx);

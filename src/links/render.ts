@@ -97,12 +97,15 @@ interface Ctx {
 	preview: boolean;
 }
 
+/** Visitors don't see an empty support note or an empty diary; the editor's preview shows everything. */
+const isHidden = (n: LinkNode, ctx: Ctx) => !ctx.preview && ((n.kind === 'support' && !n.body.trim()) || (n.kind === 'diary' && !ctx.data.diaryCount));
+
 function renderNodes(nodes: LinkNode[], ctx: Ctx, depth: number): string {
 	return nodes
-		.filter((n) => ctx.preview || (n.kind === 'support' ? !!n.body.trim() : n.kind === 'diary' ? ctx.data.diaryCount > 0 : true))
+		.filter((n) => !isHidden(n, ctx))
 		.map((n) => {
 			if (n.kind === 'group') {
-				const count = [...walk(n.children)].filter((c) => c.kind !== 'group').length;
+				const count = [...walk(n.children)].filter((c) => c.kind !== 'group' && !isHidden(c, ctx)).length;
 				return `<li class="grp"><details${depth === 0 ? ' open' : ''}><summary><span class="twisty" aria-hidden="true"></span><span class="glabel">${esc(n.label)}</span><span class="count">${count}</span></summary><ul>${renderNodes(n.children, ctx, depth + 1)}</ul></details></li>`;
 			}
 			if (n.kind === 'support') {
@@ -139,22 +142,27 @@ interface GNode {
 function graphData(ctx: Ctx): { nodes: GNode[]; svg: string; view: [number, number, number, number] } {
 	const { data, base } = ctx;
 	const nodes: GNode[] = [];
-	const hidden = (n: LinkNode) => !ctx.preview && ((n.kind === 'support' && !n.body.trim()) || (n.kind === 'diary' && !data.diaryCount));
+	const hidden = (n: LinkNode) => isHidden(n, ctx);
 	const top = data.roots.filter((n) => !hidden(n));
-	for (const n of walk(top)) {
-		if (hidden(n)) continue;
-		nodes.push({
-			id: n.id,
-			parent: n.parent_id,
-			kind: n.kind,
-			label: n.label,
-			href: n.kind === 'link' ? (ctx.preview ? safeUrl(n.url) : `${base}/go/${encodeURIComponent(n.slug)}`) : n.kind === 'diary' ? `${base}/diary` : n.kind === 'support' ? '#lp-support' : '',
-			icon: nodeIcon(n),
-			ic: icon(nodeIcon(n)).brand ? 'ib' : 'il',
-			st: brandStyle(nodeIcon(n)).replace(/^ style="|"$/g, ''),
-			image: n.image ? mediaUrl(n.image) : '',
-		});
-	}
+	// Walk the tree itself, so each node's parent is its parent in the tree (orphans already sit at the root).
+	const visit = (list: LinkNode[], parent: number | null) => {
+		for (const n of list) {
+			if (hidden(n)) continue;
+			nodes.push({
+				id: n.id,
+				parent,
+				kind: n.kind,
+				label: n.label,
+				href: n.kind === 'link' ? (ctx.preview ? safeUrl(n.url) : `${base}/go/${encodeURIComponent(n.slug)}`) : n.kind === 'diary' ? `${base}/diary` : n.kind === 'support' ? '#lp-support' : '',
+				icon: nodeIcon(n),
+				ic: icon(nodeIcon(n)).brand ? 'ib' : 'il',
+				st: brandStyle(nodeIcon(n)).replace(/^ style="|"$/g, ''),
+				image: n.image ? mediaUrl(n.image) : '',
+			});
+			visit(n.children, n.id);
+		}
+	};
+	visit(top, null);
 	const N = Math.max(top.length, 1);
 	const R1 = N <= 5 ? 112 : N <= 8 ? 128 : 150;
 	const byId = new Map(nodes.map((g) => [g.id, g]));
@@ -242,7 +250,7 @@ export function renderPage(data: PageData, opts: RenderOptions = {}): string {
 		.filter((n) => n.kind === 'link' && n.icon === 'mastodon')
 		.map((n) => `<link rel="me" href="${esc(n.url)}">`)
 		.join('');
-	const showGraph = !p.basic_mode && data.roots.length > 0;
+	const showGraph = !p.basic_mode && data.roots.some((n) => !isHidden(n, ctx));
 	const g = showGraph ? graphData(ctx) : null;
 
 	const avatar =
@@ -259,7 +267,7 @@ export function renderPage(data: PageData, opts: RenderOptions = {}): string {
 <p class="map-hint" aria-hidden="true"><span class="pulse"></span>Touch to explore</p>
 </aside>
 <button type="button" class="back" aria-label="Back to the list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/></svg></button>
-<script type="application/json" id="lp-data">${JSON.stringify({ name: p.name, photo: p.photo ? mediaUrl(p.photo) : '', kind: p.kind, initials: initials(p.name), nodes: g.nodes, view: g.view }).replace(/</g, '\\u003c')}</script>
+<script type="application/json" id="lp-data">${JSON.stringify({ name: p.name, photo: p.photo ? mediaUrl(p.photo) : '', kind: p.kind, initials: initials(p.name), nodes: g.nodes, view: g.view, preview: ctx.preview }).replace(/</g, '\\u003c')}</script>
 <script>${BOOT}</script>`
 		: '';
 
@@ -308,7 +316,7 @@ export function renderDiary(data: PageData, entries: DiaryEntry[], view: 'all' |
 }
 
 /** Loader: on the first touch, hover or keypress on the map, fetch the physics and hand over. ~1 KB. */
-const BOOT = `(()=>{const b=document.body,m=document.querySelector('.map');if(!m)return;let go=null;const on=e=>{if(b.classList.contains('map-on'))return;if(e&&e.type==='pointerenter'&&e.pointerType!=='mouse')return;const t=()=>b.classList.add('map-on');document.startViewTransition&&!matchMedia('(prefers-reduced-motion: reduce)').matches?document.startViewTransition(t):t();go=go||import('/link-assets/graph.js').then(g=>g.start(m)).catch(()=>{});};m.addEventListener('pointerenter',on);m.addEventListener('pointerdown',on);m.querySelector('.map-open').addEventListener('click',on);const off=()=>{if(!b.classList.contains('map-on'))return;const t=()=>b.classList.remove('map-on');document.startViewTransition&&!matchMedia('(prefers-reduced-motion: reduce)').matches?document.startViewTransition(t):t();window.dispatchEvent(new Event('lp-map-off'));};document.querySelector('.back').addEventListener('click',off);addEventListener('keydown',e=>{if(e.key==='Escape')off()});})();`;
+export const BOOT = `(()=>{const b=document.body,m=document.querySelector('.map');if(!m)return;let go=null;const rm=matchMedia('(prefers-reduced-motion: reduce)').matches;const vt=f=>document.startViewTransition&&!rm?document.startViewTransition(f):f();const live=()=>{m.classList.add('live');go=go||import('/link-assets/graph.js');go.then(g=>g.start(m)).catch(()=>{})};const full=()=>{if(!b.classList.contains('map-on'))vt(()=>b.classList.add('map-on'));live()};m.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse')live()});m.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse')full()});m.querySelector('.map-open').addEventListener('click',full);m.addEventListener('click',e=>{if(!e.target.closest('.n'))full()});const off=()=>{if(!b.classList.contains('map-on'))return;vt(()=>b.classList.remove('map-on'));window.dispatchEvent(new Event('lp-map-off'))};document.querySelector('.back').addEventListener('click',off);addEventListener('keydown',e=>{if(e.key==='Escape')off()})})();`;
 
 const CSS = `
 :root{--bg:#f4f7f1;--bg2:#e6efdd;--card:#fff;--ink:#132010;--muted:#5d6c56;--line:#dce6d4;--accent:#3f9c00;--accent-ink:#175a00;--tile:#eef4e8;--shadow:0 1px 2px rgb(19 32 16/5%),0 6px 20px rgb(19 32 16/6%);--r:18px;--ease:cubic-bezier(.2,.8,.2,1)}
@@ -388,7 +396,7 @@ details[open]>summary .twisty{transform:rotate(45deg)}
 .map-on .list{display:none}
 .map-on .back{display:grid;view-transition-name:lp-list}
 .map-on .map{position:fixed;inset:0;width:auto;height:auto;border-radius:0;z-index:4;background:var(--bg);cursor:default}
-.map-on .map-open,.map-on .map-hint{display:none}
+.map-on .map-open,.map-on .map-hint,.map.live .map-open,.map.live .map-hint{display:none}
 .map-on .shell{display:block}
 ::view-transition-group(*){animation-duration:.45s;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
 @media (max-width:56rem){.has-map .shell{grid-template-columns:minmax(0,34rem)}.lp:not(.map-on) .map{position:fixed;top:auto;right:1rem;bottom:max(1rem,env(safe-area-inset-bottom));width:3.75rem;height:3.75rem;border-radius:50%;background:var(--card);border:1px solid var(--line);box-shadow:0 8px 24px rgb(19 32 16/18%);z-index:3}.lp:not(.map-on) .mapsvg text,.lp:not(.map-on) .mapsvg .dots,.lp:not(.map-on) .mapsvg .e2,.lp:not(.map-on) .map-hint{display:none}.lp:not(.map-on) .mapsvg{padding:.35rem}.has-map .list{padding-bottom:4.5rem}}

@@ -28,6 +28,16 @@
 		</div>
 	</section>
 
+	<section id="v-confirm" class="center" hidden>
+		<div class="card narrow">
+			<img src="/link-media/amybo.svg" alt="AMYBO" class="brand" width="120" height="83" />
+			<h1>Sign in to edit <span id="confirm-who"></span>?</h1>
+			<p class="muted">This link is for <b id="confirm-name"></b>'s page.</p>
+			<button id="confirm-go" class="primary wide">Continue</button>
+			<p><button id="confirm-no" class="link">That's not my page</button></p>
+		</div>
+	</section>
+
 	<section id="v-sent" class="center" hidden>
 		<div class="card narrow">
 			<div class="big" aria-hidden="true">✉️</div>
@@ -91,7 +101,7 @@
 				</section>
 			</div>
 			<div class="previewpane">
-				<div class="device"><iframe id="preview" title="Preview of your page"></iframe></div>
+				<div class="device"><iframe id="preview" title="Preview of your page" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"></iframe></div>
 			</div>
 		</main>
 	</div>

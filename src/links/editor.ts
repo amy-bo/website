@@ -19,6 +19,8 @@ interface ENode {
 	seed: number;
 	children: ENode[];
 	collapsed?: boolean;
+	/** The last address the server accepted; used while the one being typed isn't valid yet. */
+	savedUrl?: string;
 }
 
 interface Person {
@@ -128,23 +130,38 @@ const find = (key: string, list = S.tree, parent: ENode | null = null): { node: 
 	}
 	return null;
 };
+const validUrl = (u: string) => /^(https?:\/\/[^\s]+\.[^\s]+|mailto:[^\s]+@[^\s]+)$/i.test(u.trim());
+/** The tree as the API wants it. A link whose address is still being typed keeps its last saved address, or
+ * (if it has never been saved) waits, so one half-typed address never holds up every other change. */
 const flatten = () => {
-	const out: unknown[] = [];
+	const out: { key: string; url: string }[] = [];
+	const pending: string[] = [];
 	const add = (list: ENode[], parent: string | null) =>
 		list.forEach((n) => {
-			out.push({ id: n.id, key: n.key, parent, kind: n.kind, label: n.label.trim() || 'Untitled', url: n.url.trim(), icon: n.icon, image: n.image, body: n.body });
+			let url = n.url.trim();
+			if (n.kind === 'link' && !validUrl(url)) {
+				pending.push(n.label || 'a link');
+				if (!n.savedUrl) return;
+				url = n.savedUrl;
+			}
+			out.push({ id: n.id, key: n.key, parent, kind: n.kind, label: n.label.trim() || 'Untitled', url, icon: n.icon, image: n.image, body: n.body } as never);
 			add(n.children, n.key);
 		});
 	add(S.tree, null);
-	return out;
+	return { nodes: out, pending };
 };
 
 let saving: Promise<void> | null = null;
 async function saveNodes() {
 	const send = async () => {
-		const sent = flatten() as { key: string }[];
-		const r = await api<{ ids: Record<string, number> }>('nodes', { method: 'PUT', body: { nodes: sent } });
-		for (const n of walkE(S.tree)) if (r.ids[n.key] != null) n.id = r.ids[n.key];
+		const { nodes, pending } = flatten();
+		const r = await api<{ ids: Record<string, number> }>('nodes', { method: 'PUT', body: { nodes } });
+		const sent = new Map(nodes.map((x) => [x.key, x.url]));
+		for (const n of walkE(S.tree)) {
+			if (r.ids[n.key] != null) n.id = r.ids[n.key];
+			if (n.kind === 'link' && sent.has(n.key) && validUrl(n.url)) n.savedUrl = n.url.trim();
+		}
+		if (pending.length) throw new Error(`Saved, except the address for "${pending[0]}": it needs to start https://`);
 	};
 	// One save at a time, so new items never get created twice.
 	saving = (saving ?? Promise.resolve()).catch(() => {}).then(send);
@@ -223,8 +240,8 @@ function rowHtml(n: ENode, depth: number): string {
 		n.kind === 'group'
 			? `<ul class="kids"${n.collapsed ? ' hidden' : ''}>${n.children.map((c) => rowHtml(c, depth + 1)).join('')}<li class="addin"><button type="button" class="ghost" data-act="add-in">+ Add a link here</button></li></ul>`
 			: '';
-	return `<li class="row ${n.kind}" data-key="${n.key}"><div class="rowin" draggable="true">
-<span class="grip" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></span>
+	return `<li class="row ${n.kind}" data-key="${n.key}"><div class="rowin">
+<span class="grip" draggable="true" aria-hidden="true" title="Drag to move"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></span>
 ${twisty}${tile}<div class="fields">${fields}</div>${count}${clicks}
 <button type="button" class="more" data-act="menu" aria-label="More for ${esc(n.label)}" aria-haspopup="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
 </div>${kids}</li>`;
@@ -363,11 +380,14 @@ let dragKey: string | null = null;
 function setupDrag() {
 	const tree = $('#tree');
 	tree.addEventListener('dragstart', (e) => {
-		const row = (e.target as HTMLElement).closest<HTMLElement>('.row');
-		if (!row || (e.target as HTMLElement).matches('input,textarea')) return;
+		const grip = (e.target as HTMLElement).closest?.('.grip');
+		const row = grip?.closest<HTMLElement>('.row');
+		if (!row) return;
 		dragKey = row.dataset.key!;
 		e.dataTransfer!.effectAllowed = 'move';
 		e.dataTransfer!.setData('text/plain', dragKey);
+		const rowin = row.querySelector<HTMLElement>('.rowin')!;
+		e.dataTransfer!.setDragImage(rowin, 24, rowin.offsetHeight / 2);
 		requestAnimationFrame(() => row.classList.add('dragging'));
 	});
 	const clear = () => tree.querySelectorAll('.drop-before,.drop-after,.drop-in').forEach((x) => x.classList.remove('drop-before', 'drop-after', 'drop-in'));
@@ -660,8 +680,8 @@ function editEntry(e: DiaryEntry | null) {
 
 // ---------- sign-in ----------
 
-function show(view: 'signin' | 'sent' | 'editor' | 'loading') {
-	for (const v of ['signin', 'sent', 'editor', 'loading']) $(`#v-${v}`).hidden = v !== view;
+function show(view: 'signin' | 'sent' | 'editor' | 'loading' | 'confirm') {
+	for (const v of ['signin', 'sent', 'editor', 'loading', 'confirm']) $(`#v-${v}`).hidden = v !== view;
 	document.body.dataset.view = view;
 }
 
@@ -685,7 +705,7 @@ async function load() {
 	S.diary = me.diary;
 	S.stats = new Map(me.stats.map((s) => [s.slug, s]));
 	const tree = buildTree(me.nodes as Omit<LinkNode, 'children'>[]);
-	const conv = (n: LinkNode): ENode => ({ key: newKey(), id: n.id, slug: n.slug, kind: n.kind, label: n.label, url: n.url, icon: n.icon, image: n.image, body: n.body, seed: n.seed, children: n.children.map(conv) });
+	const conv = (n: LinkNode): ENode => ({ key: newKey(), id: n.id, slug: n.slug, kind: n.kind, label: n.label, url: n.url, savedUrl: n.url, icon: n.icon, image: n.image, body: n.body, seed: n.seed, children: n.children.map(conv) });
 	S.tree = tree.map(conv);
 	renderProfile();
 	renderTree();
@@ -698,15 +718,21 @@ async function load() {
 function init() {
 	// Sign-in links carry their token after # so it never reaches a server log; it is swapped for a session here.
 	const m = /[#&]t=([A-Za-z0-9_-]+)/.exec(location.hash);
-	const start = m
-		? api('verify', { body: { token: m[1] } })
-				.then(() => history.replaceState(null, '', location.pathname))
-				.catch((e) => {
-					history.replaceState(null, '', location.pathname);
-					throw e;
-				})
-		: Promise.resolve();
-	start.then(load, (e) => showSignIn((e as Error).message));
+	history.replaceState(null, '', location.pathname);
+	if (m) {
+		// Say whose page the link is for, and only sign in when they confirm it.
+		show('loading');
+		api<{ handle: string; name: string }>('verify', { body: { token: m[1], peek: true } }).then(
+			(who) => {
+				$('#confirm-who').textContent = who.handle === 'amybo' ? 'amy.bo/links' : `amy.bo/~${who.handle}`;
+				$('#confirm-name').textContent = who.name;
+				show('confirm');
+				$<HTMLButtonElement>('#confirm-go').onclick = () => api('verify', { body: { token: m[1] } }).then(load, (e) => showSignIn((e as Error).message));
+				$<HTMLButtonElement>('#confirm-no').onclick = () => showSignIn('');
+			},
+			(e) => showSignIn((e as Error).message),
+		);
+	} else load();
 
 	$<HTMLFormElement>('#signin-form').addEventListener('submit', async (e) => {
 		e.preventDefault();
@@ -776,6 +802,8 @@ function init() {
 	});
 	$('#signout').addEventListener('click', async () => {
 		await api('signout', { body: {} }).catch(() => {});
+		for (const t of timers.values()) clearTimeout(t);
+		timers.clear();
 		S.person = null;
 		showSignIn('Signed out.');
 	});
@@ -832,13 +860,20 @@ function init() {
 		}),
 	);
 	addEventListener('beforeunload', (e) => {
-		if (['Editing…', 'Saving…'].includes($('#savestate').textContent ?? '')) e.preventDefault();
+		if (['Editing…', 'Saving…', 'Not saved'].includes($('#savestate').textContent ?? '')) e.preventDefault();
 	});
 }
 
+let profileSaving: Promise<void> | null = null;
 async function saveProfile() {
-	const p = S.person!;
-	await api('profile', { method: 'PUT', body: { name: p.name, bio: p.bio, photo: p.photo, basic_mode: !!p.basic_mode, diary_default: p.diary_default } });
+	// One at a time, each sending the latest state, so an older save can never land after a newer one.
+	const send = async () => {
+		const p = S.person;
+		if (!p) return;
+		await api('profile', { method: 'PUT', body: { name: p.name, bio: p.bio, photo: p.photo, basic_mode: !!p.basic_mode, diary_default: p.diary_default } });
+	};
+	profileSaving = (profileSaving ?? Promise.resolve()).catch(() => {}).then(send);
+	await profileSaving;
 }
 
 init();

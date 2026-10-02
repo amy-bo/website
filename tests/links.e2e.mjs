@@ -161,6 +161,7 @@ try {
 
 	console.log('\nInvitations and sign-in');
 	let cookie;
+	let lastSignin = 0;
 	{
 		const bad = await req('POST', '/api/admin/links/invite', { email: 'x@example.org', name: 'X', handle: 'admin', role: 'plain' }, ADMIN);
 		check('reserved handles refused', bad.status === 400, bad.text);
@@ -173,20 +174,29 @@ try {
 		const { token } = await lastTokenFor('vee@example.org');
 		check('invite email carries a link with the token after #', !!token);
 		check('an invited page is not public yet', (await req('GET', '/~vee')).status === 404);
+		const pk = await req('POST', '/api/links/verify', { token, peek: true }, SAME);
+		check('a link says whose page it is before it is used', pk.status === 200 && pk.data.handle === 'vee' && !cookieOf(pk), pk.text);
 		const v = await req('POST', '/api/links/verify', { token }, SAME);
 		cookie = cookieOf(v);
 		check('the link signs them in', v.status === 200 && !!cookie, v.text);
 		check('the session cookie is HttpOnly and SameSite', /HttpOnly/.test(v.headers.get('set-cookie')) && /SameSite=Lax/.test(v.headers.get('set-cookie')));
 		const again = await req('POST', '/api/links/verify', { token }, SAME);
 		check('a link works once', again.status === 400);
+		check('and cannot be peeked at once used', (await req('POST', '/api/links/verify', { token, peek: true }, SAME)).status === 400);
 		check('the page is public once they have signed in', (await req('GET', '/~vee')).status === 200);
 
 		const before = (await outbox()).length;
 		await req('POST', '/api/links/signin', { email: 'nobody@example.org' }, SAME);
 		check('unknown addresses get no email (and the same answer)', (await outbox()).length === before);
 		await req('POST', '/api/links/signin', { email: 'vee@example.org' }, SAME);
+		lastSignin = Date.now();
 		await req('POST', '/api/links/signin', { email: 'vee@example.org' }, SAME);
+		await sleep(500);
 		check('sign-in links are limited to one a minute', (await outbox()).length === before + 1);
+		const c = await req('GET', '/~martin');
+		const scriptSrc = /script-src[^;]*/.exec(c.headers.get('content-security-policy') || '')?.[0] || '';
+		check('pages allow only their own inline script', /'sha256-[A-Za-z0-9+/=]+'/.test(scriptSrc) && !scriptSrc.includes('unsafe-inline'), scriptSrc);
+		check('a malformed link address is a 404, not an error', (await req('GET', '/~martin/go/%E0%A4%A')).status === 404);
 	}
 
 	const C = { ...SAME, cookie: `lp_s=${cookie}` };
@@ -220,6 +230,7 @@ try {
 		check('the support note shows, formatted', page.text.includes('<strong>Lots</strong>'));
 		check('an empty diary is hidden from visitors', !page.text.includes('/~vee/diary'));
 		check('nested groups render', page.text.includes('Deeper'));
+		check('group counts leave out hidden items', /Projects<\/span><span class="count">2</.test(page.text));
 		const go = await req('GET', '/~vee/go/my-script-alert-1-script-repo');
 		check('new link slug works', go.status === 302 && go.headers.get('location') === 'https://github.com/vee', `${go.status} ${go.headers.get('location')}`);
 
@@ -231,6 +242,17 @@ try {
 		const me3 = (await req('GET', '/api/links/me', undefined, { cookie: `lp_s=${cookie}` })).data;
 		const fresh = me3.nodes.find((n) => n.url === 'https://codeberg.org/vee');
 		check('a re-added link gets a new slug', re.status === 200 && fresh && fresh.slug !== old.slug, `${old.slug} → ${fresh?.slug}`);
+
+		// Move a link out of a group and delete the group in the same save: the link must survive.
+		const m4 = (await req('GET', '/api/links/me', undefined, { cookie: `lp_s=${cookie}` })).data;
+		const deeper = m4.nodes.find((n) => n.label === 'Deeper');
+		const mail = m4.nodes.find((n) => n.label === 'Mail me');
+		const moved = m4.nodes
+			.filter((n) => n.id !== deeper.id)
+			.map((n) => ({ id: n.id, key: `k${n.id}`, parent: n.id === mail.id ? null : n.parent_id ? `k${n.parent_id}` : null, kind: n.kind, label: n.label, url: n.url, icon: n.icon, image: n.image, body: n.body }));
+		const mv = await req('PUT', '/api/links/nodes', { nodes: moved }, C);
+		const m5 = (await req('GET', '/api/links/me', undefined, { cookie: `lp_s=${cookie}` })).data;
+		check('moving a link out of a group while deleting the group keeps the link', mv.status === 200 && m5.nodes.some((n) => n.id === mail.id && n.parent_id === null) && !m5.nodes.some((n) => n.id === deeper.id), mv.text);
 
 		const e1 = await req('POST', '/api/links/diary', { day: '2026-09-01', title: 'Older', body: 'See https://amybo.org/about/' }, C);
 		const e2 = await req('POST', '/api/links/diary', { day: '2026-10-01', title: 'Newer', body: 'Built [the rig](https://amybo.org/).', highlight: true }, C);
@@ -255,6 +277,10 @@ try {
 		check('suggestions refuse private addresses', pr.status === 400, pr.status);
 		const pm = await req('GET', `/api/links/propose?url=${encodeURIComponent('mailto:vee@example.org')}`, undefined, { cookie: `lp_s=${cookie}` });
 		check('suggestions handle email links', pm.data.icon === 'mail');
+		const ri = await req('GET', `/api/links/remote-image?url=${encodeURIComponent('https://example.org/x.png')}`, undefined, { cookie: `lp_s=${cookie}`, 'sec-fetch-site': 'cross-site' });
+		check('remote images only for the editor itself', ri.status === 403, ri.status);
+		const foreign = await req('PUT', '/api/links/nodes', { nodes: [{ key: 'i', parent: null, kind: 'link', label: 'x', url: 'https://x.org', image: 'r2:vee/../martin/a.webp' }] }, C);
+		check("image paths can't climb out of their own folder", foreign.status === 400, foreign.text);
 	}
 
 	console.log('\nAccessibility (axe, serious and critical)');
@@ -271,9 +297,14 @@ try {
 		const id = /data-act="disable" data-id="(\d+)"[^]*?<\/tr>/g;
 		const vid = [...people.text.matchAll(/<tr><td><a href="\/~vee">[^]*?data-act="disable" data-id="(\d+)"/g)][0]?.[1];
 		check('admin lists the page', !!vid && !!me, vid);
+		await sleep(61000 - (Date.now() - lastSignin));
+		await req('POST', '/api/links/signin', { email: 'vee@example.org' }, SAME);
+		await sleep(500);
+		const pendingToken = (await lastTokenFor('vee@example.org')).token;
 		const ce = await req('POST', '/api/admin/links/person', { id: Number(vid), action: 'email', email: 'Vee.New@example.org' }, ADMIN);
 		check('admin can change a sign-in email', ce.status === 200, ce.text);
 		check('changing it ends their sessions', (await req('GET', '/api/links/me', undefined, { cookie: `lp_s=${cookie}` })).status === 401);
+		check('and cancels links sent to the old address', (await req('POST', '/api/links/verify', { token: pendingToken, peek: true }, SAME)).status === 400);
 		const ce2 = await req('POST', '/api/admin/links/person', { id: Number(vid), action: 'email', email: 'hello@amybo.org' }, ADMIN);
 		check("but not to another page's address", ce2.status === 400, ce2.text);
 		const r = await req('POST', '/api/admin/links/person', { id: Number(vid), action: 'disable' }, ADMIN);

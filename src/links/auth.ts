@@ -70,9 +70,16 @@ function emailHtml(lines: string[], button: { href: string; label: string }): st
 /** Emails a single-use link. Invitations last 7 days, sign-in links 20 minutes. */
 export async function sendLink(env: Env, person: { id: number; email: string; name: string; handle: string }, purpose: 'invite' | 'signin', inviter?: string) {
 	const token = newToken();
-	await env.DB.prepare('INSERT INTO lp_tokens (hash, person_id, purpose, expires_at) VALUES (?, ?, ?, ?)')
+	// Sign-in links: at most one a minute and five an hour per person, checked and recorded in one statement.
+	const r = await env.DB.prepare(
+		`INSERT INTO lp_tokens (hash, person_id, purpose, expires_at) SELECT ?1, ?2, ?3, ?4
+		 WHERE ?3 = 'invite' OR (
+			(SELECT COUNT(*) FROM lp_tokens WHERE person_id = ?2 AND purpose = 'signin' AND created_at > strftime('%Y-%m-%dT%H:%M:%SZ','now','-1 hour')) < 5
+			AND NOT EXISTS (SELECT 1 FROM lp_tokens WHERE person_id = ?2 AND purpose = 'signin' AND created_at > strftime('%Y-%m-%dT%H:%M:%SZ','now','-60 seconds')))`,
+	)
 		.bind(await sha256(token), person.id, purpose, isoIn(purpose === 'invite' ? INVITE_DAYS * 864e5 : SIGNIN_MINUTES * 6e4))
 		.run();
+	if (!r.meta.changes) return;
 	const href = editUrl(env, token);
 	const page = person.handle === 'amybo' ? 'amy.bo/links' : `amy.bo/~${person.handle}`;
 	const first = person.name.split(/\s+/)[0] || person.name;
@@ -87,6 +94,17 @@ export async function sendLink(env: Env, person: { id: number; email: string; na
 		const lines = [`Hi ${first},`, `Here's your link to edit ${page}. It works once, for 20 minutes.`, "If you didn't ask for it, you can ignore this email."];
 		await sendEmail(env, { to: person.email, subject: `Sign in to edit ${page}`, text: `${lines.join('\n\n')}\n\nSign in: ${href}\n`, html: emailHtml(lines, { href, label: 'Sign in' }) });
 	}
+}
+
+/** Whose page a token is for, without using it up. */
+export async function peek(env: Env, token: string): Promise<{ handle: string; name: string } | null> {
+	if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) return null;
+	return env.DB.prepare(
+		`SELECT p.handle, p.name FROM lp_tokens t JOIN lp_people p ON p.id = t.person_id
+		 WHERE t.hash = ? AND t.used_at IS NULL AND t.expires_at > ? AND p.status != 'disabled'`,
+	)
+		.bind(await sha256(token), nowIso())
+		.first<{ handle: string; name: string }>();
 }
 
 /** Uses up a token and returns its person, or null if it is unknown, used or expired. */

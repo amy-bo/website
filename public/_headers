@@ -17,3 +17,13 @@
 /admin/*
   Referrer-Policy: no-referrer
   Cache-Control: no-store
+
+# The link-page map's physics, also loaded by the editor's sandboxed preview (an opaque origin).
+/link-assets/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
+
+# The link-page editor: sign-in links carry their token after #; keep it out of referrers and caches.
+/links/edit/*
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store

@@ -1,6 +1,6 @@
 // Link pages: the editor's API (/api/links/*) and the admin API (/api/admin/links/*).
 import { orgName } from '../../eventsandeye/src/env';
-import { checkOrigin, endSession, fail, json, nowIso, personFromSession, redeem, sendLink, startSession, type SessionPerson } from './auth';
+import { checkOrigin, endSession, fail, json, nowIso, peek, personFromSession, redeem, sendLink, startSession, type SessionPerson } from './auth';
 import { guessIcon, ICON_KEYS } from './icons';
 import { HANDLE_RE, type NodeKind } from './model';
 import type { Ctx, Env } from './server';
@@ -34,16 +34,9 @@ export async function signin(ctx: Ctx): Promise<Response> {
 	const email = str(b?.email, 254).toLowerCase();
 	if (!EMAIL_RE.test(email)) return fail('Please enter your email address');
 	const p = await ctx.env.DB.prepare(`SELECT id, email, name, handle FROM lp_people WHERE email = ? AND status != 'disabled'`).bind(email).first<{ id: number; email: string; name: string; handle: string }>();
-	if (p) {
-		// At most one link a minute and five an hour per person, so nobody can be flooded with emails.
-		const r = await ctx.env.DB.prepare(
-			`SELECT COUNT(*) AS hour, SUM(created_at > strftime('%Y-%m-%dT%H:%M:%SZ','now','-60 seconds')) AS minute
-			 FROM lp_tokens WHERE person_id = ? AND purpose = 'signin' AND created_at > strftime('%Y-%m-%dT%H:%M:%SZ','now','-1 hour')`,
-		)
-			.bind(p.id)
-			.first<{ hour: number; minute: number }>();
-		if ((r?.hour ?? 0) < 5 && !(r?.minute ?? 0)) await sendLink(ctx.env, p, 'signin');
-	}
+	// The email goes out after the response, so the answer takes as long whether or not the address has a page.
+	// sendLink itself allows at most one link a minute and five an hour per person.
+	if (p) ctx.waitUntil(sendLink(ctx.env, p, 'signin').catch((e) => console.error('sign-in email failed', e)));
 	// The same answer whether or not the address has a page, so the form can't be used to find out who does.
 	return json({ ok: true });
 }
@@ -51,7 +44,12 @@ export async function signin(ctx: Ctx): Promise<Response> {
 export async function verify(ctx: Ctx): Promise<Response> {
 	const bad = checkOrigin(ctx);
 	if (bad) return bad;
-	const b = await body<{ token?: string }>(ctx.request);
+	const b = await body<{ token?: string; peek?: boolean }>(ctx.request);
+	if (b?.peek) {
+		// Say whose page a link is for before using it, so nobody can be signed into someone else's page unawares.
+		const who = await peek(ctx.env, str(b.token, 100));
+		return who ? json({ handle: who.handle, name: who.name }) : fail('This link has expired or been used. Ask for a new one below.', 400);
+	}
 	const id = await redeem(ctx.env, str(b?.token, 100));
 	if (!id) return fail('This link has expired or been used. Ask for a new one below.', 400);
 	const cookie = await startSession(ctx.env, ctx.request, id);
@@ -81,7 +79,8 @@ export async function me(ctx: Ctx): Promise<Response> {
 	return json({ person: person.results[0], nodes: nodes.results, diary: diary.results, stats: counts.results, uploads: !!ctx.env.LINKS_BUCKET, icons: ICON_KEYS });
 }
 
-const okImage = (v: string, handle: string) => v === '' || v.startsWith(`r2:${handle}/`) || /^\/link-media\/[\w.-]+$/.test(v);
+const okImage = (v: string, handle: string) =>
+	v === '' || (v.startsWith(`r2:${handle}/`) && /^r2:[a-z0-9-]+\/[A-Za-z0-9_-]+\.(webp|png|jpe?g|gif)$/.test(v)) || /^\/link-media\/[\w-]+\.(jpe?g|png|webp|svg)$/.test(v);
 
 export async function saveProfile(ctx: Ctx): Promise<Response> {
 	const p = await signedIn(ctx);
@@ -183,16 +182,17 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 	};
 
 	const keep = new Set(list.filter((n) => n.id != null).map((n) => n.id!));
-	const stmts: D1PreparedStatement[] = [];
-	for (const r of existing) if (!keep.has(r.id)) stmts.push(db.prepare('DELETE FROM lp_nodes WHERE id = ? AND person_id = ?').bind(r.id, p.id));
+	// New items first (to learn their ids), then in ONE transaction: every update (so kept items have left any group
+	// that is about to go) and only then the deletes. If that fails, the new rows are removed again.
 	const fresh = list.filter((n) => n.id == null);
-	const inserts = fresh.map((n) =>
-		db.prepare(`INSERT INTO lp_nodes (person_id, kind, slug, label) VALUES (?, ?, ?, ?) RETURNING id`).bind(p.id, n.kind, slugFor(n), str(n.label, 120)),
-	);
-	const results = await db.batch([...stmts, ...inserts]);
 	const idOf = new Map<string, number>();
 	list.forEach((n) => n.id != null && idOf.set(n.key, n.id));
-	fresh.forEach((n, i) => idOf.set(n.key, (results[stmts.length + i].results[0] as { id: number }).id));
+	if (fresh.length) {
+		const results = await db.batch(
+			fresh.map((n) => db.prepare(`INSERT INTO lp_nodes (person_id, kind, slug, label) VALUES (?, ?, ?, ?) RETURNING id`).bind(p.id, n.kind, slugFor(n), str(n.label, 120))),
+		);
+		fresh.forEach((n, i) => idOf.set(n.key, (results[i].results[0] as { id: number }).id));
+	}
 
 	const position = new Map<string | null, number>();
 	const updates = list.map((n) => {
@@ -213,8 +213,13 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 				p.id,
 			);
 	});
-	if (updates.length) await db.batch(updates);
-	await db.prepare('UPDATE lp_people SET updated_at = ? WHERE id = ?').bind(nowIso(), p.id).run();
+	const deletes = existing.filter((r) => !keep.has(r.id)).map((r) => db.prepare('DELETE FROM lp_nodes WHERE id = ? AND person_id = ?').bind(r.id, p.id));
+	try {
+		await db.batch([...updates, ...deletes, db.prepare('UPDATE lp_people SET updated_at = ? WHERE id = ?').bind(nowIso(), p.id)]);
+	} catch (e) {
+		if (fresh.length) await db.batch(fresh.map((n) => db.prepare('DELETE FROM lp_nodes WHERE id = ? AND person_id = ?').bind(idOf.get(n.key)!, p.id))).catch(() => {});
+		throw e;
+	}
 	return json({ ok: true, ids: Object.fromEntries(idOf) });
 }
 
@@ -258,6 +263,8 @@ export async function upload(ctx: Ctx): Promise<Response> {
 	if (bytes.byteLength > 1_500_000) return fail('That image is too large (1.5 MB at most)', 413);
 	const ext = { 'image/webp': 'webp', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif' }[type];
 	if (!ext) return fail('Use a JPEG, PNG, WebP or GIF image', 415);
+	const mine = await ctx.env.LINKS_BUCKET.list({ prefix: `${p.handle}/`, limit: 400 });
+	if (mine.objects.length >= 300) return fail('You have uploaded 300 pictures, the most a page can have', 429);
 	const id = crypto.getRandomValues(new Uint8Array(12));
 	const key = `${p.handle}/${btoa(String.fromCharCode(...id)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}.${ext}`;
 	await ctx.env.LINKS_BUCKET.put(key, bytes, { httpMetadata: { contentType: type } });
@@ -274,7 +281,7 @@ function publicUrl(raw: string | null): URL | null {
 		return null;
 	}
 	if (!/^https?:$/.test(u.protocol) || u.username || u.password || (u.port && !['80', '443'].includes(u.port))) return null;
-	const h = u.hostname.toLowerCase();
+	const h = u.hostname.toLowerCase().replace(/\.+$/, '');
 	if (!h.includes('.') || /^[\d.]+$/.test(h) || h.includes(':') || /(^|\.)(localhost|local|internal|lan|home|arpa)$/.test(h)) return null;
 	return u;
 }
@@ -348,7 +355,10 @@ export async function propose(ctx: Ctx): Promise<Response> {
 		got = null;
 	}
 	if (!got || !/html/i.test(got.res.headers.get('content-type') ?? '')) return json(fallback);
-	const html = new TextDecoder().decode(got.bytes);
+	// Only the head matters, and a short string keeps the regular expressions below cheap on hostile pages.
+	let html = new TextDecoder().decode(got.bytes.subarray(0, 96_000));
+	const headEnd = html.search(/<\/head>/i);
+	if (headEnd > 0) html = html.slice(0, headEnd);
 	const meta = (prop: string) =>
 		new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]*content=["']([^"']*)["']`, 'i').exec(html)?.[1] ??
 		new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]*(?:property|name)=["']${prop}["']`, 'i').exec(html)?.[1];
@@ -379,13 +389,22 @@ export async function propose(ctx: Ctx): Promise<Response> {
 export async function remoteImage(ctx: Ctx): Promise<Response> {
 	const p = await personFromSession(ctx.env, ctx.request);
 	if (!p) return fail('Not signed in', 401);
+	const site = ctx.request.headers.get('sec-fetch-site');
+	if (site && site !== 'same-origin') return fail('Only for the editor', 403);
 	const u = publicUrl(new URL(ctx.request.url).searchParams.get('url'));
 	if (!u) return fail('Not a public image address');
 	try {
 		const got = await fetchLimited(u, 'image/*', 4_000_000);
-		const type = got?.res.headers.get('content-type') ?? '';
-		if (!got || !/^image\/(png|jpeg|webp|gif|x-icon|vnd\.microsoft\.icon|svg\+xml)/.test(type)) return fail('Could not fetch that image', 404);
-		return new Response(got.bytes, { headers: { 'content-type': type, 'cache-control': 'private, max-age=600', 'content-security-policy': "default-src 'none'" } });
+		const type = /^image\/(png|jpeg|webp|gif|x-icon|vnd\.microsoft\.icon)(;|$)/.exec(got?.res.headers.get('content-type') ?? '')?.[1];
+		if (!got || !type) return fail('Could not fetch that image', 404);
+		return new Response(got.bytes, {
+			headers: {
+				'content-type': `image/${type}`,
+				'cache-control': 'private, max-age=600',
+				'x-content-type-options': 'nosniff',
+				'content-security-policy': "default-src 'none'; sandbox",
+			},
+		});
 	} catch {
 		return fail('Could not fetch that image', 404);
 	}
@@ -423,7 +442,11 @@ export async function adminPerson(ctx: Ctx): Promise<Response> {
 	const p = await db.prepare('SELECT id, email, name, handle, status, last_sign_in FROM lp_people WHERE id = ?').bind(Number(b?.id)).first<{ id: number; email: string; name: string; handle: string; status: string; last_sign_in: string | null }>();
 	if (!p) return fail('No such page', 404);
 	if (b?.action === 'disable') {
-		await db.batch([db.prepare(`UPDATE lp_people SET status = 'disabled' WHERE id = ?`).bind(p.id), db.prepare('DELETE FROM lp_sessions WHERE person_id = ?').bind(p.id)]);
+		await db.batch([
+			db.prepare(`UPDATE lp_people SET status = 'disabled' WHERE id = ?`).bind(p.id),
+			db.prepare('DELETE FROM lp_sessions WHERE person_id = ?').bind(p.id),
+			db.prepare('DELETE FROM lp_tokens WHERE person_id = ?').bind(p.id),
+		]);
 	} else if (b?.action === 'enable') {
 		await db.prepare('UPDATE lp_people SET status = ? WHERE id = ?').bind(p.last_sign_in ? 'active' : 'invited', p.id).run();
 	} else if (b?.action === 'email') {
@@ -431,7 +454,11 @@ export async function adminPerson(ctx: Ctx): Promise<Response> {
 		if (!EMAIL_RE.test(email)) return fail('Check the email address');
 		const clash = await db.prepare('SELECT handle FROM lp_people WHERE email = ? AND id != ?').bind(email, p.id).first<{ handle: string }>();
 		if (clash) return fail(`${email} already has a page (amy.bo/~${clash.handle})`);
-		await db.batch([db.prepare('UPDATE lp_people SET email = ? WHERE id = ?').bind(email, p.id), db.prepare('DELETE FROM lp_sessions WHERE person_id = ?').bind(p.id)]);
+		await db.batch([
+			db.prepare('UPDATE lp_people SET email = ? WHERE id = ?').bind(email, p.id),
+			db.prepare('DELETE FROM lp_sessions WHERE person_id = ?').bind(p.id),
+			db.prepare('DELETE FROM lp_tokens WHERE person_id = ?').bind(p.id),
+		]);
 	} else if (b?.action === 'resend' && p.status === 'invited') {
 		await sendLink(ctx.env, p, 'invite', orgName(ctx.env));
 	} else return fail('Unknown action');

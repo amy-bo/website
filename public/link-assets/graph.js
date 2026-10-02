@@ -82,6 +82,10 @@ export function start(map) {
 			v = { g, edge: null };
 		} else {
 			const wrap = n.href ? el('a', { href: n.href }) : el('g', { tabindex: 0, role: 'button', 'aria-expanded': 'false' });
+			if (n.href && data.preview && !n.href.startsWith('#')) {
+				wrap.setAttribute('target', '_blank');
+				wrap.setAttribute('rel', 'noopener');
+			}
 			wrap.setAttribute('class', `n ${n.kind} d${Math.min(n.depth, 3)}`);
 			wrap.setAttribute('aria-label', n.label);
 			const c = el('circle', { r: n.r }, wrap);
@@ -107,7 +111,8 @@ export function start(map) {
 			v = { g: wrap, circle: c, pic, label, badge, edge: el('line', { class: n.depth > 1 ? 'e2' : '' }) };
 			wrap.addEventListener('focus', () => {
 				focusNode = n;
-				if (n.kind === 'group') expand(n);
+				// Only keyboard focus opens a group; a click or tap is handled once, by the click handler.
+				if (n.kind === 'group' && keyboard) expand(n);
 			});
 			wrap.addEventListener('keydown', (e) => {
 				if ((e.key === 'Enter' || e.key === ' ') && n.kind === 'group') {
@@ -122,7 +127,8 @@ export function start(map) {
 				}
 				if (n.kind === 'group') {
 					e.preventDefault();
-					open.has(n.id) ? collapse(n) : expand(n);
+					if (!open.has(n.id)) expand(n);
+					else if (performance.now() - (openedAt.get(n.id) ?? 0) > 450) collapse(n);
 				} else if (n.href && n.href.startsWith('#')) {
 					// A note, not a link: go back to the list with it open.
 					e.preventDefault();
@@ -349,6 +355,7 @@ export function start(map) {
 			c.vy = Math.sin(a) * 6;
 		});
 		lastNear.set(n.id, performance.now());
+		openedAt.set(n.id, performance.now());
 		sync();
 		kick(0.8);
 	};
@@ -367,6 +374,12 @@ export function start(map) {
 	let nearNode = null;
 	let focusNode = null;
 	const lastNear = new Map();
+	const openedAt = new Map();
+	let keyboard = false;
+	addEventListener('keydown', (e) => {
+		if (e.key === 'Tab' || e.key.startsWith('Arrow')) keyboard = true;
+	});
+	addEventListener('pointerdown', () => (keyboard = false), true);
 	const toWorld = (e) => {
 		const b = box();
 		return [cam[0] + ((e.clientX - b.left) / b.width) * cam[2], cam[1] + ((e.clientY - b.top) / b.height) * cam[3]];
@@ -421,17 +434,22 @@ export function start(map) {
 	let dragging = null;
 	let dragMoved = false;
 	let dragStart = null;
+	let dragPointer = 0;
 	const beginDrag = (e, n) => {
 		if (e.button !== 0) return;
 		dragging = n;
 		dragMoved = false;
 		dragStart = [e.clientX, e.clientY];
-		n.fixed = true;
-		svg.setPointerCapture?.(e.pointerId);
+		dragPointer = e.pointerId;
 	};
 	svg.addEventListener('pointermove', (e) => {
 		if (!dragging) return onMove(e);
-		if (Math.hypot(e.clientX - dragStart[0], e.clientY - dragStart[1]) > 5) dragMoved = true;
+		if (!dragMoved && Math.hypot(e.clientX - dragStart[0], e.clientY - dragStart[1]) > 5) {
+			// Capture only once it is really a drag, so a plain click still reaches the link or group.
+			dragMoved = true;
+			dragging.fixed = true;
+			svg.setPointerCapture?.(dragPointer);
+		}
 		if (!dragMoved) return;
 		const [wx, wy] = toWorld(e);
 		dragging.x = wx;
@@ -466,10 +484,13 @@ export function start(map) {
 		if (raf) cancelAnimationFrame(raf);
 		raf = 0;
 	};
-	addEventListener('lp-map-off', pause);
+	addEventListener('lp-map-off', () => {
+		if (matchMedia('(max-width: 56rem)').matches) pause();
+		else requestAnimationFrame(() => started.resume());
+	});
 	document.addEventListener('visibilitychange', () => {
 		if (document.hidden) pause();
-		else if (document.body.classList.contains('map-on')) started.resume();
+		else if (map.classList.contains('live')) started.resume();
 	});
 	started = {
 		resume() {
