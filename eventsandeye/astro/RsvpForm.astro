@@ -173,7 +173,7 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 			const h = document.createElement('p');
 			h.innerHTML = '<strong>Nearly there: check your email.</strong>';
 			const p = document.createElement('p');
-			p.textContent = `We have sent an email to ${String(fd.get('email'))}. If this is a new registration, it is not complete until you click the "Complete registration" button in that email, and unconfirmed registrations are deleted automatically. If you had already registered, the email reminds you of your registration and joining instructions. If nothing arrives within a few minutes, check your spam folder or contact us using the link below.`;
+			p.textContent = `We have sent an email to ${String(fd.get('email'))}. It can take up to 5 minutes to arrive; if it hasn't come by then, check your junk or spam folder. If this is a new registration, it is not complete until you click the "Complete registration" button in that email, and unconfirmed registrations are deleted automatically. If you had already registered, the email reminds you of your registration and joining instructions. If nothing arrives, contact us using the link below.`;
 			box.append(h, p);
 			result.append(box);
 			box.setAttribute('tabindex', '-1');
