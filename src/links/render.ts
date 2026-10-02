@@ -387,11 +387,11 @@ details[open]>summary .twisty{transform:rotate(45deg)}
 .back svg{width:1.3rem;height:1.3rem;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 .map-on .list{display:none}
 .map-on .back{display:grid;view-transition-name:lp-list}
-.map-on .map{position:fixed;inset:0;height:auto;border-radius:0;z-index:4;background:var(--bg);cursor:default}
+.map-on .map{position:fixed;inset:0;width:auto;height:auto;border-radius:0;z-index:4;background:var(--bg);cursor:default}
 .map-on .map-open,.map-on .map-hint{display:none}
 .map-on .shell{display:block}
 ::view-transition-group(*){animation-duration:.45s;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
-@media (max-width:56rem){.has-map .shell{grid-template-columns:minmax(0,34rem);gap:1.5rem}.has-map .map{position:relative;top:0;order:-1;height:15rem;margin:-1rem 0 -.5rem}.has-map .list{order:0}.has-map .shell{display:flex;flex-direction:column;align-items:stretch;max-width:36rem}}
+@media (max-width:56rem){.has-map .shell{grid-template-columns:minmax(0,34rem)}.lp:not(.map-on) .map{position:fixed;top:auto;right:1rem;bottom:max(1rem,env(safe-area-inset-bottom));width:3.75rem;height:3.75rem;border-radius:50%;background:var(--card);border:1px solid var(--line);box-shadow:0 8px 24px rgb(19 32 16/18%);z-index:3}.lp:not(.map-on) .mapsvg text,.lp:not(.map-on) .mapsvg .dots,.lp:not(.map-on) .mapsvg .e2,.lp:not(.map-on) .map-hint{display:none}.lp:not(.map-on) .mapsvg{padding:.35rem}.has-map .list{padding-bottom:4.5rem}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 /* diary */
 .dtop{margin-bottom:1.4rem}

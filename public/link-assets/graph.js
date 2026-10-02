@@ -269,13 +269,13 @@ export function start(map) {
 				n.vx = n.vy = 0;
 				continue;
 			}
-			n.vx *= 0.78;
-			n.vy *= 0.78;
+			n.vx *= 0.72;
+			n.vy *= 0.72;
 			n.x += n.vx;
 			n.y += n.vy;
 			energy += n.vx * n.vx + n.vy * n.vy;
 		}
-		alpha = Math.max(alpha * 0.985, 0.04);
+		alpha = Math.max(alpha * 0.975, 0.04);
 		return energy / Math.max(list.length, 1);
 	};
 
