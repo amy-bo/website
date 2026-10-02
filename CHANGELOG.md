@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-10-02
 
+- [x] **Event photo: Gerrit and Teo in the Imperial labs** — the event page's lab-tours photo is now Martin's 16:9 edit of Gerrit's photo of him and Teo (sent 2 October; Teo and Sonja agreed to its use), credited "Photo: Margriet Niezen-van de Goor, CC BY-SA 4.0" as Gerrit asked; camera and location data stripped from the source, and a 1800w size added for high-resolution screens. The social preview card is unchanged.
 - [x] **Soft drinks sponsored by LabCrafter** — Gerrit agreed on WhatsApp (2 October) that LabCrafter sponsors the soft drinks; the event page's Food section credits them with a link
 - [x] **Gerrit's credit wording and forum results** — Gerrit asked on 2 October for "Gerrit Niezen" with CC BY-SA, so his photo credits (CO₂ sparging, control test, protocols, Pioreactor page) now add CC BY-SA 4.0; the homepage forum list and the electroPioreactor page name him on the current measurement experiment, and the MMO anode line links his result (about 0.3 V lower cell voltage at the same current, forum thread 166 post 2) instead of "in our hands"
 - [x] **Registration notice: allow 5 minutes** — Imperial (Microsoft 365) delivered test confirm emails after about 2 to several minutes, so the notice after registering says it can take up to 5 minutes, then to check junk or spam.
