@@ -83,8 +83,8 @@ const nodeIcon = (n: LinkNode): string => {
 export const shortLabel = (s: string) => s.split(/\s+[-–—]\s+/)[0].trim() || s;
 
 /** Up to two lines of about 18 characters, broken between words; an ellipsis only if it still doesn't fit. */
-export function labelLines(s: string, width = 18): string[] {
-	const words = shortLabel(s).split(/\s+/);
+export function labelLines(s: string, width = 18, short = true): string[] {
+	const words = (short ? shortLabel(s) : s).split(/\s+/);
 	const lines: string[] = [''];
 	for (const w of words) {
 		const cur = lines[lines.length - 1];
@@ -184,8 +184,8 @@ function graphData(ctx: Ctx): { nodes: GNode[]; svg: string; view: [number, numb
 				id: n.id,
 				parent,
 				kind: n.kind,
-				label: shortLabel(n.label),
-				lines: labelLines(n.label),
+				label: n.kind === 'group' ? shortLabel(n.label) : n.label,
+				lines: labelLines(n.label, 18, n.kind === 'group'),
 				href: n.kind === 'link' ? (ctx.preview ? safeUrl(n.url) : `${base}/go/${encodeURIComponent(n.slug)}`) : n.kind === 'diary' ? `${base}/diary` : n.kind === 'support' ? '#lp-support' : '',
 				icon: nodeIcon(n),
 				ic: icon(nodeIcon(n)).brand ? 'ib' : 'il',
@@ -225,7 +225,7 @@ function graphData(ctx: Ctx): { nodes: GNode[]; svg: string; view: [number, numb
 			kidDots.push([cx, cy]);
 		});
 		const r = n.kind === 'group' ? 21 : 18;
-		const lines = labelLines(n.label);
+		const lines = labelLines(n.label, 18, n.kind === 'group');
 		// Labels sit outside the node, on the side away from the centre, and move clear of any child dots.
 		const below = y >= -Math.abs(x) * 0.35;
 		const h = lines.length * 13;

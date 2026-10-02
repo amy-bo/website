@@ -298,8 +298,8 @@ export function start(map) {
 		for (const n of shown) {
 			x0 = Math.min(x0, n.x - n.r - 70);
 			x1 = Math.max(x1, n.x + n.r + 70);
-			y0 = Math.min(y0, n.y - n.r - 34);
-			y1 = Math.max(y1, n.y + n.r + 40);
+			y0 = Math.min(y0, n.y - n.r - 34 - ((n.lines?.length || 1) - 1) * 13);
+			y1 = Math.max(y1, n.y + n.r + 40 + ((n.lines?.length || 1) - 1) * 13);
 		}
 		const b = box();
 		const aspect = b.width / Math.max(b.height, 1) || 1;
