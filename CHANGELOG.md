@@ -2,6 +2,10 @@
 
 Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
+## 2026-10-02
+
+- [x] **Control-test data link restored** — amy-bo/results is public again (scanned first: no personal data in files or history beyond commit author emails); the link says it is a 2023 archive of early results.
+
 ## 2026-10-01
 
 - [x] **A permanent next-event link, people links, Chris French's role** — `/events/next` (Events&I route, from the registration database) redirects to the soonest event that has not ended, with `/event` as a short alias, so a short link such as amy.bo/event never needs changing (e2e check added); event pages and the events index list upcoming events from `eventStart` frontmatter and invite people to host an AMYBO event near them; people's first mention on each page links to amy.bo/~martin, amy.bo/~gerrit or LinkedIn, and talks take an optional `speakerUrl`; Chris French described as leading the work at Edinburgh; the Pioreactor boot-partition change described as welcomed by Cam Davidson-Pilon on 24 September (his forum reply), with a link to the proposed change.
