@@ -4,6 +4,7 @@ import type { LinkPage } from './types';
 const page: LinkPage = {
 	handle: 'martin',
 	name: 'Martin Currie',
+	bio: 'Biochemical Engineer working on sustainable alternative protein for human consumption, open bioreactors and productivity software to enable the above.',
 	contactUrl: 'https://contact.andeye.com/?source=amy.bo%2F~martin&subject=Message%20for%20Martin%20Currie',
 	rel: ['https://mas.to/@Aqueum'],
 	sections: [

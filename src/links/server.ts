@@ -2,8 +2,9 @@
 // Privacy: only the page, the link slug and the UTC time are stored. No IP, user agent, referrer or cookie.
 import { allLinks, type LinkPage } from './types';
 import martin from './martin';
+import amybo from './amybo';
 
-export const PAGES: LinkPage[] = [martin];
+export const PAGES: LinkPage[] = [martin, amybo];
 
 interface Env { DB: D1Database }
 type Ctx = EventContext<Env, string, Record<string, unknown>>;

@@ -1,6 +1,7 @@
 /** A link-in-bio page at amy.bo/~<handle>: the page, its click redirects and the stats all read this. */
 export type IconKey =
 	| 'amybo' | 'patreon' | 'youtube' | 'linktree' | 'x' | 'mastodon' | 'zotero' | 'linkedin' | 'github'
+	| 'forum' | 'docs' | 'print' | 'person'
 	| 'software' | 'camera' | 'water' | 'cv' | 'music' | 'gift' | 'radio' | 'mail' | 'link';
 
 export interface Link {
@@ -16,6 +17,7 @@ export interface Link {
 export interface LinkPage {
 	handle: string;
 	name: string;
+	bio?: string;
 	contactUrl?: string;
 	/** Profiles that should verify this page (rel="me"), e.g. Mastodon. */
 	rel?: string[];

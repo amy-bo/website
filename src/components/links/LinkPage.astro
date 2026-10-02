@@ -4,8 +4,10 @@ import { siPatreon, siYoutube, siLinktree, siX, siMastodon, siZotero, siGithub }
 import type { IconKey, LinkPage } from '../../links/types';
 import logo from '../../assets/amybo.svg';
 
-interface Props { page: LinkPage }
-const { page } = Astro.props;
+import { Image } from 'astro:assets';
+
+interface Props { page: LinkPage; photo?: ImageMetadata; mark?: ImageMetadata }
+const { page, photo, mark } = Astro.props;
 
 const brand: Partial<Record<IconKey, { path: string; hex: string }>> = {
 	patreon: siPatreon, youtube: siYoutube, linktree: siLinktree, x: siX, mastodon: siMastodon, zotero: siZotero, github: siGithub,
@@ -20,12 +22,16 @@ const line: Partial<Record<IconKey, string>> = {
 	gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9M12 8v13M12 8S10 3 7.5 4.5 9 8 12 8zM12 8s2-5 4.5-3.5S15 8 12 8z"/>',
 	radio: '<path d="M12 12v9M8 21h8"/><circle cx="12" cy="10" r="2"/><path d="M8.5 6.5a5 5 0 0 0 0 7M15.5 6.5a5 5 0 0 1 0 7M5.5 3.5a9 9 0 0 0 0 13M18.5 3.5a9 9 0 0 1 0 13"/>',
 	mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+	forum: '<path d="M4 5h12v8H9l-4 3v-3H4z"/><path d="M16 9h4v8h-1v3l-4-3h-4v-4"/>',
+	docs: '<path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2z"/><path d="M4 20a2 2 0 0 0 2 1h13v-3M8 7h7M8 11h5"/>',
+	print: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>',
+	person: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
 	link: '<path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/>',
 };
 const host = (u: string) => new URL(u).hostname.replace(/^www\./, '') + new URL(u).pathname.replace(/\/$/, '');
 const initials = page.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2);
 const title = page.name;
-const description = `${page.name}'s links: ${page.sections.filter((s) => s.title).map((s) => s.title!.split(' - ')[0]).join(', ')}.`;
+const description = page.bio ?? `${page.name}'s links: ${page.sections.filter((s) => s.title).map((s) => s.title!.split(' - ')[0]).join(', ')}.`;
 ---
 <!doctype html>
 <html lang="en-GB">
@@ -45,8 +51,15 @@ const description = `${page.name}'s links: ${page.sections.filter((s) => s.title
 <body>
 	<main>
 		<header>
-			<div class="avatar" aria-hidden="true">{initials}</div>
-			<h1>{page.name}</h1>
+			{mark ? (
+				<img class="mark" src={mark.src} alt={page.name} width="180" height={Math.round((180 * mark.height) / mark.width)} />
+			) : photo ? (
+				<Image class="avatar photo" src={photo} alt="" width={192} height={192} densities={[1, 2]} loading="eager" />
+			) : (
+				<div class="avatar" aria-hidden="true">{initials}</div>
+			)}
+			<h1 class:list={[{ 'visually-hidden': !!mark }]}>{page.name}</h1>
+			{page.bio && <p class="bio">{page.bio}</p>}
 		</header>
 		{page.sections.map((s) => (
 			<section>
@@ -130,6 +143,11 @@ const description = `${page.name}'s links: ${page.sections.filter((s) => s.title
 		background: linear-gradient(135deg, #87bd25, #175a00);
 		box-shadow: 0 0 0 4px var(--card), var(--shadow);
 	}
+	.avatar.photo { display: block; width: 6rem; height: 6rem; object-fit: cover; background: var(--card); }
+	.mark { display: block; width: 11rem; height: auto; margin: 0 auto 1rem; }
+	@media (prefers-color-scheme: dark) { .mark { filter: brightness(1.6); } }
+	.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+	.bio { margin: .5rem auto 0; max-width: 26rem; color: var(--muted); line-height: 1.45; text-wrap: balance; }
 	h1 { font-size: 1.6rem; margin: 0; letter-spacing: -.01em; }
 	h2 {
 		font-size: .78rem; font-weight: 650; text-transform: uppercase; letter-spacing: .08em;
