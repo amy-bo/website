@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-10-02
 
+- [x] **Confirm-email wording** — "Your registration is not complete yet … If you don't complete your registration now, your place (or, for remote attendees, your registration) will be held until … then deleted", as Martin worded it; e2e check updated.
 - [x] **Control-test data link restored** — amy-bo/results is public again (scanned first: no personal data in files or history beyond commit author emails); the control-test page links its own folder, and the PioFlo v0.01 page now links the raw data of its 1 L kombucha trial, and the Spirulina batch page links the later turbidostat run's data.
 
 ## 2026-10-01

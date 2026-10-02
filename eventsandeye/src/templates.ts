@@ -140,11 +140,13 @@ export function confirmEmail(b: Brand, ev: EventRow, reg: RegistrationRow, sessi
 		...statusLines(reg, sessions).map((l) => l.replace('You have an in-person place.', 'An in-person place is held for you.').replace('You are booked on', 'A place is held for you on')),
 		reg.share_contact ? 'You chose to share your email address with the hosts of the sessions you attend.' : 'Session hosts will see only your name and whether you have a place.',
 	];
+	const held = reg.attendance === 'in_person' ? 'your place' : 'your registration';
+	const holdUntil = ukDateTime(reg.hold_expires_at ?? ev.deadline, ev.timezone);
 	const html = layout(b, subject, `
 <h1 style="font-size:22px;margin-top:0">Please complete your registration</h1>
 <p>Hello,</p>
 <p>Someone, hopefully you, registered this address for the <strong>${escapeHtml(ev.title)}</strong> on ${escapeHtml(ukDateTime(ev.starts_at, ev.timezone))}.</p>
-<p><strong>The registration is not complete yet.</strong> Please confirm your email address by clicking the button below. The place is held until ${escapeHtml(ukDateTime(reg.hold_expires_at ?? ev.deadline, ev.timezone))}; after that, an unconfirmed registration is deleted automatically.</p>
+<p><strong>Your registration is not complete yet.</strong> Please confirm your email address by clicking the button below. If you don't complete your registration now, ${held} will be held until ${escapeHtml(holdUntil)} then deleted.</p>
 <p>You are confirming:</p><ul>${choices.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}</ul>
 ${button(confirmUrl, 'Complete registration')}
 <p style="font-size:14px">If the button does not work, copy this link into your browser:<br><a href="${escapeHtml(confirmUrl)}">${escapeHtml(confirmUrl)}</a></p>
@@ -154,10 +156,10 @@ ${button(confirmUrl, 'Complete registration')}
 
 Someone, hopefully you, registered this address for the ${ev.title} on ${ukDateTime(ev.starts_at, ev.timezone)}.
 
-THE REGISTRATION IS NOT COMPLETE YET. Please confirm your email address by opening this link and clicking "Complete registration":
+YOUR REGISTRATION IS NOT COMPLETE YET. Please confirm your email address by opening this link and clicking "Complete registration":
 ${confirmUrl}
 
-The place is held until ${ukDateTime(reg.hold_expires_at ?? ev.deadline, ev.timezone)}; after that, an unconfirmed registration is deleted automatically.
+If you don't complete your registration now, ${held} will be held until ${holdUntil} then deleted.
 
 You are confirming:
 ${choices.map((l) => `- ${l}`).join('\n')}

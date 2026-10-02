@@ -198,7 +198,7 @@ try {
 	check('Alice registers', r.status === 200 && r.data.ok, JSON.stringify(r.data));
 	let mails = await mailsTo(alice);
 	check('Alice gets one confirm-your-email message', mails.length === 1 && /Complete your registration/.test(mails[0].subject));
-	check('confirm email states until when the place is held', /The place is held until \w+day, \d+ \w+ 2026/.test(mails[0].text_body), mails[0].text_body.slice(0, 400));
+	check('confirm email states until when the place is held', /your (place|registration) will be held until \w+day, \d+ \w+ 2026 at \d\d:\d\d then deleted/.test(mails[0].text_body), mails[0].text_body.slice(0, 400));
 	check('confirm email says registration is not complete, and carries the Events&I beta footer', /NOT COMPLETE YET/.test(mails[0].text_body) && /Complete registration/.test(mails[0].html_body) && /Events&amp;I<\/a> \(beta\)/.test(mails[0].html_body) && /Events&I \(beta\)/.test(mails[0].text_body));
 	const aliceConfirm = tokenFrom(mails[0].text_body, 'confirm');
 	check('confirm link present; no manage link before the address is confirmed', !!aliceConfirm && !tokenFrom(mails[0].text_body, 'manage'));
