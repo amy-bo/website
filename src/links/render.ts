@@ -74,53 +74,18 @@ const nodeIcon = (n: LinkNode): string => {
 	if (n.kind === 'support') return 'heart';
 	if (n.kind === 'group') {
 		// A group wears the icon of its first link, so the map reads at a glance.
-		const first = [...walk(n.children)].find((c) => c.kind === 'link' && (c.icon || c.url));
+		const first = [...walk(n.children)].find((c) => c.kind === 'link');
 		return first ? nodeIcon(first) : 'folder';
 	}
 	return 'link';
 };
-/** Map labels: the part before " - " ("AMYBO - sustainable protein for all" → "AMYBO"). */
-export const shortLabel = (s: string) => s.split(/\s+[-–—]\s+/)[0].trim() || s;
-
-/** Up to two lines of about 18 characters, broken between words; an ellipsis only if it still doesn't fit. */
-export function labelLines(s: string, width = 18, short = true): string[] {
-	const words = (short ? shortLabel(s) : s).split(/\s+/);
-	const lines: string[] = [''];
-	for (const w of words) {
-		const cur = lines[lines.length - 1];
-		if (!cur) lines[lines.length - 1] = w;
-		else if (`${cur} ${w}`.length <= width) lines[lines.length - 1] = `${cur} ${w}`;
-		else if (lines.length < 2) lines.push(w);
-		else {
-			lines[1] = `${lines[1]} ${w}`;
-		}
-	}
-	return lines.map((l) => (l.length > width + 2 ? `${l.slice(0, width).replace(/\s+\S*$/, '') || l.slice(0, width)}…` : l));
-}
-
-const tspans = (lines: string[], x: number, first: number) =>
-	lines.map((l, i) => `<tspan x="${x}" dy="${i ? 13 : first}">${esc(l)}</tspan>`).join('');
 
 function sprite(keys: Set<string>): string {
 	return [...keys]
-		.map((k) => {
-			const i = icon(k);
-			return `<symbol id="i-${esc(k)}" viewBox="0 0 24 24">${i.svg}</symbol>`;
-		})
+		.filter((k) => !icon(k).logo)
+		.map((k) => `<symbol id="i-${esc(k)}" viewBox="0 0 24 24">${icon(k).svg}</symbol>`)
 		.join('');
 }
-
-const iconSvg = (key: string, cls = '') => {
-	const i = icon(key);
-	return `<svg class="${i.brand ? 'ib' : 'il'}${cls ? ` ${cls}` : ''}" aria-hidden="true"${brandStyle(key)}><use href="#i-${esc(key)}"/></svg>`;
-};
-
-function tile(n: LinkNode): string {
-	if (n.image) return `<span class="ico"><img src="${esc(mediaUrl(n.image))}" alt="" width="44" height="44" loading="lazy" decoding="async"></span>`;
-	return `<span class="ico">${iconSvg(nodeIcon(n))}</span>`;
-}
-
-const chevron = '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
 interface Ctx {
 	base: string;
@@ -131,126 +96,158 @@ interface Ctx {
 /** Visitors don't see an empty support note or an empty diary; the editor's preview shows everything. */
 const isHidden = (n: LinkNode, ctx: Ctx) => !ctx.preview && ((n.kind === 'support' && !n.body.trim()) || (n.kind === 'diary' && !ctx.data.diaryCount));
 
-function renderNodes(nodes: LinkNode[], ctx: Ctx, depth: number): string {
+/** The tree as visitors see it: hidden items gone, empty groups gone, and a group holding a single link becomes
+ * that link under the group's name (an "Email" group with one contact form is just "Email"). */
+function visible(nodes: LinkNode[], ctx: Ctx): LinkNode[] {
+	const out: LinkNode[] = [];
+	for (const n of nodes) {
+		if (isHidden(n, ctx)) continue;
+		if (n.kind !== 'group') {
+			out.push(n);
+			continue;
+		}
+		const kids = visible(n.children, ctx);
+		if (!kids.length) continue;
+		if (kids.length === 1 && kids[0].kind === 'link') out.push({ ...kids[0], label: n.label, parent_id: n.parent_id });
+		else out.push({ ...n, children: kids });
+	}
+	return out;
+}
+
+const hrefOf = (n: LinkNode, ctx: Ctx) =>
+	n.kind === 'link' ? (ctx.preview ? safeUrl(n.url) : `${ctx.base}/go/${encodeURIComponent(n.slug)}`) : n.kind === 'diary' ? `${ctx.base}/diary` : '';
+
+// ---- the list: plain text, a twisty for each group ----
+
+function renderList(nodes: LinkNode[], ctx: Ctx): string {
+	const tgt = ctx.preview ? ' target="_blank" rel="noopener"' : '';
 	return nodes
-		.filter((n) => !isHidden(n, ctx))
 		.map((n) => {
-			if (n.kind === 'group') {
-				const count = [...walk(n.children)].filter((c) => c.kind !== 'group' && !isHidden(c, ctx)).length;
-				return `<li class="grp"><details${depth === 0 ? ' open' : ''}><summary><span class="twisty" aria-hidden="true"></span><span class="glabel">${esc(n.label)}</span><span class="count">${count}</span></summary><ul>${renderNodes(n.children, ctx, depth + 1)}</ul></details></li>`;
-			}
-			if (n.kind === 'support') {
-				return `<li class="grp note"><details id="lp-support"><summary>${tile(n)}<span class="text"><span class="label">${esc(n.label)}</span></span><span class="twisty end" aria-hidden="true"></span></summary><div class="notebody">${formatText(n.body)}</div></details></li>`;
-			}
-			if (n.kind === 'diary') {
-				const { diaryCount: d, highlightCount: h } = ctx.data;
-				const sub = d ? `${d} ${d === 1 ? 'entry' : 'entries'}${h ? ` · ${h} highlight${h === 1 ? '' : 's'}` : ''}` : 'No entries yet';
-				return `<li><a class="item" href="${ctx.base}/diary">${tile(n)}<span class="text"><span class="label">${esc(n.label)}</span><span class="host">${sub}</span></span>${chevron}</a></li>`;
-			}
-			const href = ctx.preview ? safeUrl(n.url) : `${ctx.base}/go/${encodeURIComponent(n.slug)}`;
-			return `<li><a class="item" href="${esc(href)}"${ctx.preview ? ' target="_blank" rel="noopener"' : ''}>${tile(n)}<span class="text"><span class="label">${esc(n.label)}</span><span class="host">${esc(hostLine(n.url))}</span></span>${chevron}</a></li>`;
+			if (n.kind === 'group')
+				return `<li><details><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${esc(n.label)}</summary><ul>${renderList(n.children, ctx)}</ul></details></li>`;
+			if (n.kind === 'support')
+				return `<li><details id="lp-support"><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${esc(n.label)}</summary><div class="note">${formatText(n.body)}</div></details></li>`;
+			return `<li><a data-n="${n.id}" href="${esc(hrefOf(n, ctx))}"${n.kind === 'link' ? tgt : ''}>${esc(n.label)}</a></li>`;
 		})
 		.join('');
 }
 
-// ---- static map ----
+// ---- the map: purely graphical, laid out once on the server ----
 
 interface GNode {
 	id: number;
 	parent: number | null;
 	kind: string;
 	label: string;
-	lines: string[];
 	href: string;
+	/** The node's picture, as SVG markup centred on (x, y). */
+	pic: string;
 	icon: string;
-	/** 'ib' (brand, filled) or 'il' (line), and the brand colour style, for the live map. */
-	ic: string;
-	st: string;
-	image: string;
-	x?: number;
-	y?: number;
+	x: number;
+	y: number;
+	r: number;
 }
 
-function graphData(ctx: Ctx): { nodes: GNode[]; svg: string; view: [number, number, number, number] } {
-	const { data, base } = ctx;
-	const nodes: GNode[] = [];
-	const hidden = (n: LinkNode) => isHidden(n, ctx);
-	const top = data.roots.filter((n) => !hidden(n));
-	// Walk the tree itself, so each node's parent is its parent in the tree (orphans already sit at the root).
-	const visit = (list: LinkNode[], parent: number | null) => {
-		for (const n of list) {
-			if (hidden(n)) continue;
-			nodes.push({
-				id: n.id,
-				parent,
-				kind: n.kind,
-				label: n.kind === 'group' ? shortLabel(n.label) : n.label,
-				lines: labelLines(n.label, 18, n.kind === 'group'),
-				href: n.kind === 'link' ? (ctx.preview ? safeUrl(n.url) : `${base}/go/${encodeURIComponent(n.slug)}`) : n.kind === 'diary' ? `${base}/diary` : n.kind === 'support' ? '#lp-support' : '',
-				icon: nodeIcon(n),
-				ic: icon(nodeIcon(n)).brand ? 'ib' : 'il',
-				st: brandStyle(nodeIcon(n)).replace(/^ style="|"$/g, ''),
-				image: n.image ? mediaUrl(n.image) : '',
-			});
-			visit(n.children, n.id);
-		}
-	};
-	visit(top, null);
+const round = (v: number) => Math.round(v * 10) / 10;
+
+/** A radial tree: first-level items evenly round the centre; each group's items fan out beyond it, within its
+ * share of the circle. Positions never change, so nothing ever jumps from under a finger. */
+function layout(top: LinkNode[]): Map<number, { x: number; y: number; r: number; depth: number }> {
+	const pos = new Map<number, { x: number; y: number; r: number; depth: number }>();
 	const N = Math.max(top.length, 1);
-	const R1 = N <= 5 ? 112 : N <= 8 ? 128 : 150;
-	const byId = new Map(nodes.map((g) => [g.id, g]));
-	const parts: string[] = [];
-	const edges: string[] = [];
-	const dots: string[] = [];
-	top.forEach((n, i) => {
-		const a = -Math.PI / 2 + (i * 2 * Math.PI) / N;
-		const x = Math.round(Math.cos(a) * R1 * 10) / 10;
-		const y = Math.round(Math.sin(a) * R1 * 10) / 10;
-		const g = byId.get(n.id)!;
-		g.x = x;
-		g.y = y;
-		edges.push(`<line x1="0" y1="0" x2="${x}" y2="${y}"/>`);
-		const kids = n.children.filter((c) => !hidden(c));
-		const kidDots: [number, number][] = [];
-		kids.forEach((c, j) => {
-			const spread = Math.min(1.4, 0.32 * kids.length);
-			const ca = a + (kids.length > 1 ? -spread / 2 + (j * spread) / (kids.length - 1) : 0);
-			const cx = Math.round((x + Math.cos(ca) * 40) * 10) / 10;
-			const cy = Math.round((y + Math.sin(ca) * 40) * 10) / 10;
-			const cg = byId.get(c.id)!;
-			cg.x = cx;
-			cg.y = cy;
-			edges.push(`<line class="e2" x1="${x}" y1="${y}" x2="${cx}" y2="${cy}"/>`);
-			dots.push(`<circle class="dot" cx="${cx}" cy="${cy}" r="4.5"/>`);
-			kidDots.push([cx, cy]);
+	const R1 = N <= 5 ? 118 : N <= 8 ? 132 : 150;
+	const sector = (2 * Math.PI) / N;
+	const radiusFor = (n: LinkNode, depth: number) => (depth === 1 ? (n.kind === 'group' ? 23 : 21) : depth === 2 ? 17 : 15);
+	const place = (list: LinkNode[], depth: number, centre: number, ringR: number) => {
+		const k = list.length;
+		// About 40 px of arc per item, within this branch's share of the circle; a crowded ring moves outwards.
+		const R = Math.max(ringR, (k * 40) / (sector * 0.95));
+		const spread = Math.min(sector * 0.95, (k * 40) / R);
+		list.forEach((n, i) => {
+			const a = depth === 1 ? -Math.PI / 2 + i * sector : centre - spread / 2 + ((i + 0.5) * spread) / k;
+			const rr = depth === 1 ? R1 : R;
+			pos.set(n.id, { x: round(Math.cos(a) * rr), y: round(Math.sin(a) * rr), r: radiusFor(n, depth), depth });
+			if (n.children.length) place(n.children, depth + 1, a, rr + (depth === 1 ? 100 : 82));
 		});
-		const r = n.kind === 'group' ? 21 : 18;
-		const lines = labelLines(n.label, 18, n.kind === 'group');
-		// Labels sit outside the node, on the side away from the centre, and move clear of any child dots.
-		const below = y >= -Math.abs(x) * 0.35;
-		const h = lines.length * 13;
-		let ly = below ? y + r + 15 : y - r - 6 - (lines.length - 1) * 13;
-		const half = Math.max(...lines.map((l) => l.length)) * 3.1;
-		const hits = () => kidDots.some(([dx, dy]) => Math.abs(dx - x) < half + 5 && dy > ly - 15 && dy < ly - 11 + h + 4);
-		for (let i = 0; i < 6 && hits(); i++) ly += below ? 9 : -9;
-		const k = nodeIcon(n);
-		const ic = icon(k);
-		parts.push(
-			`<g class="n ${n.kind}"><circle cx="${x}" cy="${y}" r="${r}"/><use href="#i-${esc(k)}" class="${ic.brand ? 'ib' : 'il'}" x="${x - 10}" y="${y - 10}" width="20" height="20"${brandStyle(k)}/><text x="${x}" y="${ly}">${tspans(lines, x, 0)}</text></g>`,
+	};
+	place(top, 1, 0, R1);
+	return pos;
+}
+
+function iconMarkup(key: string, x: number, y: number, r: number): string {
+	const i = icon(key);
+	if (i.logo) {
+		const l = i.logo;
+		const s = l.cover ? r * 2 - 3 : r * 1.45;
+		const id = `c${Math.abs(Math.round(x * 7 + y * 13))}`;
+		const clip = l.cover ? ` clip-path="url(#${id})"` : '';
+		return `${l.cover ? `<clipPath id="${id}"><circle cx="${x}" cy="${y}" r="${round(r - 1.5)}"/></clipPath>` : ''}<image href="${esc(l.src)}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${round(s)}" height="${round(s)}" preserveAspectRatio="xMidYMid ${l.cover ? 'slice' : 'meet'}"${clip}${l.invert ? ' class="inv"' : ''}/>`;
+	}
+	const s = round(r * 1.05);
+	return `<use href="#i-${esc(key)}" class="${i.brand ? 'ib' : 'il'}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${s}" height="${s}"${brandStyle(key)}/>`;
+}
+
+function graphData(roots: LinkNode[], ctx: Ctx) {
+	const pos = layout(roots);
+	const nodes: GNode[] = [];
+	const visit = (list: LinkNode[], parent: number | null) =>
+		list.forEach((n) => {
+			const p = pos.get(n.id)!;
+			nodes.push({ id: n.id, parent, kind: n.kind, label: n.label, href: n.kind === 'support' ? '#lp-support' : hrefOf(n, ctx), pic: iconMarkup(nodeIcon(n), p.x, p.y, p.r), icon: nodeIcon(n), x: p.x, y: p.y, r: p.r });
+			visit(n.children, n.id);
+		});
+	visit(roots, null);
+	// The view fits every item the map can show, so it never zooms or pans as groups open.
+	const ext = Math.max(...nodes.map((n) => Math.hypot(n.x, n.y) + n.r)) + 14;
+	const view: [number, number, number, number] = [-ext, -ext, ext * 2, ext * 2].map(round) as [number, number, number, number];
+
+	const tgt = ctx.preview ? ' target="_blank" rel="noopener"' : '';
+	const edges: string[] = [];
+	const buds: string[] = [];
+	const items: string[] = [];
+	for (const n of roots) {
+		const p = pos.get(n.id)!;
+		edges.push(`<line data-e="${n.id}" x1="0" y1="0" x2="${p.x}" y2="${p.y}"/>`);
+		// Small buds hint at what a group holds, on the side it will open towards.
+		n.children.forEach((c) => {
+			const q = pos.get(c.id)!;
+			const d = Math.hypot(q.x - p.x, q.y - p.y) || 1;
+			buds.push(`<circle class="bud" data-b="${n.id}" cx="${round(p.x + ((q.x - p.x) / d) * (p.r + 9))}" cy="${round(p.y + ((q.y - p.y) / d) * (p.r + 9))}" r="3"/>`);
+		});
+		const body = `<title>${esc(n.label)}</title><circle cx="${p.x}" cy="${p.y}" r="${p.r}"/>${iconMarkup(nodeIcon(n), p.x, p.y, p.r)}`;
+		const href = n.kind === 'support' ? '#lp-support' : hrefOf(n, ctx);
+		items.push(
+			n.kind === 'group'
+				? `<g class="n group" data-g="${n.id}" tabindex="0" role="button" aria-expanded="false" aria-label="${esc(n.label)}">${body}</g>`
+				: `<a class="n ${n.kind}" data-g="${n.id}" href="${esc(href)}" aria-label="${esc(n.label)}"${n.kind === 'link' ? tgt : ''}>${body}</a>`,
 		);
-	});
-	const p = data.person;
-	const centre =
+	}
+	const p = ctx.data.person;
+	const hub =
 		p.kind === 'org'
-			? `<circle class="hub" r="38"/><image href="${esc(mediaUrl(p.photo))}" x="-27" y="-19" width="54" height="38" preserveAspectRatio="xMidYMid meet"/>`
+			? `<circle class="hub" r="42"/><image href="${esc(mediaUrl(p.photo))}" x="-30" y="-21" width="60" height="42" class="inv" preserveAspectRatio="xMidYMid meet"/>`
 			: p.photo
-				? `<clipPath id="lp-hub"><circle r="38"/></clipPath><circle class="hub" r="40"/><image href="${esc(mediaUrl(p.photo))}" x="-38" y="-38" width="76" height="76" clip-path="url(#lp-hub)" preserveAspectRatio="xMidYMid slice"/>`
-				: `<circle class="hub" r="38"/><text class="initials" y="9">${esc(initials(p.name))}</text>`;
-	const pad = 70;
-	const ext = R1 + 40 + pad;
-	const view: [number, number, number, number] = [-ext, -ext, ext * 2, ext * 2];
-	const svg = `<g class="edges">${edges.join('')}</g><g class="dots">${dots.join('')}</g><g class="hubg">${centre}</g>${parts.join('')}`;
+				? `<circle class="hub" r="44"/><clipPath id="hubc"><circle r="42"/></clipPath><image href="${esc(mediaUrl(p.photo))}" x="-42" y="-42" width="84" height="84" clip-path="url(#hubc)" preserveAspectRatio="xMidYMid slice"/>`
+				: `<circle class="hub" r="42"/><text class="initials" y="10">${esc(initials(p.name))}</text>`;
+	const svg = `<g class="edges">${edges.join('')}</g><g class="buds">${buds.join('')}</g><g class="nodes">${items.join('')}</g><g class="hubg"><title>${esc(p.name)}</title>${hub}</g>`;
 	return { nodes, svg, view };
+}
+
+/** Hovering an item in the list lights up its place on the map, and the other way round. Pure CSS (:has), so it
+ * costs nothing until someone points at something. */
+function linkStyles(roots: LinkNode[]): string {
+	const rules: string[] = [];
+	const visit = (list: LinkNode[], chain: number[]) =>
+		list.forEach((n) => {
+			const ids = [n.id, ...chain];
+			rules.push(
+				`.lp:has([data-n="${n.id}"]:is(:hover,:focus-visible)) :is(${ids.map((i) => `[data-g="${i}"]`).join(',')})>circle{stroke:var(--accent);stroke-width:3}` +
+					`.lp:has([data-g="${n.id}"]:is(:hover,:focus-visible)) :is(${ids.map((i) => `[data-n="${i}"]`).join(',')}){color:var(--accent-ink)}`,
+			);
+			visit(n.children, ids);
+		});
+	visit(roots, []);
+	return rules.join('');
 }
 
 const initials = (name: string) =>
@@ -274,54 +271,56 @@ export interface RenderOptions {
 function head(title: string, description: string, canonical: string, extra = ''): string {
 	return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(description)}"><meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f4f7f1" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#0b1208" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f8f4" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#0b1208" media="(prefers-color-scheme: dark)">
 <meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(description)}"><meta property="og:url" content="${esc(canonical)}"><meta property="og:type" content="profile">
 <link rel="canonical" href="${esc(canonical)}"><link rel="icon" href="/favicon.svg">${extra}<style>${CSS}</style></head>`;
 }
+
+const FOOT = `<footer class="foot"><a href="https://amybo.org/">AMYBO</a> · clicks are counted, nothing about you is stored · <a href="https://amybo.org/privacy/">Privacy</a></footer>`;
 
 export function renderPage(data: PageData, opts: RenderOptions = {}): string {
 	const p = data.person;
 	const base = pagePath(p.handle);
 	const ctx: Ctx = { base, data, preview: !!opts.preview };
 	const canonical = `${opts.origin ?? 'https://amy.bo'}${base}`;
-	const keys = new Set<string>();
-	for (const n of walk(data.roots)) keys.add(nodeIcon(n));
+	const roots = visible(data.roots, ctx);
 	const description = p.bio || `${p.name}: links.`;
 	const relMe = [...walk(data.roots)]
 		.filter((n) => n.kind === 'link' && n.icon === 'mastodon')
 		.map((n) => `<link rel="me" href="${esc(n.url)}">`)
 		.join('');
-	const showGraph = !p.basic_mode && data.roots.some((n) => !isHidden(n, ctx));
-	const g = showGraph ? graphData(ctx) : null;
+	const g = !p.basic_mode && roots.length ? graphData(roots, ctx) : null;
+	const keys = new Set<string>(g ? g.nodes.map((n) => n.icon) : []);
 
-	const avatar =
-		p.kind === 'org'
-			? `<img class="logo" src="${esc(mediaUrl(p.photo))}" alt="${esc(p.name)}" width="176" height="122">`
+	// With the map, its centre is the portrait; without it, the portrait (or logo) heads the list.
+	const portrait = g
+		? ''
+		: p.kind === 'org'
+			? `<img class="logo inv" src="${esc(mediaUrl(p.photo))}" alt="" width="160" height="111">`
 			: p.photo
 				? `<img class="avatar" src="${esc(mediaUrl(p.photo))}" alt="" width="104" height="104">`
-				: `<span class="avatar ph" aria-hidden="true">${esc(initials(p.name))}</span>`;
+				: '';
 
-	const graphPanel = g
+	const map = g
 		? `<aside class="map" aria-label="Map of these links">
-<button type="button" class="map-open" aria-label="Explore these links as a map"></button>
-<svg class="mapsvg" viewBox="${g.view.join(' ')}" role="presentation">${g.svg}</svg>
-<p class="map-hint" aria-hidden="true"><span class="pulse"></span>Touch to explore</p>
-</aside>
+<svg class="mapsvg" viewBox="${g.view.join(' ')}">${g.svg}</svg>
 <button type="button" class="back" aria-label="Back to the list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/></svg></button>
-<script type="application/json" id="lp-data">${JSON.stringify({ name: p.name, photo: p.photo ? mediaUrl(p.photo) : '', kind: p.kind, initials: initials(p.name), nodes: g.nodes, view: g.view, preview: ctx.preview }).replace(/</g, '\\u003c')}</script>
+</aside>
+<script type="application/json" id="lp-data">${JSON.stringify({ nodes: g.nodes, preview: ctx.preview }).replace(/</g, '\\u003c')}</script>
 <script>${BOOT}</script>`
 		: '';
 
 	return `${head(p.name, description, canonical, relMe)}
-<body class="lp${g ? ' has-map' : ''}"><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>${sprite(keys)}</defs></svg>
+<body class="lp${g ? ' has-map' : ''}">${keys.size ? `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>${sprite(keys)}</defs></svg>` : ''}
 <div class="shell">
 <main class="list">
-<header class="top">${avatar}<h1${p.kind === 'org' ? ' class="vh"' : ''}>${esc(p.name)}</h1>${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}</header>
-<nav aria-label="Links"><ul class="tree">${renderNodes(data.roots, ctx, 0)}</ul></nav>
-<footer class="foot"><a href="https://amybo.org/">AMYBO</a><span aria-hidden="true"> · </span>clicks are counted, nothing about you is stored<span aria-hidden="true"> · </span><a href="https://amybo.org/privacy/">Privacy</a></footer>
+<header class="top">${portrait}<h1>${esc(p.name)}</h1>${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}</header>
+<nav aria-label="Links"><ul class="tree">${renderList(roots, ctx)}</ul></nav>
 </main>
-${graphPanel}
+${map}
 </div>
+${FOOT}
+${g ? `<style>${linkStyles(roots)}</style>` : ''}
 </body></html>`;
 }
 
@@ -336,127 +335,102 @@ export function renderDiary(data: PageData, entries: DiaryEntry[], view: 'all' |
 	const canonical = `${opts.origin ?? 'https://amy.bo'}${base}/diary`;
 	const diaryNode = [...walk(data.roots)].find((n) => n.kind === 'diary');
 	const title = `${diaryNode?.label || 'Diary'} · ${p.name}`;
-	const seg = (v: 'all' | 'highlights', label: string, n: number) =>
-		`<a href="${base}/diary?view=${v}"${view === v ? ' aria-current="page"' : ''}>${label} <span class="count">${n}</span></a>`;
+	const seg = (v: 'all' | 'highlights', label: string) => (view === v ? `<span aria-current="page">${label}</span>` : `<a href="${base}/diary?view=${v}">${label}</a>`);
 	const list = entries.length
 		? entries
 				.map(
 					(e) =>
-						`<article class="entry${e.highlight ? ' hl' : ''}"><header><time datetime="${esc(e.day)}">${esc(fmtDay(e.day))}</time>${e.highlight ? '<span class="star" title="Highlight" aria-label="Highlight">★</span>' : ''}</header><h2>${esc(e.title)}</h2>${formatText(e.body)}</article>`,
+						`<article class="entry"><p class="day"><time datetime="${esc(e.day)}">${esc(fmtDay(e.day))}</time>${e.highlight ? ' <span class="star" aria-label="Highlight">★</span>' : ''}</p><h2>${esc(e.title)}</h2>${formatText(e.body)}</article>`,
 				)
 				.join('')
 		: `<p class="empty">${view === 'highlights' ? 'No highlights yet.' : 'No entries yet.'}</p>`;
-	const mini = p.photo ? `<img class="${p.kind === 'org' ? 'minilogo' : 'mini'}" src="${esc(mediaUrl(p.photo))}" alt="" width="40" height="40">` : '';
 	return `${head(title, `${p.name}'s ${diaryNode?.label || 'diary'}`, canonical)}
-<body class="lp diary"><div class="shell one"><main class="list">
-<header class="dtop"><a class="backlink" href="${base}">${mini}<span>${esc(p.name)}</span></a><h1>${esc(diaryNode?.label || 'Diary')}</h1>
-<nav class="seg" aria-label="Show">${seg('highlights', 'Highlights', data.highlightCount)}${seg('all', 'All', data.diaryCount)}</nav></header>
-<div class="entries">${list}</div>
-<footer class="foot"><a href="${base}">Back to ${esc(p.name)}</a></footer>
-</main></div></body></html>`;
+<body class="lp diary"><div class="shell"><main class="list">
+<header class="top"><p class="crumb"><a href="${base}">${esc(p.name)}</a></p><h1>${esc(diaryNode?.label || 'Diary')}</h1>
+<p class="seg">${seg('highlights', 'Highlights')} · ${seg('all', 'All entries')}</p></header>
+${list}
+</main></div>
+${FOOT}
+</body></html>`;
 }
 
 /** Loader: on the first touch, hover or keypress on the map, fetch the physics and hand over. ~1 KB. */
-export const BOOT = `(()=>{const b=document.body,m=document.querySelector('.map');if(!m)return;let go=null;const rm=matchMedia('(prefers-reduced-motion: reduce)').matches;const vt=f=>document.startViewTransition&&!rm?document.startViewTransition(f):f();const live=()=>{m.classList.add('live');go=go||import('/link-assets/graph.js');go.then(g=>g.start(m)).catch(()=>{})};const full=()=>{if(!b.classList.contains('map-on'))vt(()=>b.classList.add('map-on'));live()};m.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse')live()});m.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse')full()});m.querySelector('.map-open').addEventListener('click',full);m.addEventListener('click',e=>{if(!e.target.closest('.n'))full()});const off=()=>{if(!b.classList.contains('map-on'))return;vt(()=>b.classList.remove('map-on'));window.dispatchEvent(new Event('lp-map-off'))};document.querySelector('.back').addEventListener('click',off);addEventListener('keydown',e=>{if(e.key==='Escape')off()})})();`;
+/** The map's only script until it is used: a click (or Enter) on a group, or any tap on a phone, fetches
+ * /link-assets/graph.js. Links on the map are plain links and work without it. */
+export const BOOT = `(()=>{const b=document.body,m=document.querySelector('.map');if(!m)return;let go;const rm=matchMedia('(prefers-reduced-motion: reduce)').matches;const vt=f=>document.startViewTransition&&!rm?document.startViewTransition(f):f();const small=()=>matchMedia('(max-width: 56rem)').matches;const load=()=>(go=go||import('/link-assets/graph.js').then(g=>g.start(m)));const act=(e,g)=>{e.preventDefault();load().then(x=>g&&x.toggle(+g.dataset.g))};m.addEventListener('click',e=>{if(small()&&!b.classList.contains('map-on')){e.preventDefault();vt(()=>b.classList.add('map-on'));load();return}const g=e.target.closest('g.n[data-g]');if(g)act(e,g)});m.addEventListener('keydown',e=>{const g=e.target.closest&&e.target.closest('g.n[data-g]');if(g&&(e.key==='Enter'||e.key===' '))act(e,g)});const off=()=>{if(b.classList.contains('map-on'))vt(()=>b.classList.remove('map-on'))};m.querySelector('.back').addEventListener('click',e=>{e.stopPropagation();off()});addEventListener('keydown',e=>{if(e.key==='Escape')off()})})();`;
 
 const CSS = `
-:root{--bg:#f4f7f1;--bg2:#e6efdd;--card:#fff;--ink:#132010;--muted:#5d6c56;--line:#dce6d4;--accent:#3f9c00;--accent-ink:#175a00;--tile:#eef4e8;--shadow:0 1px 2px rgb(19 32 16/5%),0 6px 20px rgb(19 32 16/6%);--r:18px;--ease:cubic-bezier(.2,.8,.2,1)}
-@media (prefers-color-scheme:dark){:root{--bg:#0b1208;--bg2:#13200e;--card:#141f10;--ink:#e9f2e3;--muted:#9bad92;--line:#22331b;--accent:#87bd25;--accent-ink:#b7e27c;--tile:#1c2b16;--shadow:0 1px 2px rgb(0 0 0/40%)}}
-*{box-sizing:border-box}html{background:var(--bg);-webkit-text-size-adjust:100%}
-body{margin:0;min-height:100vh;font:16px/1.45 system-ui,-apple-system,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:radial-gradient(70rem 34rem at 30% -12rem,var(--bg2),transparent 70%),var(--bg);-webkit-font-smoothing:antialiased}
+:root{--bg:#f6f8f4;--ink:#16210f;--muted:#66745f;--line:#d8e2cf;--accent:#3f9c00;--accent-ink:#1d6b00;--node:#fff;--ease:cubic-bezier(.2,.8,.2,1)}
+@media (prefers-color-scheme:dark){:root{--bg:#0b1208;--ink:#e6f0df;--muted:#97a88e;--line:#24361d;--accent:#87bd25;--accent-ink:#b7e27c;--node:#142010}.inv{filter:invert(1) hue-rotate(180deg) brightness(1.15)}}
+*{box-sizing:border-box}
+html{background:var(--bg);-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;font:18px/1.5 -apple-system,system-ui,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
 a{color:inherit}
-.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.shell{max-width:76rem;margin:0 auto;padding:max(2.5rem,env(safe-area-inset-top)) 1rem 2rem;display:grid;grid-template-columns:minmax(0,34rem);justify-content:center;gap:3rem}
-.has-map .shell{grid-template-columns:minmax(0,34rem) minmax(20rem,1fr)}
-.list{view-transition-name:lp-list;min-width:0}
-.top{text-align:center;margin-bottom:1.6rem}
-.avatar{display:block;width:6.5rem;height:6.5rem;margin:0 auto 1rem;border-radius:50%;object-fit:cover;background:var(--card);box-shadow:0 0 0 4px var(--card),var(--shadow)}
-.avatar.ph{display:grid;place-items:center;font-size:2.1rem;font-weight:700;color:#fff;background:linear-gradient(135deg,#87bd25,#175a00)}
-.logo{display:block;width:11rem;height:auto;margin:.5rem auto 1.2rem}
-@media (prefers-color-scheme:dark){.logo,.minilogo{filter:invert(1) hue-rotate(180deg) brightness(1.1)}}
-h1{font-size:1.75rem;line-height:1.15;margin:0;letter-spacing:-.015em;font-weight:680}
-.bio{margin:.6rem auto 0;max-width:27rem;color:var(--muted);text-wrap:balance}
-ul{list-style:none;margin:0;padding:0}
-.tree,.tree ul{display:grid;gap:.55rem}
-.tree ul{padding:.55rem 0 .2rem .9rem;margin-left:.55rem;border-left:1.5px solid var(--line)}
-.item,.note summary{display:flex;align-items:center;gap:.9rem;padding:.65rem .9rem .65rem .65rem;background:var(--card);border:1px solid var(--line);border-radius:var(--r);text-decoration:none;box-shadow:var(--shadow);transition:transform .2s var(--ease),border-color .2s,box-shadow .2s}
-.item:hover,.note summary:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--accent) 60%,var(--line))}
-.item:active{transform:scale(.985)}
-.item:focus-visible,summary:focus-visible,.seg a:focus-visible,.back:focus-visible,.map-open:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
-.ico{flex:none;width:2.75rem;height:2.75rem;border-radius:13px;display:grid;place-items:center;background:var(--tile);color:var(--accent-ink);overflow:hidden}
-.ico img{width:100%;height:100%;object-fit:cover}
-.ico svg{width:1.4rem;height:1.4rem}
+.shell{flex:1;width:100%;max-width:72rem;margin:0 auto;padding:max(3.5rem,env(safe-area-inset-top)) 1.5rem 3rem;display:grid;grid-template-columns:minmax(0,30rem);justify-content:center;gap:4rem}
+.has-map .shell{grid-template-columns:minmax(0,26rem) minmax(0,1fr);align-items:start}
+.top{margin-bottom:2rem}
+.avatar{display:block;width:6rem;height:6rem;border-radius:50%;object-fit:cover;margin-bottom:1.2rem}
+.logo{display:block;width:9rem;height:auto;margin-bottom:1.2rem}
+h1{font-size:2rem;line-height:1.15;margin:0;font-weight:650;letter-spacing:-.02em}
+.bio{margin:.7rem 0 0;color:var(--muted);font-size:1rem;text-wrap:pretty}
+/* the list: words only, a > for each group */
+.tree,.tree ul{list-style:none;margin:0;padding:0}
+.tree ul{padding-left:1.15em}
+.tree a,.tree summary{display:block;padding:.28em 0;text-decoration:none;cursor:pointer;transition:color .15s}
+.tree>li>a{padding-left:1.15em}
+.tree ul>li>a{padding-left:1.15em}
+.tree a:hover,.tree summary:hover{color:var(--accent-ink)}
+.tree a:focus-visible,.tree summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+summary{list-style:none;-webkit-tap-highlight-color:transparent}
+summary::-webkit-details-marker{display:none}
+.tw{display:inline-block;width:1.15em;transition:transform .25s var(--ease);transform-origin:.3em 55%}
+details[open]>summary .tw{transform:rotate(90deg)}
+.note{padding:.2em 0 .6em 1.15em;color:var(--muted);font-size:.95em}
+.note p,.entry p{margin:0 0 .6em}
+.note a,.entry a{color:var(--accent-ink);text-underline-offset:2px}
+@supports (interpolate-size:allow-keywords){:root{interpolate-size:allow-keywords}details::details-content{block-size:0;overflow:clip;transition:block-size .3s var(--ease),content-visibility .3s allow-discrete}details[open]::details-content{block-size:auto}}
+.foot{text-align:center;font-size:.75rem;color:var(--muted);padding:1.5rem 1rem max(1.2rem,env(safe-area-inset-bottom))}
+.foot a{color:inherit}
+/* the map: pictures only */
+.map{position:sticky;top:2rem;aspect-ratio:1;max-height:calc(100vh - 4rem);width:100%;justify-self:center}
+.mapsvg{display:block;width:100%;height:100%;overflow:visible}
+.mapsvg .edges line{stroke:var(--line);stroke-width:1.5}
+.mapsvg .bud{fill:var(--line)}
+.mapsvg .hub{fill:var(--node);stroke:var(--line);stroke-width:1.5}
+.mapsvg .initials{font-size:28px;font-weight:650;text-anchor:middle;fill:var(--accent-ink)}
+.mapsvg .n{cursor:pointer;outline:none;transform-box:fill-box;transform-origin:center;transition:transform .42s cubic-bezier(.34,1.4,.64,1),opacity .3s}
+.mapsvg .edges line{transition:opacity .3s}
+.mapsvg .bud{transition:opacity .2s}
+.mapsvg .n>circle{fill:var(--node);stroke:var(--line);stroke-width:1.5;transition:stroke .15s,stroke-width .15s}
+.mapsvg .n.group>circle{stroke:color-mix(in srgb,var(--accent) 40%,var(--line))}
+.mapsvg .n:hover>circle,.mapsvg .n:focus-visible>circle,.mapsvg .n.open>circle{stroke:var(--accent);stroke-width:3}
+.mapsvg use{color:var(--accent-ink)}
 svg.ib,use.ib{fill:var(--brand,currentColor)}
 svg.il,use.il{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-@media (prefers-color-scheme:dark){svg.ib,use.ib{fill:var(--brand-d,currentColor)}}
-.text{flex:1;min-width:0;display:grid}
-.label{font-weight:600;line-height:1.3}
-.host{font-size:.82rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.chev{flex:none;width:1.1rem;height:1.1rem;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s var(--ease)}
-.item:hover .chev{transform:translateX(2px)}
-summary{list-style:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
-summary::-webkit-details-marker{display:none}
-.grp:not(.note)>details>summary{display:flex;align-items:center;gap:.55rem;padding:.35rem .4rem;margin-top:.6rem;border-radius:10px;font-size:.78rem;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
-.grp:first-child>details>summary{margin-top:0}
-.twisty{flex:none;width:.55rem;height:.55rem;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .25s var(--ease);margin:0 .2rem}
-details[open]>summary .twisty{transform:rotate(45deg)}
-.twisty.end{margin-left:auto;color:var(--muted)}
-.glabel{flex:1}
-.count{font-size:.72rem;font-weight:600;letter-spacing:0;padding:.05rem .45rem;border-radius:99px;background:var(--tile);color:var(--muted)}
-.notebody{padding:.8rem 1rem .2rem 4.4rem;color:var(--ink)}
-.notebody p,.entry p{margin:0 0 .7rem}
-.notebody a,.entry a{color:var(--accent-ink);text-underline-offset:2px}
-@supports (interpolate-size:allow-keywords){:root{interpolate-size:allow-keywords}details::details-content{block-size:0;overflow:clip;transition:block-size .3s var(--ease),content-visibility .3s allow-discrete}details[open]::details-content{block-size:auto}}
-.foot{margin-top:2.6rem;text-align:center;font-size:.8rem;color:var(--muted)}
-.foot a{color:inherit}
-/* map */
-.map{position:sticky;top:2rem;align-self:start;height:min(40rem,calc(100vh - 4rem));border-radius:28px;background:radial-gradient(circle at 50% 45%,var(--card),transparent 72%);view-transition-name:lp-map;cursor:pointer}
-.map-open{position:absolute;inset:0;width:100%;height:100%;background:none;border:0;border-radius:inherit;cursor:pointer;z-index:1}
-.mapsvg{width:100%;height:100%;display:block;overflow:visible}
-.mapsvg .edges line{stroke:var(--line);stroke-width:1.5}
-.mapsvg .edges line.e2{stroke-width:1}
-.mapsvg .dot{fill:var(--muted);opacity:.45}
-.mapsvg .hub{fill:var(--card);stroke:var(--line);stroke-width:1.5}
-.mapsvg .initials{font-size:26px;font-weight:700;text-anchor:middle;fill:var(--accent-ink)}
-.mapsvg .n circle{fill:var(--card);stroke:var(--line);stroke-width:1.5}
-.mapsvg .n.group circle{stroke:color-mix(in srgb,var(--accent) 45%,var(--line));stroke-width:2}
-.mapsvg .n use{color:var(--accent-ink)}
-.mapsvg text{font-size:11px;text-anchor:middle;fill:var(--muted);font-weight:550}
-.mapsvg .n{cursor:pointer;outline:none}
-.mapsvg .n.near circle,.mapsvg .n:focus-visible circle,.mapsvg a.n:hover circle{stroke:var(--accent);stroke-width:2.5}
-.mapsvg .n.near .lbl,.mapsvg .n:focus-visible .lbl{fill:var(--ink)}
-.mapsvg .badge circle{fill:var(--accent);stroke:var(--card);stroke-width:2}
-.mapsvg .badge text{fill:#fff;font-size:9px;font-weight:700}
-.mapsvg .d2 .lbl,.mapsvg .d3 .lbl{font-size:10px}
-.map-on .mapsvg{touch-action:none}
-.map-hint{position:absolute;left:0;right:0;bottom:1rem;margin:0;text-align:center;font-size:.8rem;color:var(--muted);display:flex;gap:.5rem;align-items:center;justify-content:center;pointer-events:none}
-.pulse{width:.5rem;height:.5rem;border-radius:50%;background:var(--accent);box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 50%,transparent);animation:pulse 2.4s ease-out 3}
-@keyframes pulse{to{box-shadow:0 0 0 10px transparent}}
-.back{position:fixed;top:max(1rem,env(safe-area-inset-top));left:1rem;z-index:5;width:3rem;height:3rem;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);box-shadow:var(--shadow);display:none;place-items:center;cursor:pointer}
-.back svg{width:1.3rem;height:1.3rem;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
-.map-on .list{display:none}
-.map-on .back{display:grid;view-transition-name:lp-list}
-.map-on .map{position:fixed;inset:0;width:auto;height:auto;border-radius:0;z-index:4;background:var(--bg);cursor:default}
-.map-on .map-open,.map-on .map-hint,.map.live .map-open,.map.live .map-hint{display:none}
-.map-on .shell{display:block}
-::view-transition-group(*){animation-duration:.45s;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
-@media (max-width:56rem){.has-map .shell{grid-template-columns:minmax(0,34rem)}.lp:not(.map-on) .map{position:fixed;top:auto;right:1rem;bottom:max(1rem,env(safe-area-inset-bottom));width:3.75rem;height:3.75rem;border-radius:50%;background:var(--card);border:1px solid var(--line);box-shadow:0 8px 24px rgb(19 32 16/18%);z-index:3}.lp:not(.map-on) .mapsvg text,.lp:not(.map-on) .mapsvg .dots,.lp:not(.map-on) .mapsvg .e2,.lp:not(.map-on) .map-hint{display:none}.lp:not(.map-on) .mapsvg{padding:.35rem}.has-map .list{padding-bottom:4.5rem}}
+@media (prefers-color-scheme:dark){use.ib{fill:var(--brand-d,currentColor)}}
+.back{display:none}
+@media (max-width:56rem){
+.has-map .shell{grid-template-columns:minmax(0,30rem);gap:1rem;padding-top:max(1.2rem,env(safe-area-inset-top))}
+.has-map .map{position:relative;top:0;order:-1;max-height:22rem;cursor:zoom-in}
+.map-on .map{position:fixed;inset:0;max-height:none;aspect-ratio:auto;z-index:5;background:var(--bg);cursor:default;padding:4.5rem 1rem 1rem}
+.map-on .list,.map-on .foot{visibility:hidden}
+.map-on .back{display:grid;place-items:center;position:fixed;top:max(1rem,env(safe-area-inset-top));left:1rem;width:2.75rem;height:2.75rem;border-radius:50%;border:1px solid var(--line);background:var(--node);color:var(--ink);cursor:pointer;view-transition-name:lp-list}
+.back svg{width:1.2rem;height:1.2rem;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.map-on .list{view-transition-name:none}
+.list{view-transition-name:lp-list}
+}
+::view-transition-group(*){animation-duration:.4s;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 /* diary */
-.dtop{margin-bottom:1.4rem}
-.backlink{display:inline-flex;align-items:center;gap:.6rem;text-decoration:none;color:var(--muted);font-weight:550;margin-bottom:1rem}
-.mini{width:2.5rem;height:2.5rem;border-radius:50%;object-fit:cover}
-.minilogo{width:3.4rem;height:auto}
-.seg{display:inline-flex;gap:.25rem;padding:.25rem;margin-top:1rem;border-radius:99px;background:var(--tile)}
-.seg a{padding:.35rem .95rem;border-radius:99px;text-decoration:none;font-size:.9rem;font-weight:600;color:var(--muted)}
-.seg a[aria-current]{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
-.seg .count{background:none;padding:0 0 0 .2rem}
-.entries{display:grid;gap:.9rem}
-.entry{padding:1.1rem 1.2rem .5rem;background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
-.entry.hl{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
-.entry header{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:.85rem}
-.entry h2{font-size:1.15rem;margin:.25rem 0 .55rem;letter-spacing:-.01em}
-.star{color:var(--accent);font-size:1rem}
-.empty{color:var(--muted);text-align:center;padding:2rem 0}
-.one{grid-template-columns:minmax(0,40rem)!important}
+.crumb{margin:0 0 .4rem;font-size:.95rem}
+.crumb a{color:var(--muted);text-decoration:none}
+.crumb a::before{content:"< "}
+.seg{margin:.8rem 0 0;font-size:.95rem;color:var(--muted)}
+.seg a{color:var(--accent-ink)}
+.seg [aria-current]{color:var(--ink);font-weight:600}
+.entry{padding:1.2rem 0;border-top:1px solid var(--line)}
+.entry .day{margin:0;font-size:.85rem;color:var(--muted)}
+.entry h2{font-size:1.15rem;margin:.15rem 0 .5rem;letter-spacing:-.01em}
+.star{color:var(--accent)}
+.empty{color:var(--muted)}
 `;

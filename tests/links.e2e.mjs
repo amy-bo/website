@@ -128,7 +128,14 @@ try {
 	{
 		const r = await req('GET', '/~martin');
 		check('/~martin renders', r.status === 200 && r.text.includes('Martin Currie') && r.text.includes('/~martin/go/patreon'), r.status);
-		check('it has the twisty list and the static map', r.text.includes('<details open>') && r.text.includes('class="mapsvg"') && r.text.includes('/link-assets/graph.js'));
+		check('it has the twisty list, closed, and the static map', r.text.includes('<details><summary data-n=') && !r.text.includes('<details open') && r.text.includes('class="mapsvg"') && r.text.includes('/link-assets/graph.js'));
+		check('the list is words only: no addresses, counts or icons', !r.text.includes('class="host"') && !r.text.includes('class="count"') && !/<nav[^]*?<svg[^]*?<\/nav>/.test(r.text));
+		check('no instructions on the page', !/touch to explore|click to|tap to/i.test(r.text));
+		check('one portrait only (the map\'s centre)', !r.text.includes('class="avatar"') && (r.text.match(/martin-currie\.jpg/g) || []).length === 1);
+		check('a group with one link is just that link (Email)', /<a data-n="\d+" href="\/~martin\/go\/email">Email<\/a>/.test(r.text), (/.{0,80}go\/email.{0,40}/.exec(r.text) || [''])[0]);
+		check('hovering one lights up the other (CSS only)', r.text.includes(':has([data-n=') && r.text.includes(':has([data-g='));
+		check('the map uses the real logos', r.text.includes('/link-media/logo-andeye.png') || r.text.includes('/link-media/amybo.svg'));
+		check('the footer sits outside the content, at the bottom', /<\/div>\s*<footer class="foot">/.test(r.text));
 		check('no script runs a loop before the map is touched', !/requestAnimationFrame|setInterval/.test(r.text));
 		check('Mastodon verification link', r.text.includes('<link rel="me" href="https://mas.to/@Aqueum">'));
 		check('canonical address is on amy.bo', r.text.includes('<link rel="canonical" href="https://amy.bo/~martin">'));
@@ -230,7 +237,7 @@ try {
 		check('the support note shows, formatted', page.text.includes('<strong>Lots</strong>'));
 		check('an empty diary is hidden from visitors', !page.text.includes('/~vee/diary'));
 		check('nested groups render', page.text.includes('Deeper'));
-		check('group counts leave out hidden items', /Projects<\/span><span class="count">2</.test(page.text));
+		check('groups show no counts', !page.text.includes('class="count"'));
 		const go = await req('GET', '/~vee/go/my-script-alert-1-script-repo');
 		check('new link slug works', go.status === 302 && go.headers.get('location') === 'https://github.com/vee', `${go.status} ${go.headers.get('location')}`);
 

@@ -6,3 +6,5 @@ Pictures used by the seeded link pages. Uploads from the editor go to the R2 buc
 | --- | --- |
 | martin-currie.jpg | © Aqueum Ltd, used with permission (not under the site's CC BY-SA content licence); square crop, 384 px, metadata stripped |
 | amybo.svg, amybo-dark.svg | AMYBO logo, copies of src/assets/amybo.svg and amybo_dark.svg |
+| logo-andeye.png | andeye's mark (from Martin, 2 October 2026), trimmed and resized |
+| logo-aqueum-q.jpg | The "q" from the Aqueum logo (from Martin, 2 October 2026), cropped square for a circle |

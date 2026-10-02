@@ -28,20 +28,33 @@ const LINE: Record<string, [string, string]> = {
 	video: ['Video', '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/>'],
 	shop: ['Shop', '<path d="M4 9l1-5h14l1 5M4 9h16v11H4zM9 20v-6h6v6"/>'],
 	amybo: ['AMYBO', ''],
+	andeye: ['andeye', ''],
+	aqueum: ['Aqueum', ''],
 	linkedin: ['LinkedIn', ''],
 };
 
-export type IconSpec = { key: string; title: string; svg: string; brand: boolean; hex?: string };
+export type IconSpec = { key: string; title: string; svg: string; brand: boolean; hex?: string; logo?: Logo };
+
+/** Real logos, drawn as pictures in a circle. `invert`: flip for dark mode; `cover`: fill the circle. */
+export interface Logo {
+	src: string;
+	invert?: boolean;
+	cover?: boolean;
+}
+const LOGOS: Record<string, [string, Logo]> = {
+	amybo: ['AMYBO', { src: '/link-media/amybo.svg', invert: true }],
+	andeye: ['andeye', { src: '/link-media/logo-andeye.png' }],
+	aqueum: ['Aqueum', { src: '/link-media/logo-aqueum-q.jpg', cover: true }],
+};
 
 /** The <svg> markup for an icon key, or the link icon when unknown. */
 export function icon(key: string): IconSpec {
+	const lg = LOGOS[key];
+	if (lg) return { key, title: lg[0], brand: true, svg: '', logo: lg[1] };
 	const b = BRANDS[key];
 	if (b) return { key, title: b.t, brand: true, hex: b.h, svg: `<path d="${b.p}"/>` };
 	if (key === 'linkedin')
 		return { key, title: 'LinkedIn', brand: true, hex: '0A66C2', svg: '<path d="M3 3h18v18H3z" fill="none"/><text x="12" y="17" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="14" stroke="none" fill="currentColor">in</text>' };
-	if (key === 'amybo')
-		// The "A" from the AMYBO logo (src/assets/amybo.svg), scaled into 24×24.
-		return { key, title: 'AMYBO', brand: true, hex: '175A00', svg: '<path transform="translate(1.2 2) scale(0.0095)" d="M-0,2098.92l943.623,-2098.92l384.974,0l946.247,2098.92l-407.93,0l-810.802,-1891l155.779,0l-810.801,1891l-401.09,0Zm436.041,-485.89l104.196,-306.124l1132.62,0l106.773,306.124l-1343.59,-0Z"/>' };
 	const l = LINE[key] ?? LINE.link;
 	return { key: LINE[key] ? key : 'link', title: l[0], brand: false, svg: l[1] };
 }
@@ -99,6 +112,8 @@ const DOMAINS: [RegExp, string][] = [
 	[/(^|\.)stackoverflow\.com$/, 'stackoverflow'],
 	[/(^|\.)notion\.(so|site)$/, 'notion'],
 	[/(^|\.)amybo\.org$|^amy\.bo$/, 'amybo'],
+	[/(^|\.)andeye\.(com|photo)$/, 'andeye'],
+	[/(^|\.)aqueum\.com$/, 'aqueum'],
 	[/^forum\./, 'forum'],
 	[/^docs\./, 'docs'],
 	[/^contact\./, 'mail'],

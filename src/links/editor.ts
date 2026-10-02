@@ -217,6 +217,7 @@ const tileHtml = (n: { icon: string; image: string; kind?: NodeKind }) => {
 	if (n.image) return `<img src="${esc(mediaUrl(n.image))}" alt="">`;
 	const key = n.icon || (n.kind === 'diary' ? 'diary' : n.kind === 'support' ? 'heart' : n.kind === 'group' ? 'folder' : 'link');
 	const i = icon(key);
+	if (i.logo) return `<img src="${esc(i.logo.src)}" alt="" class="${i.logo.cover ? 'cover' : 'fit'}${i.logo.invert ? ' inv' : ''}">`;
 	return `<svg viewBox="0 0 24 24" class="${i.brand ? 'ib' : 'il'}" aria-hidden="true"${i.brand && i.hex ? ` style="--brand:#${i.hex}"` : ''}>${i.svg}</svg>`;
 };
 

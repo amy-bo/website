@@ -79,7 +79,7 @@ The 13 November 2026 get-together page is `src/content/docs/events/2026-11-13-lo
 
 ## Link pages (amy.bo/~name)
 
-Link-in-bio pages for AMYBO volunteers and supporters, and AMYBO's own at amy.bo/links. Each page is a twisty list of links with a map of the same links beside it; the map is a static drawing until someone touches it, and only then loads `public/link-assets/graph.js` (force-directed physics that stops when it settles). Volunteers get a diary with highlights; supporters a "How I support" note.
+Link-in-bio pages for AMYBO volunteers and supporters, and AMYBO's own at amy.bo/links. Each page is a plain-text twisty list with a purely graphical map of the same links beside it (above it on phones). The map is laid out once on the server and drawn as static SVG; links on it work without any script, and only opening a group (or tapping the map on a phone) loads `public/link-assets/graph.js`, which grows the group's items out of it with CSS transitions. Hovering an item in either lights up its counterpart, in CSS alone. Volunteers get a diary with highlights; supporters a "How I support" note.
 
 - **Code:** `src/links/` (model, renderer, icons, API, editor), routes in `functions/[page]/` (`/~name`), `functions/links/` (`/links`), `functions/api/links/` and `functions/admin/links/`, the editor at `src/pages/links/edit/`. `public/_routes.json` limits Functions to the paths that need them; keep it in step with `functions/`.
 - **Data:** D1 tables `lp_*` and `link_events` (`db/links/`). Clicks and views store only the page, the link and the time.
