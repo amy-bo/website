@@ -68,7 +68,38 @@ function brandStyle(key: string): string {
 	return ` style="--brand:${light};--brand-d:${dark}"`;
 }
 
-const nodeIcon = (n: LinkNode) => n.icon || (n.kind === 'diary' ? 'diary' : n.kind === 'support' ? 'heart' : n.kind === 'group' ? 'folder' : 'link');
+const nodeIcon = (n: LinkNode): string => {
+	if (n.icon) return n.icon;
+	if (n.kind === 'diary') return 'diary';
+	if (n.kind === 'support') return 'heart';
+	if (n.kind === 'group') {
+		// A group wears the icon of its first link, so the map reads at a glance.
+		const first = [...walk(n.children)].find((c) => c.kind === 'link' && (c.icon || c.url));
+		return first ? nodeIcon(first) : 'folder';
+	}
+	return 'link';
+};
+/** Map labels: the part before " - " ("AMYBO - sustainable protein for all" → "AMYBO"). */
+export const shortLabel = (s: string) => s.split(/\s+[-–—]\s+/)[0].trim() || s;
+
+/** Up to two lines of about 18 characters, broken between words; an ellipsis only if it still doesn't fit. */
+export function labelLines(s: string, width = 18): string[] {
+	const words = shortLabel(s).split(/\s+/);
+	const lines: string[] = [''];
+	for (const w of words) {
+		const cur = lines[lines.length - 1];
+		if (!cur) lines[lines.length - 1] = w;
+		else if (`${cur} ${w}`.length <= width) lines[lines.length - 1] = `${cur} ${w}`;
+		else if (lines.length < 2) lines.push(w);
+		else {
+			lines[1] = `${lines[1]} ${w}`;
+		}
+	}
+	return lines.map((l) => (l.length > width + 2 ? `${l.slice(0, width).replace(/\s+\S*$/, '') || l.slice(0, width)}…` : l));
+}
+
+const tspans = (lines: string[], x: number, first: number) =>
+	lines.map((l, i) => `<tspan x="${x}" dy="${i ? 13 : first}">${esc(l)}</tspan>`).join('');
 
 function sprite(keys: Set<string>): string {
 	return [...keys]
@@ -129,6 +160,7 @@ interface GNode {
 	parent: number | null;
 	kind: string;
 	label: string;
+	lines: string[];
 	href: string;
 	icon: string;
 	/** 'ib' (brand, filled) or 'il' (line), and the brand colour style, for the live map. */
@@ -152,7 +184,8 @@ function graphData(ctx: Ctx): { nodes: GNode[]; svg: string; view: [number, numb
 				id: n.id,
 				parent,
 				kind: n.kind,
-				label: n.label,
+				label: shortLabel(n.label),
+				lines: labelLines(n.label),
 				href: n.kind === 'link' ? (ctx.preview ? safeUrl(n.url) : `${base}/go/${encodeURIComponent(n.slug)}`) : n.kind === 'diary' ? `${base}/diary` : n.kind === 'support' ? '#lp-support' : '',
 				icon: nodeIcon(n),
 				ic: icon(nodeIcon(n)).brand ? 'ib' : 'il',
@@ -178,6 +211,7 @@ function graphData(ctx: Ctx): { nodes: GNode[]; svg: string; view: [number, numb
 		g.y = y;
 		edges.push(`<line x1="0" y1="0" x2="${x}" y2="${y}"/>`);
 		const kids = n.children.filter((c) => !hidden(c));
+		const kidDots: [number, number][] = [];
 		kids.forEach((c, j) => {
 			const spread = Math.min(1.4, 0.32 * kids.length);
 			const ca = a + (kids.length > 1 ? -spread / 2 + (j * spread) / (kids.length - 1) : 0);
@@ -188,14 +222,21 @@ function graphData(ctx: Ctx): { nodes: GNode[]; svg: string; view: [number, numb
 			cg.y = cy;
 			edges.push(`<line class="e2" x1="${x}" y1="${y}" x2="${cx}" y2="${cy}"/>`);
 			dots.push(`<circle class="dot" cx="${cx}" cy="${cy}" r="4.5"/>`);
+			kidDots.push([cx, cy]);
 		});
 		const r = n.kind === 'group' ? 21 : 18;
-		const label = n.label.length > 20 ? `${n.label.slice(0, 19)}…` : n.label;
+		const lines = labelLines(n.label);
+		// Labels sit outside the node, on the side away from the centre, and move clear of any child dots.
+		const below = y >= -Math.abs(x) * 0.35;
+		const h = lines.length * 13;
+		let ly = below ? y + r + 15 : y - r - 6 - (lines.length - 1) * 13;
+		const half = Math.max(...lines.map((l) => l.length)) * 3.1;
+		const hits = () => kidDots.some(([dx, dy]) => Math.abs(dx - x) < half + 5 && dy > ly - 15 && dy < ly - 11 + h + 4);
+		for (let i = 0; i < 6 && hits(); i++) ly += below ? 9 : -9;
 		const k = nodeIcon(n);
 		const ic = icon(k);
-		const ly = y >= 0 ? y + r + 15 : y - r - 8;
 		parts.push(
-			`<g class="n ${n.kind}"><circle cx="${x}" cy="${y}" r="${r}"/><use href="#i-${esc(k)}" class="${ic.brand ? 'ib' : 'il'}" x="${x - 10}" y="${y - 10}" width="20" height="20"${brandStyle(k)}/><text x="${x}" y="${ly}">${esc(label)}</text></g>`,
+			`<g class="n ${n.kind}"><circle cx="${x}" cy="${y}" r="${r}"/><use href="#i-${esc(k)}" class="${ic.brand ? 'ib' : 'il'}" x="${x - 10}" y="${y - 10}" width="20" height="20"${brandStyle(k)}/><text x="${x}" y="${ly}">${tspans(lines, x, 0)}</text></g>`,
 		);
 	});
 	const p = data.person;

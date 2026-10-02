@@ -107,7 +107,10 @@ export function start(map) {
 				el('text', { y: 3.5 }, badge).textContent = String(n.children.length);
 			}
 			const label = el('text', { class: 'lbl' }, wrap);
-			label.textContent = n.label.length > 26 ? `${n.label.slice(0, 25)}…` : n.label;
+			for (const [i, line] of (n.lines || [n.label]).entries()) {
+				const t = el('tspan', { dy: i ? 13 : 0 }, label);
+				t.textContent = line;
+			}
 			v = { g: wrap, circle: c, pic, label, badge, edge: el('line', { class: n.depth > 1 ? 'e2' : '' }) };
 			wrap.addEventListener('focus', () => {
 				focusNode = n;
@@ -196,8 +199,10 @@ export function start(map) {
 			const dx = n.x - (n.parentNode?.x ?? 0);
 			const dy = n.y - (n.parentNode?.y ?? 0);
 			const below = dy >= -Math.abs(dx) * 0.35;
+			const extra = ((n.lines?.length || 1) - 1) * 13;
 			v.label.setAttribute('x', n.x.toFixed(1));
-			v.label.setAttribute('y', (below ? n.y + n.r + 14 : n.y - n.r - 7).toFixed(1));
+			v.label.setAttribute('y', (below ? n.y + n.r + 14 : n.y - n.r - 7 - extra).toFixed(1));
+			for (const t of v.label.children) t.setAttribute('x', n.x.toFixed(1));
 			if (v.badge) v.badge.setAttribute('transform', `translate(${(n.x + n.r * 0.72).toFixed(1)} ${(n.y - n.r * 0.72).toFixed(1)})`);
 			const p = n.parentNode;
 			const ex = n.x - p.x;
