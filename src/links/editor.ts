@@ -2,7 +2,7 @@
 // Plain DOM, no framework. State is a tree; every change re-renders the affected part and autosaves.
 import { guessIcon, icon } from './icons';
 import { type LinkNode, type NodeKind, type PageData, buildTree, diaryEntries } from './model';
-import { esc, hostLine, renderPage } from './render';
+import { TILE_CSS, esc, hostLine, renderPage, tileSvg, tintProps } from './render';
 
 // ---------- types and state ----------
 
@@ -100,6 +100,7 @@ async function api<T = unknown>(path: string, opts: { method?: string; body?: un
 // ---------- toasts and save status ----------
 
 function toast(msg: string, kind: 'ok' | 'err' = 'ok') {
+	if (!msg) return;
 	const t = h(`<div class="toast ${kind}" role="${kind === 'err' ? 'alert' : 'status'}">${esc(msg)}</div>`);
 	$('#toasts').append(t);
 	setTimeout(() => t.classList.add('out'), kind === 'err' ? 5200 : 2400);
@@ -300,17 +301,22 @@ function preview() {
 
 // ---------- rendering the editor ----------
 
-const tileHtml = (n: { icon: string; image: string; kind?: NodeKind; tint?: string; zoom?: number }) => {
-	if (n.image) return `<img src="${esc(mediaUrl(n.image))}" alt="">`;
-	const key = n.icon || (n.kind === 'diary' ? 'diary' : n.kind === 'support' ? 'heart' : n.kind === 'text' ? 'text' : n.kind === 'group' ? 'folder' : 'link');
-	const i = icon(key);
-	const z = n.zoom && n.zoom !== 1 ? ` transform:scale(${n.zoom});` : '';
-	const mono = n.tint === 'mono';
-	if (i.logo) return `<img src="${esc(i.logo.src)}" alt="" class="${i.logo.cover ? 'cover' : 'fit'}${i.logo.invert ? ' inv' : ''}${mono ? ' mono' : ''}"${z ? ` style="${z}"` : ''}>`;
-	const colour = mono ? 'var(--ink)' : /^#[0-9a-f]{6}$/i.test(n.tint ?? '') ? n.tint : i.brand && i.hex ? `#${i.hex}` : '';
-	const st = `${colour ? `--brand:${colour};${mono || n.tint ? `color:${colour};` : ''}` : ''}${z}`;
-	return `<svg viewBox="0 0 24 24" class="${i.brand ? 'ib' : 'il'}" aria-hidden="true"${st ? ` style="${st}"` : ''}>${i.svg}</svg>`;
-};
+let tileSeq = 0;
+/** An item's picture exactly as the page draws it (see tileSvg). */
+const tileHtml = (n: { icon: string; image: string; kind?: NodeKind; tint?: string; zoom?: number; dk_linked?: number; dk_icon?: string; dk_tint?: string; dk_zoom?: number; children?: unknown[] }) =>
+	tileSvg(
+		{ kind: n.kind ?? 'link', icon: n.icon, image: n.image, tint: n.tint ?? '', zoom: n.zoom ?? 1, dk_linked: n.dk_linked ?? 1, dk_icon: n.dk_icon ?? '', dk_tint: n.dk_tint ?? '', dk_zoom: n.dk_zoom ?? 1, children: (n.children ?? []) as LinkNode[] },
+		`e${++tileSeq}`,
+	);
+
+/** Tiles take the page's tint, as on the page. */
+function applyTint() {
+	const t = tintProps(S.person?.accent ?? '');
+	const b = document.body;
+	for (const k of ['--t', '--ti', '--td', '--tid']) b.style.removeProperty(k);
+	if (t) for (const [k, v] of Object.entries(t)) b.style.setProperty(k, v);
+	b.toggleAttribute('data-tint', !!t);
+}
 
 const KIND_NAME: Record<NodeKind, string> = { group: 'group', link: 'link', text: 'text', diary: 'diary', support: 'support note' };
 
@@ -361,12 +367,13 @@ function renderTree() {
 }
 
 function renderProfile() {
+	applyTint();
 	const p = S.person!;
 	$<HTMLInputElement>('#p-name').value = p.name;
 	$<HTMLTextAreaElement>('#p-bio').value = p.bio;
 	$('#p-count').textContent = `${p.bio.length}/300`;
 	$('#p-photo').innerHTML = p.hub_icon
-		? tileHtml({ icon: p.hub_icon, image: '', tint: p.hub_tint, zoom: p.hub_zoom })
+		? tileHtml({ icon: p.hub_icon, image: '', tint: p.hub_tint, zoom: p.hub_zoom, dk_linked: p.hub_dk_linked, dk_icon: p.hub_dk_icon, dk_tint: p.hub_dk_tint, dk_zoom: p.hub_dk_zoom })
 		: p.photo
 			? `<img src="${esc(mediaUrl(p.photo))}" alt="">`
 			: `<span>${esc(p.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2))}</span>`;
@@ -585,6 +592,100 @@ function setupDrag() {
 
 // ---------- pictures: icons, suggested images and uploads ----------
 
+interface Crop {
+	/** 1 = the picture just covers the circle; more zooms in. */
+	zoom: number;
+	/** Shift of the picture's centre, as a fraction of the circle's width. */
+	dx: number;
+	dy: number;
+}
+
+/** Lets the person choose which part of a picture shows in its circle: drag to move it, slide or scroll to zoom.
+ * Resolves with the crop, or null if they cancel. */
+function chooseCrop(img: HTMLImageElement): Promise<Crop | null> {
+	return new Promise((resolve) => {
+		const dlg = h(`<dialog class="cropper" aria-label="Choose the part of the picture to show">
+			<h2>Choose what shows</h2>
+			<div class="cropbox"><img alt="" draggable="false"></div>
+			<label class="field"><span>Zoom</span><input type="range" min="1" max="4" step="0.01" value="1" aria-label="Zoom"></label>
+			<div class="actions"><button type="button" class="ghost" data-x="cancel">Cancel</button><button type="button" class="primary" data-x="ok">Use this</button></div>
+		</dialog>`) as HTMLDialogElement;
+		document.body.append(dlg);
+		const box = dlg.querySelector<HTMLElement>('.cropbox')!;
+		const pic = dlg.querySelector<HTMLImageElement>('img')!;
+		const zoom = dlg.querySelector<HTMLInputElement>('input')!;
+		pic.src = img.src;
+		const w = img.naturalWidth || 1;
+		const hh = img.naturalHeight || 1;
+		const c: Crop = { zoom: 1, dx: 0, dy: 0 };
+		// Keep the picture covering the circle wherever it's moved.
+		const clamp = () => {
+			const k = c.zoom / Math.min(w, hh);
+			const maxX = Math.max(0, (w * k - 1) / 2);
+			const maxY = Math.max(0, (hh * k - 1) / 2);
+			c.dx = Math.min(maxX, Math.max(-maxX, c.dx));
+			c.dy = Math.min(maxY, Math.max(-maxY, c.dy));
+		};
+		const draw = () => {
+			clamp();
+			const side = box.clientWidth;
+			const k = (c.zoom * side) / Math.min(w, hh);
+			pic.style.width = `${w * k}px`;
+			pic.style.height = `${hh * k}px`;
+			pic.style.left = `${side / 2 - (w * k) / 2 + c.dx * side}px`;
+			pic.style.top = `${side / 2 - (hh * k) / 2 + c.dy * side}px`;
+		};
+		let drag: { x: number; y: number; dx: number; dy: number } | null = null;
+		box.onpointerdown = (e) => {
+			box.setPointerCapture(e.pointerId);
+			drag = { x: e.clientX, y: e.clientY, dx: c.dx, dy: c.dy };
+		};
+		box.onpointermove = (e) => {
+			if (!drag) return;
+			c.dx = drag.dx + (e.clientX - drag.x) / box.clientWidth;
+			c.dy = drag.dy + (e.clientY - drag.y) / box.clientWidth;
+			draw();
+		};
+		box.onpointerup = box.onpointercancel = () => (drag = null);
+		box.onwheel = (e) => {
+			e.preventDefault();
+			c.zoom = Math.min(4, Math.max(1, c.zoom * (e.deltaY < 0 ? 1.06 : 1 / 1.06)));
+			zoom.value = String(c.zoom);
+			draw();
+		};
+		box.tabIndex = 0;
+		box.onkeydown = (e) => {
+			const step = 0.02;
+			const m: Record<string, [number, number]> = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] };
+			if (!m[e.key]) return;
+			e.preventDefault();
+			c.dx += m[e.key][0];
+			c.dy += m[e.key][1];
+			draw();
+		};
+		zoom.oninput = () => {
+			c.zoom = Number(zoom.value);
+			draw();
+		};
+		const end = (v: Crop | null) => {
+			dlg.close();
+			dlg.remove();
+			resolve(v);
+		};
+		dlg.onclick = (e) => {
+			const x = (e.target as HTMLElement).closest<HTMLElement>('[data-x]')?.dataset.x;
+			if (x) end(x === 'ok' ? { ...c } : null);
+		};
+		dlg.oncancel = (e) => {
+			e.preventDefault();
+			end(null);
+		};
+		dlg.showModal();
+		requestAnimationFrame(draw);
+		box.focus();
+	});
+}
+
 async function toWebp(blob: Blob, size: number, cover = true): Promise<Blob> {
 	const url = URL.createObjectURL(blob);
 	try {
@@ -594,12 +695,15 @@ async function toWebp(blob: Blob, size: number, cover = true): Promise<Blob> {
 		await img.decode();
 		const w = img.naturalWidth || size;
 		const hgt = img.naturalHeight || size;
+		// A photo for a circle: the person picks the part that shows.
+		const crop = cover ? await chooseCrop(img) : { zoom: 1, dx: 0, dy: 0 };
+		if (!crop) throw new Error('');
 		const c = document.createElement('canvas');
 		c.width = c.height = size;
 		const g = c.getContext('2d')!;
-		const s = cover ? Math.max(size / w, size / hgt) : Math.min(size / w, size / hgt);
+		const s = (cover ? Math.max(size / w, size / hgt) : Math.min(size / w, size / hgt)) * crop.zoom;
 		g.imageSmoothingQuality = 'high';
-		g.drawImage(img, (size - w * s) / 2, (size - hgt * s) / 2, w * s, hgt * s);
+		g.drawImage(img, (size - w * s) / 2 + crop.dx * size, (size - hgt * s) / 2 + crop.dy * size, w * s, hgt * s);
 		const out = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/webp', 0.86));
 		if (out && out.type === 'image/webp') return out;
 		return await new Promise<Blob>((r) => c.toBlob((b) => r(b!), 'image/png'));
@@ -724,7 +828,6 @@ function pickPicture(n: ENode, suggestions: Proposal | null = null, onChange: ()
 			chain.setAttribute('aria-pressed', String(n.dk_linked !== 0));
 			chain.title = n.dk_linked !== 0 ? 'Light and dark are linked: dark follows light. Click to give dark its own.' : 'Dark has its own picture. Click to link it to light again (its own choices are kept).';
 			chain.classList.toggle('broken', n.dk_linked === 0);
-			$('#pick-mode-note', dlg).textContent = mode === 'dark' ? (n.dk_linked === 0 ? 'Editing dark mode' : 'Editing dark mode: a change gives dark its own picture') : 'Editing light mode';
 		};
 		const drawGrid = () => {
 			const q = search.value.trim().toLowerCase();
@@ -744,6 +847,7 @@ function pickPicture(n: ENode, suggestions: Proposal | null = null, onChange: ()
 			const logo = !n.image ? icon(c.icon).logo : undefined;
 			const canSingle = !n.image && !(logo && logo.cover);
 			$('#tint-single-wrap', dlg).hidden = !canSingle;
+			$('.pickstyle', dlg).hidden = !!n.image;
 			for (const r of dlg.querySelectorAll<HTMLInputElement>('input[name="tint"]')) r.checked = r.value === (canSingle && c.tint ? 'single' : 'orig');
 			const fixed = /^#[0-9a-f]{6}$/i.test(c.tint);
 			colour.value = hex.value = fixed ? c.tint : '#3f9c00';
@@ -818,6 +922,7 @@ function pickPicture(n: ENode, suggestions: Proposal | null = null, onChange: ()
 				b.classList.add('busy');
 				try {
 					n.image = await fromRemote(b.dataset.remote, 256, !b.dataset.fit);
+					syncControls();
 					refresh();
 				} catch (err) {
 					toast((err as Error).message, 'err');
@@ -830,6 +935,7 @@ function pickPicture(n: ENode, suggestions: Proposal | null = null, onChange: ()
 			if (!file) return;
 			try {
 				n.image = await uploadBlob(file, uploadSize);
+				syncControls();
 				refresh();
 			} catch (err) {
 				toast((err as Error).message, 'err');
@@ -1084,6 +1190,7 @@ function init() {
 	const tree = $('#tree');
 	tree.addEventListener('input', onTreeInput);
 	tree.addEventListener('keydown', onTreeKey);
+	document.head.append(Object.assign(document.createElement('style'), { textContent: TILE_CSS }));
 	addEventListener('keydown', (e) => {
 		if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z' || document.querySelector('dialog[open]')) return;
 		// In a text field, the field's own undo comes first; outside one, the whole editor's.
@@ -1119,6 +1226,8 @@ function init() {
 	});
 	$('#add-link').addEventListener('click', () => addLink(null));
 	$('#undo').addEventListener('click', undo);
+	$('#help-open').addEventListener('click', () => $<HTMLDialogElement>('#help').showModal());
+	$('#help-close').addEventListener('click', () => $<HTMLDialogElement>('#help').close());
 	$('#redo').addEventListener('click', redo);
 	$('#add-group').addEventListener('click', () => addSpecial('group'));
 	$('#add-diary').addEventListener('click', () => addSpecial('diary'));
@@ -1129,6 +1238,8 @@ function init() {
 		S.person!.accent = v;
 		$<HTMLInputElement>('#s-tint').value = $<HTMLInputElement>('#s-tint-hex').value = v || '#3f9c00';
 		$('#s-tint-reset').hidden = !v;
+		applyTint();
+		renderTree();
 		preview();
 		later('profile', saveProfile, 300);
 	};

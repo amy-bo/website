@@ -257,7 +257,7 @@ function tintFilters(tints: Set<string>): string {
 }
 
 /** A node's picture, centred on (x, y). `uid` keeps clip-path ids unique; `zoom` sizes the picture in its circle. */
-function iconMarkup(key: string, x: number, y: number, r: number, uid: string | number = '', tint = '', zoom = 1, forDark = false): string {
+function iconMarkup(key: string, x: number, y: number, r: number, uid: string | number = '', tint = '', zoom = 1, forDark = false, inline = false): string {
 	const i = icon(key);
 	const z = Math.min(2.4, Math.max(0.6, zoom || 1));
 	if (i.logo) {
@@ -276,16 +276,40 @@ function iconMarkup(key: string, x: number, y: number, r: number, uid: string | 
 		return `${bg}<image href="${esc(l.src)}" x="${round(x - w / 2)}" y="${round(y - w / 2)}" width="${round(w)}" height="${round(w)}" preserveAspectRatio="xMidYMid meet"${cls}${single ? ` filter="url(#${single})"` : ''}/>`;
 	}
 	const s = round(r * 1.05 * z);
+	if (inline) return `<svg viewBox="0 0 24 24" class="${i.brand ? 'ib' : 'il'}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${s}" height="${s}"${tintStyle(key, tint)}>${i.svg}</svg>`;
 	return `<use href="#i-${esc(key)}" class="${i.brand ? 'ib' : 'il'}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${s}" height="${s}"${tintStyle(key, tint)}/>`;
 }
 
 /** A node's picture for both modes: one drawing while light and dark are linked; two (one shown per mode) when not. */
-function picture(n: LinkNode, x: number, y: number, r: number, uid: string): string {
-	const light = iconMarkup(nodeIcon(n), x, y, r, uid, n.tint, n.zoom);
+function picture(n: LinkNode, x: number, y: number, r: number, uid: string, inline = false): string {
+	// An uploaded picture fills the circle.
+	if (n.image) {
+		const z = Math.min(2.4, Math.max(0.6, n.zoom || 1));
+		const s = round((r * 2 - 3) * z);
+		return `<clipPath id="p${uid}"><circle cx="${x}" cy="${y}" r="${round(r - 1.5)}"/></clipPath><image href="${esc(mediaUrl(n.image))}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${s}" height="${s}" preserveAspectRatio="xMidYMid slice" clip-path="url(#p${uid})"/>`;
+	}
+	const light = iconMarkup(nodeIcon(n), x, y, r, uid, n.tint, n.zoom, false, inline);
 	if (n.dk_linked !== 0) return light;
-	const dark = iconMarkup(n.dk_icon || nodeIcon(n), x, y, r, `${uid}d`, n.dk_tint, n.dk_zoom, true);
+	const dark = iconMarkup(n.dk_icon || nodeIcon(n), x, y, r, `${uid}d`, n.dk_tint, n.dk_zoom, true, inline);
 	return `<g class="lt">${light}</g><g class="dk">${dark}</g>`;
 }
+
+/** One item's picture drawn exactly as the page draws it (same colours for light and dark, logo inversion, separate
+ * dark pictures), in a self-contained SVG for the editor. Its styles are TILE_CSS. */
+export function tileSvg(n: Pick<LinkNode, 'kind' | 'icon' | 'image' | 'tint' | 'zoom' | 'dk_linked' | 'dk_icon' | 'dk_tint' | 'dk_zoom'> & { children?: LinkNode[] }, uid: string, ring = true): string {
+	const node = { label: '', children: [], ...n } as unknown as LinkNode;
+	const filters = tintFilters(new Set([n.tint, n.dk_linked === 0 ? n.dk_tint : ''].filter((t) => t && icon(nodeIcon(node)).logo)));
+	return `<svg class="l-tile" viewBox="-24 -24 48 48" aria-hidden="true">${filters ? `<defs>${filters}</defs>` : ''}${ring ? '<circle class="tn" r="22.5"/>' : ''}${picture(node, 0, 0, 22, uid, true)}</svg>`;
+}
+export const TILE_CSS = `.l-tile{width:100%;height:100%;display:block;overflow:visible}
+.l-tile .tn{fill:var(--node,#fff);stroke:var(--line);stroke-width:1.5}
+.l-tile svg{color:var(--accent-ink)}
+.l-tile svg.ib{fill:var(--brand,currentColor)}
+.l-tile svg.il{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.l-tile .dk{display:none}
+[data-tint] .l-tile{--accent-ink:var(--ti)}
+@media (prefers-color-scheme:dark){[data-tint] .l-tile{--accent-ink:var(--tid)}}
+@media (prefers-color-scheme:dark){.l-tile svg.ib{fill:var(--brand-d,currentColor)}.l-tile .inv{filter:invert(1) hue-rotate(180deg) brightness(1.15)}.l-tile .lt{display:none}.l-tile .dk{display:inline}}`;
 
 /** Small dots on the far side of a group from its parent, one per item it holds: groups open, everything else is
  * a link. `angle` points away from the parent (radians); the live map turns the arc as the group moves. With many
@@ -374,9 +398,14 @@ function mix(hex: string, to: number, t: number): string {
 }
 
 /** The page's own tint, if it has one: inline variables the stylesheet picks up for light and dark. */
+/** The page tint's colours for light and dark (null for AMYBO green). */
+export function tintProps(accent: string): Record<string, string> | null {
+	if (!/^#[0-9a-f]{6}$/i.test(accent)) return null;
+	return { '--t': accent, '--ti': mix(accent, 0, 0.35), '--td': mix(accent, 255, 0.2), '--tid': mix(accent, 255, 0.45) };
+}
 function tintVars(accent: string): string {
-	if (!/^#[0-9a-f]{6}$/i.test(accent)) return '';
-	return ` data-tint style="--t:${accent};--ti:${mix(accent, 0, 0.35)};--td:${mix(accent, 255, 0.2)};--tid:${mix(accent, 255, 0.45)}"`;
+	const t = tintProps(accent);
+	return t ? ` data-tint style="${Object.entries(t).map(([k, v]) => `${k}:${v}`).join(';')}"` : '';
 }
 
 const initials = (name: string) =>
@@ -548,6 +577,9 @@ details[open]>summary .tw{transform:rotate(90deg)}
 .map{position:sticky;top:2rem;aspect-ratio:1;max-height:calc(100vh - 4rem);width:100%;justify-self:center}
 .mapsvg{display:block;width:100%;height:100%;overflow:visible}
 .mapsvg .edges line{stroke:var(--line);stroke-width:1.5}
+.l-card{position:absolute;left:0;top:0;z-index:5;max-width:min(18rem,80%);padding:.7rem .9rem;border-radius:14px;background:var(--node);color:var(--ink);border:1px solid var(--line);box-shadow:0 6px 24px rgb(0 0 0/12%);font-size:.92rem;line-height:1.45}
+.l-card-h{margin:0 0 .3rem;font-weight:600}
+.l-card p{margin:.3rem 0}
 .mapsvg .n.flash>circle{animation:nflash 1.2s ease-out}
 @keyframes nflash{0%,40%{stroke:var(--accent);stroke-width:5}}
 .mapsvg .halo circle{fill:var(--muted);opacity:.6;stroke:none}

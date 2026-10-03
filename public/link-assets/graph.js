@@ -190,6 +190,35 @@ export function start(map) {
 				b.vy += dy * f;
 			}
 		}
+		// Lines push nodes off them too, so items spread round their parent instead of bunching on one side, and no
+		// node sits on someone else's line. Force falls off over 70px from the line; the line's ends take the reaction.
+		for (const c of shown) {
+			const p = c.parent != null ? byId.get(c.parent) : c === hub ? null : hub;
+			if (!p || !role.has(p)) continue;
+			const lx = c.x - p.x;
+			const ly = c.y - p.y;
+			const len2 = lx * lx + ly * ly || 1;
+			for (const n of shown) {
+				if (n === c || n === p) continue;
+				const t = Math.max(0, Math.min(1, ((n.x - p.x) * lx + (n.y - p.y) * ly) / len2));
+				const qx = p.x + lx * t;
+				const qy = p.y + ly * t;
+				let dx = n.x - qx;
+				let dy = n.y - qy;
+				const d = Math.hypot(dx, dy) || 0.5;
+				const reach = 70 + radius(n);
+				if (d >= reach) continue;
+				const f = 1.1 * (1 - d / reach) ** 2;
+				dx /= d;
+				dy /= d;
+				n.vx += dx * f;
+				n.vy += dy * f;
+				c.vx -= dx * f * t;
+				c.vy -= dy * f * t;
+				p.vx -= dx * f * (1 - t);
+				p.vy -= dy * f * (1 - t);
+			}
+		}
 		const parentOfFocus = focus.parent != null ? byId.get(focus.parent) : null;
 		// The direction "away from where we came from", fixed when the focus was chosen: children fan out along it
 		// and the parent drifts against it. Fixing it keeps the picture from slowly turning.
@@ -214,9 +243,10 @@ export function start(map) {
 				}
 			}
 			const push = 0.9;
-			if (r === 'child') {
-				n.vx += ox * push;
-				n.vy += oy * push;
+			if (r === 'child' && focus !== hub) {
+				// A gentle lean away from the parent; the lines and the other nodes spread them round from there.
+				n.vx += ox * push * 0.4;
+				n.vy += oy * push * 0.4;
 			} else if (r === 'parent' || r === 'anc') {
 				// Straight out from whatever it is tied to: balanced by that spring, so it settles rather than circling.
 				const dx = n.x - anchor.x;
@@ -299,6 +329,7 @@ export function start(map) {
 
 	// ---- drawing ----
 	function draw() {
+		placeCard();
 		for (const n of byId.values()) {
 			if (!n.on || !n.el) continue;
 			n.el.setAttribute('transform', `translate(${n.x.toFixed(1)} ${n.y.toFixed(1)}) scale(${n.s.toFixed(3)})`);
@@ -409,8 +440,14 @@ export function start(map) {
 
 	function setFocus(n, fromMap = false, record = fromMap) {
 		if (!n || n === focus) return;
+		closeCard();
 		// Each move is a step in the browser's history, so Back (or Cmd+Z) retraces it.
-		if (record) history.pushState({ lp: n.id }, '', n === hub ? location.pathname + location.search : `#${encodeURIComponent(n.slug)}`);
+		// (The editor's preview is a sandboxed frame, where history can't be written.)
+		if (record && !data.preview) {
+			try {
+				history.pushState({ lp: n.id }, '', n === hub ? location.pathname + location.search : `#${encodeURIComponent(n.slug)}`);
+			} catch {}
+		}
 		focus = n;
 		const p = n.parent != null ? byId.get(n.parent) : null;
 		const d = p ? Math.hypot(n.x - p.x, n.y - p.y) || 1 : 1;
@@ -435,15 +472,55 @@ export function start(map) {
 	}
 
 	// ---- a note on the map opens its twisty in the list (on a phone, back on the list) ----
+	// A note's text shows on the map, in a card beside it; the list opens it too (when the list is on screen).
+	let card = null;
+	let cardFor = null;
+	function closeCard() {
+		card?.remove();
+		card = cardFor = null;
+	}
+	function placeCard() {
+		if (!card || !cardFor) return;
+		const m = svg.getScreenCTM();
+		if (!m) return;
+		const box = map.getBoundingClientRect();
+		const pt = new DOMPoint(cardFor.x, cardFor.y).matrixTransform(m);
+		const r = cardFor.r * cardFor.s * m.a;
+		const w = card.offsetWidth;
+		const h = card.offsetHeight;
+		// Beside the node, on whichever side has room, kept inside the map.
+		let x = pt.x - box.left + r + 10;
+		if (x + w > box.width - 8) x = pt.x - box.left - r - 10 - w;
+		x = Math.max(8, Math.min(box.width - w - 8, x));
+		const y = Math.max(8, Math.min(box.height - h - 8, pt.y - box.top - h / 2));
+		card.style.transform = `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px)`;
+	}
 	function openNote(n) {
 		const d = document.getElementById(`l-note-${n.id}`);
-		if (!d) return;
-		if (document.body.classList.contains('map-on')) map.querySelector('.back')?.click();
-		for (let p = d.parentElement?.closest('details'); p; p = p.parentElement?.closest('details')) p.open = true;
-		d.open = true;
-		d.querySelector('summary')?.focus({ preventScroll: true });
-		d.scrollIntoView({ block: 'nearest', behavior: reduce() ? 'auto' : 'smooth' });
+		if (cardFor === n) return closeCard();
+		closeCard();
+		card = document.createElement('div');
+		card.className = 'l-card';
+		card.setAttribute('role', 'dialog');
+		card.setAttribute('aria-label', n.label);
+		const h = document.createElement('p');
+		h.className = 'l-card-h';
+		h.textContent = n.label;
+		card.append(h);
+		const body = d?.querySelector('.note');
+		if (body) card.append(...[...body.childNodes].map((x) => x.cloneNode(true)));
+		map.append(card);
+		cardFor = n;
+		placeCard();
+		if (d && !document.body.classList.contains('map-on') && !matchMedia('(max-width: 56rem)').matches) {
+			for (let p = d.parentElement?.closest('details'); p; p = p.parentElement?.closest('details')) p.open = true;
+			d.open = true;
+		}
 	}
+	document.addEventListener('pointerdown', (e) => {
+		if (card && !card.contains(e.target) && !e.target.closest?.(`[data-g="${cardFor?.id}"]`)) closeCard();
+	});
+	addEventListener('keydown', (e) => e.key === 'Escape' && closeCard());
 
 	/** A tap on a group or the centre: it becomes the focus; tapping the focus again goes back up a level.
 	 * A tap on a note opens its text in the list. */
@@ -477,7 +554,7 @@ export function start(map) {
 
 	// ---- dragging: the held node follows the pointer, everything else keeps its physics ----
 	let dragging = null;
-	let justDragged = 0;
+	let justDragged = -1e9;
 	function toWorld(e) {
 		const ctm = svg.getScreenCTM();
 		if (!ctm) return null;
@@ -493,6 +570,8 @@ export function start(map) {
 		const start = [e.clientX, e.clientY];
 		let moved = false;
 		const move = (ev) => {
+			// The first tap also loads this file, so the button may already be up by the time we listen: no drag then.
+			if (ev.buttons === 0 && ev.pointerType === 'mouse') return up();
 			if (!moved && Math.hypot(ev.clientX - start[0], ev.clientY - start[1]) < 6) return;
 			if (!moved) {
 				moved = true;
