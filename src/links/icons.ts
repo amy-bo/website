@@ -28,6 +28,7 @@ const LINE: Record<string, [string, string]> = {
 	calendar: ['Event', '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],
 	video: ['Video', '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/>'],
 	shop: ['Shop', '<path d="M4 9l1-5h14l1 5M4 9h16v11H4zM9 20v-6h6v6"/>'],
+	star: ['Highlight', '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>'],
 	text: ['Text', '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>'],
 	people: ['People', '<circle cx="9" cy="8" r="3.2"/><path d="M3 19.5a6 6 0 0 1 12 0"/><circle cx="16.8" cy="9.2" r="2.6"/><path d="M15.2 14.4A4.8 4.8 0 0 1 21.5 19"/>'],
 	stuff: ['Stuff', '<circle cx="7.5" cy="7.5" r="3.5"/><rect x="13" y="4" width="7" height="7" rx="1.2"/><path d="M7.5 13.5l4 7h-8z"/><path d="M16.5 13.2l1 2.2 2.4.3-1.8 1.6.5 2.4-2.1-1.2-2.1 1.2.5-2.4-1.8-1.6 2.4-.3z"/>'],

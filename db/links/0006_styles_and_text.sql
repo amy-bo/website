@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS lp_node_style (
 	node_id INTEGER PRIMARY KEY REFERENCES lp_nodes(id) ON DELETE CASCADE,
 	tint TEXT NOT NULL DEFAULT '',   -- '' original colours, 'mono' the page's ink, or '#rrggbb'
-	zoom REAL NOT NULL DEFAULT 1     -- picture size within its circle, 0.6 to 1.6
+	zoom REAL NOT NULL DEFAULT 1     -- picture size within its circle, 0.6 to 2.4
 );
 CREATE TABLE IF NOT EXISTS lp_page_style (
 	person_id INTEGER PRIMARY KEY REFERENCES lp_people(id) ON DELETE CASCADE,

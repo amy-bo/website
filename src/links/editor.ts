@@ -209,6 +209,7 @@ function preview() {
 			roots: S.tree.map((n) => toLink(n, null)),
 			diaryCount: S.diary.length,
 			highlightCount: S.diary.filter((d) => d.highlight).length,
+			diaryRecent: (S.person.diary_default === 'highlights' && S.diary.some((d) => d.highlight) ? S.diary.filter((d) => d.highlight) : S.diary).slice(0, 8),
 		};
 		// The preview is sandboxed (its own origin), so its scroll position can't be read; just redraw it.
 		$<HTMLIFrameElement>('#preview').srcdoc = renderPage(data, { preview: true });
@@ -519,35 +520,48 @@ function pickPicture(n: ENode, suggestions: Proposal | null = null): Promise<voi
 		if (S.uploads && suggestions?.image) sugg.push(`<button type="button" class="sugg" data-remote="${esc(suggestions.image)}"><img src="/api/links/remote-image?url=${encodeURIComponent(suggestions.image)}" alt=""><span>The site's picture</span></button>`);
 		sug.innerHTML = sugg.join('');
 		$('#pick-upload', dlg).hidden = !S.uploads;
-		// Colour and size for this item's picture.
-		const custom = /^#[0-9a-f]{6}$/i.test(n.tint);
-		for (const r of dlg.querySelectorAll<HTMLInputElement>('input[name="tint"]')) r.checked = r.value === (custom ? 'custom' : n.tint || 'orig');
+		// Colour and size for this item's picture: original colours, or a single colour (the page's text colour,
+		// which adapts to light and dark, or one fixed colour).
+		const logo = !n.image ? icon(n.icon).logo : undefined;
+		const canSingle = !n.image && !(logo && logo.cover);
+		$('#tint-single-wrap', dlg).hidden = !canSingle;
+		const isSingle = canSingle && !!n.tint;
+		for (const r of dlg.querySelectorAll<HTMLInputElement>('input[name="tint"]')) r.checked = r.value === (isSingle ? 'single' : 'orig');
 		const colour = $<HTMLInputElement>('#tint-colour', dlg);
 		const hex = $<HTMLInputElement>('#tint-hex', dlg);
-		colour.value = hex.value = custom ? n.tint : '#3f9c00';
+		const textBtn = $<HTMLInputElement>('#tint-text', dlg);
+		const fixed = /^#[0-9a-f]{6}$/i.test(n.tint);
+		colour.value = hex.value = fixed ? n.tint : '#3f9c00';
+		textBtn.checked = n.tint === 'mono' || !fixed;
 		const zoom = $<HTMLInputElement>('#pick-zoom', dlg);
 		zoom.value = String(n.zoom || 1);
-		const isLogo = !n.image && !!icon(n.icon).logo;
-		$('#tint-custom-wrap', dlg).hidden = isLogo || !!n.image;
 		const restyle = () => {
-			const choice = dlg.querySelector<HTMLInputElement>('input[name="tint"]:checked')?.value ?? 'orig';
-			n.tint = choice === 'orig' ? '' : choice === 'mono' ? 'mono' : /^#[0-9a-f]{6}$/i.test(hex.value) ? hex.value.toLowerCase() : n.tint;
+			const single = dlg.querySelector<HTMLInputElement>('input[name="tint"]:checked')?.value === 'single';
+			n.tint = !single ? '' : textBtn.checked ? 'mono' : /^#[0-9a-f]{6}$/i.test(hex.value) ? hex.value.toLowerCase() : 'mono';
 			n.zoom = Number(zoom.value) || 1;
 			drawGrid();
 			changed(true);
 		};
+		const pickSingle = () => {
+			(dlg.querySelector('input[name="tint"][value="single"]') as HTMLInputElement).checked = true;
+		};
 		dlg.querySelectorAll<HTMLInputElement>('input[name="tint"]').forEach((r) => (r.onchange = restyle));
+		textBtn.onchange = () => {
+			pickSingle();
+			restyle();
+		};
 		colour.oninput = () => {
 			hex.value = colour.value;
-			(dlg.querySelector('input[name="tint"][value="custom"]') as HTMLInputElement).checked = true;
+			textBtn.checked = false;
+			pickSingle();
 			restyle();
 		};
 		hex.oninput = () => {
-			if (/^#[0-9a-f]{6}$/i.test(hex.value)) {
-				colour.value = hex.value;
-				(dlg.querySelector('input[name="tint"][value="custom"]') as HTMLInputElement).checked = true;
-				restyle();
-			}
+			if (!/^#[0-9a-f]{6}$/i.test(hex.value)) return;
+			colour.value = hex.value;
+			textBtn.checked = false;
+			pickSingle();
+			restyle();
 		};
 		zoom.oninput = restyle;
 		const done = () => {
@@ -608,7 +622,7 @@ function addLink(into: ENode | null) {
 	url.value = '';
 	name.value = '';
 	tile.innerHTML = tileHtml(n);
-	hint.textContent = 'Paste a web address and we will suggest a name and picture.';
+	hint.textContent = 'Paste a web address and we will suggest a name and picture. Or leave it empty and just give a name, for some text instead of a link.';
 	let seq = 0;
 	const look = async () => {
 		let v = url.value.trim();
@@ -649,8 +663,13 @@ function addLink(into: ENode | null) {
 	$<HTMLFormElement>('#a-form', dlg).onsubmit = (e) => {
 		e.preventDefault();
 		if (!n.url) {
-			url.focus();
-			return;
+			// A name with no address is a text item: something to say rather than somewhere to go.
+			if (!name.value.trim()) {
+				name.focus();
+				return;
+			}
+			n.kind = 'text';
+			if (n.icon === 'link' || n.icon === 'globe') n.icon = 'text';
 		}
 		n.label = name.value.trim() || prop?.title || hostLine(n.url);
 		(into ? into.children : S.tree).push(n);

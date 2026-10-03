@@ -128,7 +128,7 @@ try {
 	{
 		const r = await req('GET', '/~martin');
 		check('/~martin renders', r.status === 200 && r.text.includes('Martin Currie') && r.text.includes('/~martin/go/patreon'), r.status);
-		check('it has the twisty list, closed, and the static map', r.text.includes('<details><summary data-n=') && !r.text.includes('<details open') && r.text.includes('class="mapsvg"') && r.text.includes('/link-assets/graph.js'));
+		check('it has the twisty list, closed, and the static map', r.text.includes('<details name="l-root"><summary data-n=') && !r.text.includes('<details open') && r.text.includes('class="mapsvg"') && r.text.includes('/link-assets/graph.js'));
 		check('the list is words only: no addresses, counts or icons', !r.text.includes('class="host"') && !r.text.includes('class="count"') && !/<nav[^]*?<svg[^]*?<\/nav>/.test(r.text));
 		check('no instructions on the page', !/touch to explore|click to|tap to/i.test(r.text));
 		check('one portrait only (the map\'s centre)', !r.text.includes('class="avatar"') && (r.text.match(/martin-currie\.jpg/g) || []).length === 1);
@@ -271,15 +271,18 @@ try {
 			{ key: 'help', parent: null, kind: 'group', label: 'Help me' },
 			{ key: 'pat', parent: 'help', kind: 'link', label: 'Patreon', url: 'https://patreon.com/x', icon: 'patreon', tint: 'mono', zoom: 1.3 },
 			{ key: 'txt', parent: null, kind: 'text', label: 'About my lab', body: 'We grow **things**.', tint: '#ff0000' },
+			{ key: 'lg', parent: null, kind: 'link', label: 'AMYBO', url: 'https://amybo.org/', icon: 'amybo', tint: '#00aa00' },
 		];
 		check('bad colours are refused', (await req('PUT', '/api/links/nodes', { nodes: [...base, { key: 'bad', parent: null, kind: 'link', label: 'x', url: 'https://x.org', tint: 'red' }] }, C)).status === 400);
 		const sv = await req('PUT', '/api/links/nodes', { nodes: [...base, ...extra] }, C);
 		check('text items, colours and sizes save', sv.status === 200, sv.text);
 		await req('PUT', '/api/links/profile', { name: 'Vee', accent: '#aa3377' }, C);
 		const pg = await req('GET', '/~vee');
-		check('a group with one link keeps its twisty', /<summary data-n="\d+"><span class="tw" aria-hidden="true">&gt;<\/span>Help me<\/summary>/.test(pg.text));
+		check('a group with one link is that link, under the group\'s name', />Help me<\/a>/.test(pg.text) && !/<summary[^>]*>[^<]*<span class="tw"[^>]*>&gt;<\/span>Help me</.test(pg.text));
+		check('one twisty open per level (named details)', /<details name="l-\d+">/.test(pg.text) || /<details name="l-root"/.test(pg.text));
 		check('text items show their text in the list', pg.text.includes('About my lab') && pg.text.includes('We grow <strong>things</strong>.'));
 		check('monochrome and own-colour pictures', pg.text.includes('--brand:var(--ink)') && pg.text.includes('--brand:#ff0000'));
+		check('a single-colour logo gets its colour filter', pg.text.includes('<filter id="lt-00aa00"') && pg.text.includes('filter="url(#lt-00aa00)"'));
 		check('the page tint is applied', pg.text.includes('data-tint style="--t:#aa3377'));
 		check('the tint must be a colour', (await req('PUT', '/api/links/profile', { name: 'Vee', accent: 'pink' }, C)).status === 400);
 		const m7 = (await req('GET', '/api/links/me', undefined, { cookie: `lp_s=${cookie}` })).data;
@@ -294,6 +297,8 @@ try {
 		check('diary links are safe', d.text.includes('href="https://amybo.org/" rel="nofollow ugc noopener"'));
 		const hl = await req('GET', '/~vee/diary?view=highlights');
 		check('highlights only', hl.text.includes('Newer') && !hl.text.includes('Older'));
+		const withEntries = await req('GET', '/~vee');
+		check('the diary opens like a group, with its entries and the full diary', /1 October 2026: Newer/.test(withEntries.text) && withEntries.text.includes('href="/~vee/diary">All entries</a>'));
 		await req('PUT', '/api/links/profile', { name: 'Vee Volunteer', bio: 'Builds things', diary_default: 'highlights' }, C);
 		check('the owner chooses the default view', !(await req('GET', '/~vee/diary')).text.includes('Older'));
 		check('the page now links the diary', (await req('GET', '/~vee')).text.includes('/~vee/diary'));

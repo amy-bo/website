@@ -73,6 +73,7 @@ const nodeIcon = (n: LinkNode): string => {
 	if (n.kind === 'diary') return 'diary';
 	if (n.kind === 'support') return 'heart';
 	if (n.kind === 'text') return 'text';
+	if (n.kind === 'entry') return 'calendar';
 	if (n.kind === 'group') {
 		// A group wears the icon of its first link, so the map reads at a glance.
 		const first = [...walk(n.children)].find((c) => c.kind === 'link');
@@ -95,9 +96,10 @@ interface Ctx {
 }
 
 /** Visitors don't see an empty support note or an empty diary; the editor's preview shows everything. */
-const isHidden = (n: LinkNode, ctx: Ctx) => !ctx.preview && (((n.kind === 'support' || n.kind === 'text') && !n.body.trim()) || (n.kind === 'diary' && !ctx.data.diaryCount));
+const isHidden = (n: LinkNode, ctx: Ctx) => !ctx.preview && (((n.kind === 'support' || n.kind === 'text') && !n.body.trim()) || (n.kind === 'diary' && n.slug !== 'diary-all' && !ctx.data.diaryCount));
 
-/** The tree as visitors see it: hidden items and empty groups left out. */
+/** The tree as visitors see it: hidden items and empty groups left out, and a group holding a single link shown as
+ * that link under the group's name (an "Email" group with one contact form is just "Email"). */
 function visible(nodes: LinkNode[], ctx: Ctx): LinkNode[] {
 	const out: LinkNode[] = [];
 	for (const n of nodes) {
@@ -107,24 +109,52 @@ function visible(nodes: LinkNode[], ctx: Ctx): LinkNode[] {
 			continue;
 		}
 		const kids = visible(n.children, ctx);
-		if (kids.length) out.push({ ...n, children: kids });
+		if (!kids.length) continue;
+		if (kids.length === 1 && kids[0].kind === 'link') out.push({ ...kids[0], label: n.label, parent_id: n.parent_id });
+		else out.push({ ...n, children: kids });
 	}
 	return out;
 }
+
+/** Diary entries become items under the diary, which then opens like a group; the last item is the full diary. */
+function withDiary(nodes: LinkNode[], ctx: Ctx): LinkNode[] {
+	return nodes.map((n) => {
+		if (n.kind === 'group') return { ...n, children: withDiary(n.children, ctx) };
+		if (n.kind !== 'diary' || !ctx.data.diaryRecent.length) return n;
+		const base = { url: '', image: '', seed: 0, position: 0, tint: '', zoom: 1, children: [], parent_id: n.id };
+		const entries: LinkNode[] = ctx.data.diaryRecent.map((e) => ({
+			...base,
+			id: -1_000_000 - e.id,
+			kind: 'entry',
+			slug: `entry-${e.id}`,
+			label: `${fmtDay(e.day)}: ${e.title}`,
+			icon: e.highlight ? 'star' : 'calendar',
+			body: e.body,
+		}));
+		const all = ctx.data.diaryCount > ctx.data.diaryRecent.length || ctx.data.highlightCount;
+		const more: LinkNode = { ...base, id: -2_000_000 - n.id, kind: 'diary', slug: 'diary-all', label: all ? 'All entries' : 'The diary page', icon: 'diary', body: '' };
+		return { ...n, children: [...entries, more] };
+	});
+}
+
+/** Items that open (a group, or a diary with entries). */
+const opens = (n: LinkNode) => n.kind === 'group' || (n.kind === 'diary' && n.children.length > 0);
 
 const hrefOf = (n: LinkNode, ctx: Ctx) =>
 	n.kind === 'link' ? (ctx.preview ? safeUrl(n.url) : `${ctx.base}/go/${encodeURIComponent(n.slug)}`) : n.kind === 'diary' ? `${ctx.base}/diary` : '';
 
 // ---- the list: plain text, a twisty for each group ----
 
-function renderList(nodes: LinkNode[], ctx: Ctx): string {
+function renderList(nodes: LinkNode[], ctx: Ctx, level = 'root'): string {
 	const tgt = ctx.preview ? ' target="_blank" rel="noopener"' : '';
+	// Twisties sharing a name open one at a time (the browser does it), matching the map's one branch at a time.
+	const nm = ` name="l-${level}"`;
 	return nodes
 		.map((n) => {
-			if (n.kind === 'group')
-				return `<li><details><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${esc(n.label)}</summary><ul>${renderList(n.children, ctx)}</ul></details></li>`;
-			if (n.kind === 'support' || n.kind === 'text')
-				return `<li><details id="l-note-${n.id}"><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${esc(n.label)}</summary><div class="note">${formatText(n.body)}</div></details></li>`;
+			if (opens(n))
+				return `<li><details${nm}><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${esc(n.label)}</summary><ul>${renderList(n.children, ctx, String(n.id))}</ul></details></li>`;
+			if (n.kind === 'support' || n.kind === 'text' || n.kind === 'entry')
+				return `<li><details${nm} id="l-note-${n.id}"><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${esc(n.label)}</summary><div class="note">${formatText(n.body)}</div></details></li>`;
 			return `<li><a data-n="${n.id}" href="${esc(hrefOf(n, ctx))}"${n.kind === 'link' ? tgt : ''}>${esc(n.label)}</a></li>`;
 		})
 		.join('');
@@ -140,8 +170,6 @@ interface GNode {
 	href: string;
 	/** The node's picture, as SVG markup centred on (0, 0), for the live map. */
 	pic: string;
-	/** A note's text, formatted, for the card the live map shows when it is tapped. */
-	note?: string;
 	icon: string;
 	x: number;
 	y: number;
@@ -190,23 +218,39 @@ function tintStyle(key: string, tint: string): string {
 	return brandStyle(key);
 }
 
+/** The id of the SVG filter that paints a logo in a single colour, or '' for its own colours. */
+const tintFilterId = (tint: string) => (tint === 'mono' ? 'lt-mono' : /^#[0-9a-f]{6}$/i.test(tint) ? `lt-${tint.slice(1).toLowerCase()}` : '');
+
+/** Filters for the single colours the page's logos use. */
+function tintFilters(tints: Set<string>): string {
+	return [...tints]
+		.map((t) => {
+			const id = tintFilterId(t);
+			if (!id) return '';
+			const flood = t === 'mono' ? 'style="flood-color:var(--ink)"' : `flood-color="${t}"`;
+			return `<filter id="${id}" color-interpolation-filters="sRGB"><feFlood ${flood}/><feComposite in2="SourceAlpha" operator="in"/></filter>`;
+		})
+		.join('');
+}
+
 /** A node's picture, centred on (x, y). `uid` keeps clip-path ids unique; `zoom` sizes the picture in its circle. */
 function iconMarkup(key: string, x: number, y: number, r: number, uid: string | number = '', tint = '', zoom = 1): string {
 	const i = icon(key);
-	const z = Math.min(1.6, Math.max(0.6, zoom || 1));
+	const z = Math.min(2.4, Math.max(0.6, zoom || 1));
 	if (i.logo) {
 		const l = i.logo;
-		const mono = tint === 'mono' ? ' class="mono"' : '';
-		const bg = l.bg ? `<circle class="bg" cx="${x}" cy="${y}" r="${round(r - 1)}" style="fill:${esc(tint === 'mono' ? 'var(--ink)' : l.bg)};stroke:none"/>` : '';
+		const bg = l.bg ? `<circle class="bg" cx="${x}" cy="${y}" r="${round(r - 1)}" style="fill:${esc(l.bg)};stroke:none"/>` : '';
 		if (l.cover) {
 			const s = (r * 2 - 3) * z;
 			const id = `c${uid || Math.abs(Math.round(x * 7 + y * 13))}`;
-			return `<clipPath id="${id}"><circle cx="${x}" cy="${y}" r="${round(r - 1.5)}"/></clipPath><image href="${esc(l.src)}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${round(s)}" height="${round(s)}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"${mono}/>`;
+			return `<clipPath id="${id}"><circle cx="${x}" cy="${y}" r="${round(r - 1.5)}"/></clipPath><image href="${esc(l.src)}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${round(s)}" height="${round(s)}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`;
 		}
-		// Natural proportions, never squeezed: the box is the logo's width, and "meet" keeps its shape.
+		// Natural proportions, never squeezed: the box is the logo's width, and "meet" keeps its shape. A single
+		// colour recolours the logo's shape (its transparent background stays clear).
 		const w = r * (l.scale ?? 1.3) * z;
-		const cls = [l.invert ? 'inv' : '', tint === 'mono' ? 'mono' : ''].filter(Boolean).join(' ');
-		return `${bg}<image href="${esc(l.src)}" x="${round(x - w / 2)}" y="${round(y - w / 2)}" width="${round(w)}" height="${round(w)}" preserveAspectRatio="xMidYMid meet"${cls ? ` class="${cls}"` : ''}/>`;
+		const single = tintFilterId(tint);
+		const cls = !single && l.invert ? ' class="inv"' : '';
+		return `${bg}<image href="${esc(l.src)}" x="${round(x - w / 2)}" y="${round(y - w / 2)}" width="${round(w)}" height="${round(w)}" preserveAspectRatio="xMidYMid meet"${cls}${single ? ` filter="url(#${single})"` : ''}/>`;
 	}
 	const s = round(r * 1.05 * z);
 	return `<use href="#i-${esc(key)}" class="${i.brand ? 'ib' : 'il'}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${s}" height="${s}"${tintStyle(key, tint)}/>`;
@@ -216,7 +260,7 @@ function iconMarkup(key: string, x: number, y: number, r: number, uid: string | 
  * a link. `angle` points away from the parent (radians); the live map turns the arc as the group moves. With many
  * items the arc widens up to a half circle and the dots get smaller to fit. */
 function halo(n: LinkNode, x: number, y: number, r: number, angle = 0): string {
-	if (n.kind !== 'group' || !n.children.length) return '';
+	if (!opens(n)) return '';
 	const k = n.children.length;
 	const ring = r + 8;
 	const step = k > 1 ? Math.min(0.42, Math.PI / (k - 1)) : 0;
@@ -234,7 +278,7 @@ function graphData(roots: LinkNode[], ctx: Ctx) {
 	const visit = (list: LinkNode[], parent: number | null) =>
 		list.forEach((n) => {
 			const p = pos.get(n.id)!;
-			nodes.push({ id: n.id, parent, kind: n.kind, label: n.label, href: hrefOf(n, ctx), pic: iconMarkup(nodeIcon(n), 0, 0, p.r, `l${n.id}`, n.tint, n.zoom) + halo(n, 0, 0, p.r), note: n.kind === 'text' || n.kind === 'support' ? formatText(n.body) : undefined, icon: nodeIcon(n), x: p.x, y: p.y, r: p.r });
+			nodes.push({ id: n.id, parent, kind: opens(n) ? 'group' : n.kind, label: n.label, href: hrefOf(n, ctx), pic: iconMarkup(nodeIcon(n), 0, 0, p.r, `l${n.id}`, n.tint, n.zoom) + halo(n, 0, 0, p.r), icon: nodeIcon(n), x: p.x, y: p.y, r: p.r });
 			visit(n.children, n.id);
 		});
 	visit(roots, null);
@@ -252,8 +296,8 @@ function graphData(roots: LinkNode[], ctx: Ctx) {
 		const href = hrefOf(n, ctx);
 		// Groups open, notes show their text: both are buttons. Links and the diary are plain links.
 		items.push(
-			n.kind === 'group' || n.kind === 'text' || n.kind === 'support'
-				? `<g class="n l-${n.kind}" data-g="${n.id}" tabindex="0" role="button"${n.kind === 'group' ? ' aria-expanded="false"' : ''} aria-label="${esc(n.label)}">${body}</g>`
+			opens(n) || n.kind === 'text' || n.kind === 'support' || n.kind === 'entry'
+				? `<g class="n l-${opens(n) ? 'group' : n.kind}" data-g="${n.id}" tabindex="0" role="button"${opens(n) ? ' aria-expanded="false"' : ''} aria-label="${esc(n.label)}">${body}</g>`
 				: `<a class="n l-${n.kind}" data-g="${n.id}" href="${esc(href)}" aria-label="${esc(n.label)}"${n.kind === 'link' ? tgt : ''}>${body}</a>`,
 		);
 	}
@@ -331,7 +375,7 @@ export function renderPage(data: PageData, opts: RenderOptions = {}): string {
 	const base = pagePath(p.handle);
 	const ctx: Ctx = { base, data, preview: !!opts.preview };
 	const canonical = `${opts.origin ?? 'https://amy.bo'}${base}`;
-	const roots = visible(data.roots, ctx);
+	const roots = visible(withDiary(data.roots, ctx), ctx);
 	const description = p.bio || `${p.name}: links.`;
 	const relMe = [...walk(data.roots)]
 		.filter((n) => n.kind === 'link' && n.icon === 'mastodon')
@@ -339,6 +383,7 @@ export function renderPage(data: PageData, opts: RenderOptions = {}): string {
 		.join('');
 	const g = !p.basic_mode && roots.length ? graphData(roots, ctx) : null;
 	const keys = new Set<string>(g ? g.nodes.map((n) => n.icon) : []);
+	const logoTints = new Set<string>([...walk(roots)].filter((n) => icon(nodeIcon(n)).logo && n.tint).map((n) => n.tint));
 
 	// With the map, its centre is the portrait; without it, the portrait (or logo) heads the list.
 	const portrait = g
@@ -359,7 +404,7 @@ export function renderPage(data: PageData, opts: RenderOptions = {}): string {
 		: '';
 
 	return `${head(p.name, description, canonical, relMe)}
-<body class="lp${g ? ' has-map' : ''}"${tintVars(p.accent)}>${keys.size ? `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>${sprite(keys)}</defs></svg>` : ''}
+<body class="lp${g ? ' has-map' : ''}"${tintVars(p.accent)}>${keys.size ? `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>${sprite(keys)}${tintFilters(logoTints)}</defs></svg>` : ''}
 <div class="shell">
 <main class="list">
 <header class="top">${portrait}<h1>${esc(p.name)}</h1>${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}</header>
@@ -412,13 +457,6 @@ const CSS = `
 @media (prefers-color-scheme:dark){:root{--bg:#0b1208;--ink:#e6f0df;--muted:#97a88e;--line:#24361d;--accent:#87bd25;--accent-ink:#b7e27c;--node:#142010}.inv{filter:invert(1) hue-rotate(180deg) brightness(1.15)}}
 [data-tint]{--accent:var(--t);--accent-ink:var(--ti)}
 @media (prefers-color-scheme:dark){[data-tint]{--accent:var(--td);--accent-ink:var(--tid)}}
-.mapsvg image.mono{filter:grayscale(1) contrast(1.1)}
-@media (prefers-color-scheme:dark){.mapsvg image.mono.inv{filter:invert(1) grayscale(1)}}
-.card{position:absolute;z-index:6;max-width:min(22rem,calc(100% - 2rem));padding:.9rem 1.1rem;background:var(--node);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgb(0 0 0/14%);font-size:.95rem;line-height:1.5;animation:cardin .18s cubic-bezier(.2,.8,.2,1)}
-.card h2{font-size:1rem;margin:0 0 .4rem}
-.card p{margin:0 0 .5em}
-.card a{color:var(--accent-ink)}
-@keyframes cardin{from{opacity:0;transform:translateY(4px)}}
 *{box-sizing:border-box}
 html{background:var(--bg);-webkit-text-size-adjust:100%}
 body{margin:0;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;font:18px/1.5 -apple-system,system-ui,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}

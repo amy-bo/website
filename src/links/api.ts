@@ -8,7 +8,7 @@ import type { Ctx, Env } from './server';
 const RESERVED = new Set(['amybo', 'links', 'admin', 'api', 'edit', 'www', 'go', 'media', 'diary', 'events', 'help', 'about']);
 const KINDS: NodeKind[] = ['group', 'link', 'text', 'diary', 'support'];
 const TINT_RE = /^(|mono|#[0-9a-f]{6})$/i;
-const cleanZoom = (z: unknown) => Math.min(1.6, Math.max(0.6, Number(z) || 1));
+const cleanZoom = (z: unknown) => Math.min(2.4, Math.max(0.6, Number(z) || 1));
 const EMAIL_RE = /^[^\s@<>"]{1,64}@[^\s@<>"]{1,190}\.[a-z]{2,}$/i;
 
 const body = async <T>(req: Request): Promise<T | null> => {

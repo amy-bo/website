@@ -42,7 +42,7 @@ export function start(map) {
 	function nodeEl(n) {
 		if (n.el) return n.el;
 		const e =
-			n.kind === 'group' || n.kind === 'text' || n.kind === 'support'
+			n.kind === 'group' || n.kind === 'text' || n.kind === 'support' || n.kind === 'entry'
 				? el('g', { class: `n l-${n.kind}`, 'data-g': n.id, tabindex: 0, role: 'button', 'aria-label': n.label })
 				: el('a', { class: `n l-${n.kind}`, 'data-g': n.id, href: n.href, 'aria-label': n.label });
 		if (n.kind === 'link' && data.preview) {
@@ -400,49 +400,23 @@ export function start(map) {
 		kick();
 	}
 
-	// ---- a note's text, in a card beside it ----
-	let card = null;
-	function closeCard() {
-		card?.remove();
-		card = null;
+	// ---- a note on the map opens its twisty in the list (on a phone, back on the list) ----
+	function openNote(n) {
+		const d = document.getElementById(`l-note-${n.id}`);
+		if (!d) return;
+		if (document.body.classList.contains('map-on')) map.querySelector('.back')?.click();
+		for (let p = d.parentElement?.closest('details'); p; p = p.parentElement?.closest('details')) p.open = true;
+		d.open = true;
+		d.querySelector('summary')?.focus({ preventScroll: true });
+		d.scrollIntoView({ block: 'nearest', behavior: reduce() ? 'auto' : 'smooth' });
 	}
-	function showCard(n) {
-		if (card && card.dataset.id === String(n.id)) return closeCard();
-		closeCard();
-		card = document.createElement('div');
-		card.className = 'card';
-		card.dataset.id = n.id;
-		card.setAttribute('role', 'dialog');
-		card.setAttribute('aria-label', n.label);
-		const h = document.createElement('h2');
-		h.textContent = n.label;
-		card.append(h);
-		card.insertAdjacentHTML('beforeend', n.note || ''); // formatted and escaped on the server
-		map.append(card);
-		// Beside the node, kept inside the map.
-		const mb = map.getBoundingClientRect();
-		const nb = n.el.getBoundingClientRect();
-		const cw = card.offsetWidth;
-		const ch = card.offsetHeight;
-		let left = nb.right - mb.left + 10;
-		if (left + cw > mb.width - 8) left = nb.left - mb.left - cw - 10;
-		left = Math.max(8, Math.min(left, mb.width - cw - 8));
-		const top = Math.max(8, Math.min(nb.top - mb.top + nb.height / 2 - ch / 2, mb.height - ch - 8));
-		card.style.left = `${left}px`;
-		card.style.top = `${top}px`;
-	}
-	document.addEventListener('pointerdown', (e) => {
-		if (card && !card.contains(e.target) && !e.target.closest?.('.l-text,.l-support')) closeCard();
-	});
-	addEventListener('keydown', (e) => e.key === 'Escape' && closeCard());
 
 	/** A tap on a group or the centre: it becomes the focus; tapping the focus again goes back up a level.
-	 * A tap on a note shows its text. */
+	 * A tap on a note opens its text in the list. */
 	function tap(id) {
 		const n = byId.get(id);
 		if (!n) return;
-		if (n.kind === 'text' || n.kind === 'support') return showCard(n);
-		closeCard();
+		if (n.kind === 'text' || n.kind === 'support' || n.kind === 'entry') return openNote(n);
 		if (n === focus) setFocus(n.parent != null ? byId.get(n.parent) : hub, true);
 		else if (n.kind === 'group' || n === hub) setFocus(n, true);
 	}
