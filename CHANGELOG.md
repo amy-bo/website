@@ -2,6 +2,10 @@
 
 Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
+## 2026-10-03
+
+- [x] **Link pages tried in a real browser; waitlist icon** — clicked and tapped through on the Mac test account (Chromium, desktop and phone): groups open in place with every item staying put, list and map open together, hover lights up the counterpart. AMYBO's logo given more room in its circle; less empty space round the map on phones. The bioreactor waitlist has a sign-up-list icon, distinct from Contact us (db/links/0004_waitlist_icon.sql); Mailchimp links get it by default. The waitlist link checked: it opens AMYBO's Mailchimp form, where "Free bioreactor emails" is one of three unticked choices.
+
 ## 2026-10-02
 
 - [x] **Link pages redesigned after Martin tried them** — the map no longer uses force physics, which flung second-level items across the centre as they were touched: positions are laid out once on the server (a radial tree, one branch open at a time) and groups grow their items out of themselves with CSS transitions, with no animation loop. The map is purely graphical (logos and icons, names only as tooltips), links on it work without any script, and graph.js loads only when a group is opened; on phones the map sits above the list and a tap opens it full screen. The list is plain text: words only, groups closed to start, a ">" in the text's own font that turns to open them; a group holding one link is just that link (Email). Hovering an item in either lights up the other, in CSS alone. One portrait (the map's centre); no instructions on the page; footer centred at the very bottom; diary page plain to match. Martin's own logos (AMYBO, andeye, Aqueum's q) replace generic icons (db/links/0003_logos.sql updates his page once). test:links 92 checks.
