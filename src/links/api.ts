@@ -2,7 +2,7 @@
 import { orgName } from '../../eventsandeye/src/env';
 import { checkOrigin, endSession, fail, json, nowIso, peek, personFromSession, redeem, sendLink, startSession, type SessionPerson } from './auth';
 import { guessIcon, ICON_KEYS } from './icons';
-import { HANDLE_RE, NODE_SELECT, type NodeKind } from './model';
+import { HANDLE_RE, NODE_SELECT, PERSON_SELECT, type NodeKind } from './model';
 import type { Ctx, Env } from './server';
 
 const RESERVED = new Set(['amybo', 'links', 'admin', 'api', 'edit', 'www', 'go', 'media', 'diary', 'events', 'help', 'about']);
@@ -90,18 +90,14 @@ export async function me(ctx: Ctx): Promise<Response> {
 	const p = await personFromSession(ctx.env, ctx.request);
 	if (!p) return fail('Not signed in', 401);
 	const db = ctx.env.DB;
-	const [person, nodes, diary, counts] = await db.batch([
-		db.prepare(
-			`SELECT p.handle, p.email, p.name, p.bio, p.photo, p.kind, p.basic_mode, p.diary_default, COALESCE(s.accent, '') AS accent
-			 FROM lp_people p LEFT JOIN lp_page_style s ON s.person_id = p.id WHERE p.id = ?`,
-		).bind(p.id),
+	const [person, nodes, counts] = await db.batch([
+		db.prepare(`${PERSON_SELECT} WHERE p.id = ?`).bind(p.id),
 		db.prepare(`${NODE_SELECT} ORDER BY n.position, n.id`).bind(p.id),
-		db.prepare('SELECT id, day, title, body, highlight FROM lp_diary WHERE person_id = ? ORDER BY day DESC, id DESC').bind(p.id),
 		db.prepare(
 			`SELECT slug, COUNT(*) AS total, SUM(at >= strftime('%Y-%m-%dT%H:%M:%SZ','now','-30 days')) AS d30 FROM link_events WHERE page = ? GROUP BY slug`,
 		).bind(p.handle),
 	]);
-	return json({ person: person.results[0], nodes: nodes.results, diary: diary.results, stats: counts.results, uploads: !!ctx.env.LINKS_BUCKET, icons: ICON_KEYS });
+	return json({ person: person.results[0], nodes: nodes.results, stats: counts.results, uploads: !!ctx.env.LINKS_BUCKET, icons: ICON_KEYS });
 }
 
 const okImage = (v: string, handle: string) =>
@@ -116,9 +112,13 @@ export async function saveProfile(ctx: Ctx): Promise<Response> {
 	if (!name) return fail('Your page needs a name');
 	const photo = str(b.photo, 300);
 	if (!okImage(photo, p.handle)) return fail('That photo is not one of your uploads');
-	const diaryDefault = b.diary_default === 'highlights' ? 'highlights' : 'all';
+	const diaryDefault = 'all';
 	const accent = str(b.accent, 7);
 	if (!/^(|#[0-9a-f]{6})$/i.test(accent)) return fail('The tint must be a colour like #3f9c00');
+	const hubIcon = str(b.hub_icon, 40);
+	const hubTint = str(b.hub_tint, 7);
+	if (hubIcon && !ICON_KEYS.includes(hubIcon)) return fail('Unknown picture for the centre');
+	if (!TINT_RE.test(hubTint)) return fail('The centre colour must be like #3f9c00');
 	const before = await imagesInUse(ctx.env.DB, p.id);
 	await ctx.env.DB.batch([
 		ctx.env.DB.prepare('UPDATE lp_people SET name = ?, bio = ?, photo = ?, basic_mode = ?, diary_default = ?, updated_at = ? WHERE id = ?').bind(
@@ -130,7 +130,10 @@ export async function saveProfile(ctx: Ctx): Promise<Response> {
 			nowIso(),
 			p.id,
 		),
-		ctx.env.DB.prepare('INSERT INTO lp_page_style (person_id, accent) VALUES (?, ?) ON CONFLICT(person_id) DO UPDATE SET accent = excluded.accent').bind(p.id, accent.toLowerCase()),
+		ctx.env.DB.prepare(
+			`INSERT INTO lp_page_meta (person_id, accent, hub_icon, hub_tint, hub_zoom) VALUES (?, ?, ?, ?, ?)
+			 ON CONFLICT(person_id) DO UPDATE SET accent = excluded.accent, hub_icon = excluded.hub_icon, hub_tint = excluded.hub_tint, hub_zoom = excluded.hub_zoom`,
+		).bind(p.id, accent.toLowerCase(), hubIcon, hubTint.toLowerCase(), cleanZoom(b.hub_zoom)),
 	]);
 	forgetImages(ctx, before, await imagesInUse(ctx.env.DB, p.id));
 	return json({ ok: true });
@@ -148,6 +151,8 @@ interface InNode {
 	body?: string;
 	tint?: string;
 	zoom?: number;
+	day?: string;
+	highlight?: boolean | number;
 }
 
 const slugify = (s: string) =>
@@ -193,6 +198,7 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 		if (n.id != null && !existingById.has(n.id)) return fail('The page data is out of date; please reload the editor');
 		if (n.icon && !ICON_KEYS.includes(n.icon)) n.icon = '';
 		if (!TINT_RE.test(String(n.tint ?? ''))) return fail(`The colour for "${label}" must be like #3f9c00`);
+		if (!/^(|\d{2}|\d{4}|\d{6})$/.test(String(n.day ?? ''))) return fail(`The date for "${label}" must be YY, YYMM or YYMMDD, like 2608 or 260822`);
 		if (!okImage(str(n.image, 300), p.handle)) return fail(`The image for "${label}" is not one of your uploads`);
 		keys.set(n.key, n);
 	}
@@ -200,7 +206,7 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 	for (const n of list) {
 		if (n.parent === null) continue;
 		const parent = keys.get(n.parent);
-		if (!parent || parent.kind !== 'group') return fail('Items can only sit inside groups');
+		if (!parent || (parent.kind !== 'group' && parent.kind !== 'diary')) return fail('Items can only sit inside groups and diaries');
 	}
 	const depth = (n: InNode, seen = new Set<string>()): number => {
 		if (seen.has(n.key)) return Infinity;
@@ -256,8 +262,11 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 	});
 	const styles = list.map((n) =>
 		db
-			.prepare('INSERT INTO lp_node_style (node_id, tint, zoom) VALUES (?, ?, ?) ON CONFLICT(node_id) DO UPDATE SET tint = excluded.tint, zoom = excluded.zoom')
-			.bind(idOf.get(n.key)!, String(n.tint ?? '').toLowerCase(), cleanZoom(n.zoom)),
+			.prepare(
+				`INSERT INTO lp_node_meta (node_id, tint, zoom, day, highlight) VALUES (?, ?, ?, ?, ?)
+				 ON CONFLICT(node_id) DO UPDATE SET tint = excluded.tint, zoom = excluded.zoom, day = excluded.day, highlight = excluded.highlight`,
+			)
+			.bind(idOf.get(n.key)!, String(n.tint ?? '').toLowerCase(), cleanZoom(n.zoom), String(n.day ?? ''), n.highlight ? 1 : 0),
 	);
 	const deletes = existing.filter((r) => !keep.has(r.id)).map((r) => db.prepare('DELETE FROM lp_nodes WHERE id = ? AND person_id = ?').bind(r.id, p.id));
 	const imagesBefore = await imagesInUse(db, p.id);
@@ -269,33 +278,6 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 	}
 	forgetImages(ctx, imagesBefore, await imagesInUse(db, p.id));
 	return json({ ok: true, ids: Object.fromEntries(idOf) });
-}
-
-export async function saveDiary(ctx: Ctx): Promise<Response> {
-	const p = await signedIn(ctx);
-	if (p instanceof Response) return p;
-	const db = ctx.env.DB;
-	if (ctx.request.method === 'DELETE') {
-		const id = Number(new URL(ctx.request.url).searchParams.get('id'));
-		await db.prepare('DELETE FROM lp_diary WHERE id = ? AND person_id = ?').bind(id, p.id).run();
-		return json({ ok: true });
-	}
-	const b = await body<{ id?: number; day?: string; title?: string; body?: string; highlight?: boolean }>(ctx.request);
-	const day = str(b?.day, 10);
-	const title = str(b?.title, 160);
-	if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(Date.parse(day))) return fail('Please give the entry a date');
-	if (!title) return fail('Please give the entry a title');
-	const text = typeof b?.body === 'string' ? b.body.slice(0, 20000) : '';
-	if (b?.id) {
-		await db.prepare('UPDATE lp_diary SET day = ?, title = ?, body = ?, highlight = ?, updated_at = ? WHERE id = ? AND person_id = ?')
-			.bind(day, title, text, b.highlight ? 1 : 0, nowIso(), b.id, p.id)
-			.run();
-		return json({ ok: true, id: b.id });
-	}
-	const n = await db.prepare('SELECT COUNT(*) AS n FROM lp_diary WHERE person_id = ?').bind(p.id).first<{ n: number }>();
-	if ((n?.n ?? 0) >= 2000) return fail('The diary is full (2,000 entries)');
-	const row = await db.prepare('INSERT INTO lp_diary (person_id, day, title, body, highlight) VALUES (?, ?, ?, ?, ?) RETURNING id').bind(p.id, day, title, text, b?.highlight ? 1 : 0).first<{ id: number }>();
-	return json({ ok: true, id: row?.id });
 }
 
 // ---- images ----

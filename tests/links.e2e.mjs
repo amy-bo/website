@@ -238,7 +238,7 @@ try {
 		const page = await req('GET', '/~vee');
 		check('labels are escaped', page.text.includes('My &lt;script&gt;alert(1)&lt;/script&gt; repo') && !page.text.includes('<script>alert(1)'));
 		check('the support note shows, formatted', page.text.includes('<strong>Lots</strong>'));
-		check('an empty diary is hidden from visitors', !page.text.includes('/~vee/diary'));
+		check('an empty diary is hidden from visitors', !page.text.includes('AMYBO diary'));
 		check('nested groups render', page.text.includes('Deeper'));
 		check('groups show no counts', !page.text.includes('class="count"'));
 		const go = await req('GET', '/~vee/go/my-script-alert-1-script-repo');
@@ -288,20 +288,35 @@ try {
 		const m7 = (await req('GET', '/api/links/me', undefined, { cookie: `lp_s=${cookie}` })).data;
 		check('sizes come back to the editor', m7.nodes.some((n) => n.label === 'Patreon' && n.zoom === 1.3 && n.tint === 'mono') && m7.person.accent === '#aa3377');
 
-		const e1 = await req('POST', '/api/links/diary', { day: '2026-09-01', title: 'Older', body: 'See https://amybo.org/about/' }, C);
-		const e2 = await req('POST', '/api/links/diary', { day: '2026-10-01', title: 'Newer', body: 'Built [the rig](https://amybo.org/).', highlight: true }, C);
-		check('diary entries save', e1.status === 200 && e2.status === 200, e1.text + e2.text);
-		check('bad dates refused', (await req('POST', '/api/links/diary', { day: '2026-13-45', title: 'x' }, C)).status === 400);
+		// Diary entries are ordinary items inside the diary, with a short date and a highlight.
+		const m8 = (await req('GET', '/api/links/me', undefined, { cookie: `lp_s=${cookie}` })).data;
+		const keep8 = m8.nodes.map((n) => ({ id: n.id, key: `k${n.id}`, parent: n.parent_id ? `k${n.parent_id}` : null, kind: n.kind, label: n.label, url: n.url, icon: n.icon, image: n.image, body: n.body, tint: n.tint, zoom: n.zoom, day: n.day, highlight: n.highlight }));
+		const dk = `k${m8.nodes.find((n) => n.kind === 'diary').id}`;
+		const entries = [
+			{ key: 'e1', parent: dk, kind: 'text', label: 'Older', body: 'See https://amybo.org/about/', day: '260901' },
+			{ key: 'e2', parent: dk, kind: 'text', label: 'Newer', body: 'Built [the rig](https://amybo.org/).', day: '261001' },
+			{ key: 'e3', parent: dk, kind: 'link', label: 'Paper', url: 'https://example.org/paper', day: '2609' },
+		];
+		check('bad dates refused', (await req('PUT', '/api/links/nodes', { nodes: [...keep8, { ...entries[0], day: '2026-09-01' }] }, C)).status === 400);
+		const de = await req('PUT', '/api/links/nodes', { nodes: [...keep8, ...entries] }, C);
+		check('diary entries save as items', de.status === 200, de.text);
+		let pgd = await req('GET', '/~vee');
+		const order = ['Newer 261001', 'Older 260901', 'Paper 2609'].map((t) => pgd.text.indexOf(t));
+		check('diary entries show newest first, with short dates in their titles', order.every((v, i) => v > 0 && (i === 0 || v > order[i - 1])), order.join(','));
+		check('no highlights: no All group', !/>All<\/summary>/.test(pgd.text));
 		const d = await req('GET', '/~vee/diary');
-		check('diary shows newest first', d.status === 200 && d.text.indexOf('Newer') < d.text.indexOf('Older') && d.text.indexOf('Newer') > 0, d.status);
+		check('the diary page lists them, newest first', d.status === 200 && d.text.indexOf('Newer') < d.text.indexOf('Older') && d.text.includes('1 October 2026'), d.status);
 		check('diary links are safe', d.text.includes('href="https://amybo.org/" rel="nofollow ugc noopener"'));
+		await req('PUT', '/api/links/nodes', { nodes: [...keep8, { ...entries[0] }, { ...entries[1], highlight: true }, entries[2]] }, C);
+		pgd = await req('GET', '/~vee');
+		check('with a highlight: highlights first, then an All group with everything', /Newer 261001[^]*>All<\/summary>[^]*Newer 261001[^]*Older 260901/.test(pgd.text));
 		const hl = await req('GET', '/~vee/diary?view=highlights');
-		check('highlights only', hl.text.includes('Newer') && !hl.text.includes('Older'));
-		const withEntries = await req('GET', '/~vee');
-		check('the diary opens like a group, with its entries and the full diary', /1 October 2026: Newer/.test(withEntries.text) && withEntries.text.includes('href="/~vee/diary">All entries</a>'));
-		await req('PUT', '/api/links/profile', { name: 'Vee Volunteer', bio: 'Builds things', diary_default: 'highlights' }, C);
-		check('the owner chooses the default view', !(await req('GET', '/~vee/diary')).text.includes('Older'));
-		check('the page now links the diary', (await req('GET', '/~vee')).text.includes('/~vee/diary'));
+		check('the diary page can show highlights only', hl.text.includes('Newer') && !hl.text.includes('Older'));
+		const hubp = await req('PUT', '/api/links/profile', { name: 'Vee Volunteer', bio: 'Builds things', hub_icon: 'flask', hub_tint: '#123456', hub_zoom: 1.4 }, C);
+		check('the centre can have its own picture, colour and size', hubp.status === 200 && /<g class="hubg"[^]*?--brand:#123456[^]*?<\/g>/.test((await req('GET', '/~vee')).text), hubp.text);
+		check('unknown centre pictures are refused', (await req('PUT', '/api/links/profile', { name: 'Vee', hub_icon: 'nope' }, C)).status === 400);
+		await req('PUT', '/api/links/profile', { name: 'Vee Volunteer', bio: 'Builds things' }, C);
+		check('the page now shows the diary', (await req('GET', '/~vee')).text.includes('AMYBO diary'));
 		const pf = await req('PUT', '/api/links/profile', { name: 'Vee', photo: 'r2:martin/abc.webp' }, C);
 		check("someone else's image is refused", pf.status === 400);
 		check('a name is required', (await req('PUT', '/api/links/profile', { name: ' ' }, C)).status === 400);

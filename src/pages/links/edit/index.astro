@@ -84,17 +84,6 @@
 					</div>
 				</section>
 
-				<section class="card" id="diary-card" aria-labelledby="h-diary" hidden>
-					<div class="cardhead"><h2 id="h-diary">Diary</h2><button id="new-entry" class="primary small">+ New entry</button></div>
-					<p class="fine">Write up what you're working on for AMYBO, as briefly or fully as you like. Star the entries you're proudest of: visitors can choose to see just those.</p>
-					<ul id="entries" class="entries"></ul>
-					<fieldset class="seg">
-						<legend>Visitors first see</legend>
-						<label><input type="radio" name="ddef" value="all" /> All entries</label>
-						<label><input type="radio" name="ddef" value="highlights" /> Highlights</label>
-					</fieldset>
-				</section>
-
 				<section class="card" aria-labelledby="h-settings">
 					<h2 id="h-settings">Settings</h2>
 					<div class="tintrow"><span>Page tint</span> <input id="s-tint" type="color" aria-label="Page tint" /> <input id="s-tint-hex" class="hex" maxlength="7" aria-label="Page tint as hex" /> <button id="s-tint-reset" class="link" type="button">Back to AMYBO green</button></div>
@@ -132,16 +121,6 @@
 		<label class="pickzoom">Size <input id="pick-zoom" type="range" min="0.6" max="2.4" step="0.05" /></label>
 		<input id="icon-search" type="search" placeholder="Search icons" aria-label="Search icons" />
 		<div id="icon-grid" class="grid"></div>
-	</dialog>
-
-	<dialog id="entry" aria-labelledby="entry-title">
-		<form id="e-form" method="dialog">
-			<h2 id="entry-title">New diary entry</h2>
-			<div class="arow"><label class="field"><span>Date</span><input id="e-day" type="date" required /></label><label class="hl-toggle"><input id="e-hl" type="checkbox" /> ★ Highlight</label></div>
-			<label class="field"><span>Title</span><input id="e-title" maxlength="160" required placeholder="e.g. First anode test on the AEP 0.2" /></label>
-			<label class="field"><span>What happened</span><textarea id="e-body" rows="9" placeholder="Links work as they are, or [like this](https://…). **Bold** and *italic* too."></textarea></label>
-			<div class="actions"><button type="button" id="e-delete" class="danger ghost">Delete</button><span class="grow"></span><button type="button" id="e-cancel" class="ghost">Cancel</button><button class="primary">Save entry</button></div>
-		</form>
 	</dialog>
 
 	<div id="toasts" class="toasts"></div>
@@ -251,6 +230,12 @@
 	.fields .url{font-size:.82rem;color:var(--muted)}
 	.fields .body{margin-top:.3rem;background:var(--bg);border-color:var(--line);font-size:.9rem}
 	.sub{font-size:.8rem;color:var(--muted);padding:0 .4rem}
+	.rowin .day{flex:none;width:5.2rem;font-family:ui-monospace,monospace;font-size:.85rem;padding:.25rem .4rem;background:var(--bg)}
+	.rowin .star{flex:none;border:0;background:none;font-size:1.15rem;color:var(--muted);width:1.9rem;height:1.9rem;border-radius:8px;cursor:pointer}
+	.rowin .star.on{color:var(--accent)}
+	.rowin .star:hover{background:var(--tile)}
+	.photo svg{width:2.6rem;height:2.6rem}
+	.photo img.fit{width:78%;height:78%;object-fit:contain}
 	.chip{flex:none;font-size:.72rem;font-weight:600;color:var(--muted);background:var(--tile);border-radius:99px;padding:.1rem .5rem;white-space:nowrap}
 	.row.l-group>.rowin .chip{background:var(--card)}
 	.more{flex:none;width:30px;height:30px;border:0;background:none;border-radius:8px;display:grid;place-items:center;color:var(--muted)}

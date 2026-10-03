@@ -42,7 +42,7 @@ export function start(map) {
 	function nodeEl(n) {
 		if (n.el) return n.el;
 		const e =
-			n.kind === 'group' || n.kind === 'text' || n.kind === 'support' || n.kind === 'entry'
+			n.kind === 'group' || n.kind === 'text' || n.kind === 'support'
 				? el('g', { class: `n l-${n.kind}`, 'data-g': n.id, tabindex: 0, role: 'button', 'aria-label': n.label })
 				: el('a', { class: `n l-${n.kind}`, 'data-g': n.id, href: n.href, 'aria-label': n.label });
 		if (n.kind === 'link' && data.preview) {
@@ -53,6 +53,7 @@ export function start(map) {
 		t.textContent = n.label;
 		e.append(t, el('circle', { r: n.r }));
 		e.insertAdjacentHTML('beforeend', n.pic);
+		e.querySelector('.halo')?.remove(); // the live map draws its own dots (see dots())
 		n.el = e;
 		return e;
 	}
@@ -114,6 +115,7 @@ export function start(map) {
 			n.top = show ? (role.get(n) === 'anc' ? 0.55 : 1) : 0;
 		}
 		nodeLayer.append(hubEl);
+		for (const n of byId.values()) if (n.on || n === hub) dots(n);
 		const onPath = new Set([focus, ...ancestors(focus)]);
 		for (const n of byId.values()) {
 			if (n.el) {
@@ -123,6 +125,36 @@ export function start(map) {
 				if (n.kind === 'group') n.el.setAttribute('aria-expanded', String(n === focus));
 			}
 		}
+	}
+
+	// ---- dots: one per child that isn't on show, on the far side from the node's link towards the focus ----
+	function dots(n) {
+		const el0 = n === hub ? hubEl : n.el;
+		if (!el0) return;
+		const hidden = role.has(n) ? n.children.filter((c) => !role.has(c)).length : 0;
+		if (hidden === n.dotCount) return;
+		n.dotCount = hidden;
+		n.dotG?.remove();
+		n.dotG = null;
+		if (!hidden) return;
+		const g = el('g', { class: 'halo', 'aria-hidden': 'true' });
+		const ring = n.r + 8;
+		const step = hidden > 1 ? Math.min(0.42, Math.PI / (hidden - 1)) : 0;
+		const dot = Math.max(1.2, Math.min(3.4, (step || 1) * ring * 0.36));
+		for (let i = 0; i < hidden; i++) {
+			const a = (i - (hidden - 1) / 2) * step;
+			g.append(el('circle', { cx: (Math.cos(a) * ring).toFixed(1), cy: (Math.sin(a) * ring).toFixed(1), r: dot.toFixed(1) }));
+		}
+		n.dotG = g;
+		el0.append(g);
+	}
+	/** The node a dot arc points away from: the next node towards the focus, or its own parent. */
+	function dotAnchor(n) {
+		if (n === focus) return null;
+		const path = [focus, ...ancestors(focus)];
+		const i = path.indexOf(n);
+		if (i > 0) return path[i - 1];
+		return byId.get(n.parent) ?? null;
 	}
 
 	// ---- physics ----
@@ -232,8 +264,8 @@ export function start(map) {
 		}
 		let energy = 0;
 		for (const n of live) {
-			if (n === focus) {
-				n.vx = n.vy = 0; // the touched node never moves
+			if (n === focus || n.held) {
+				n.vx = n.vy = 0; // the touched node never moves, nor one being dragged
 			} else {
 				// Friction grows as the system cools, so it comes to a complete stop within a couple of seconds.
 				const fr = 0.52 + 0.2 * alpha;
@@ -268,11 +300,9 @@ export function start(map) {
 		for (const n of byId.values()) {
 			if (!n.on || !n.el) continue;
 			n.el.setAttribute('transform', `translate(${n.x.toFixed(1)} ${n.y.toFixed(1)}) scale(${n.s.toFixed(3)})`);
-			// A group's dots point away from the line to its parent.
-			const halo = n.halo ?? (n.halo = n.el.querySelector('.halo') || false);
-			if (halo) {
-				const p = byId.get(n.parent) ?? hub;
-				halo.setAttribute('transform', `rotate(${((Math.atan2(n.y - p.y, n.x - p.x) * 180) / Math.PI).toFixed(1)})`);
+			if (n.dotG) {
+				const a = dotAnchor(n);
+				if (a) n.dotG.setAttribute('transform', `rotate(${((Math.atan2(n.y - a.y, n.x - a.x) * 180) / Math.PI).toFixed(1)})`);
 			}
 			n.el.style.opacity = n.op.toFixed(2);
 			if (n.edge && n !== hub) {
@@ -338,7 +368,7 @@ export function start(map) {
 		draw();
 		// Run while things move, but never more than 3 seconds after a tap: then everything is frozen where it is.
 		const now = performance.now();
-		if (now < stopAt && (e > 0.02 || m > 0.15 || now < holdUntil)) raf = requestAnimationFrame(frame);
+		if (dragging || (now < stopAt && (e > 0.02 || m > 0.15 || now < holdUntil))) raf = requestAnimationFrame(frame);
 		else for (const n of byId.values()) n.vx = n.vy = 0;
 	};
 	function kick() {
@@ -416,7 +446,7 @@ export function start(map) {
 	function tap(id) {
 		const n = byId.get(id);
 		if (!n) return;
-		if (n.kind === 'text' || n.kind === 'support' || n.kind === 'entry') return openNote(n);
+		if (n.kind === 'text' || n.kind === 'support') return openNote(n);
 		if (n === focus) setFocus(n.parent != null ? byId.get(n.parent) : hub, true);
 		else if (n.kind === 'group' || n === hub) setFocus(n, true);
 	}
@@ -441,6 +471,69 @@ export function start(map) {
 	}
 	draw();
 
-	api = { tap };
+	// ---- dragging: the held node follows the pointer, everything else keeps its physics ----
+	let dragging = null;
+	let justDragged = 0;
+	function toWorld(e) {
+		const ctm = svg.getScreenCTM();
+		if (!ctm) return null;
+		const pt = svg.createSVGPoint();
+		pt.x = e.clientX;
+		pt.y = e.clientY;
+		const w = pt.matrixTransform(ctm.inverse());
+		return [w.x, w.y];
+	}
+	function grab(e, id) {
+		const n = byId.get(id);
+		if (!n || !n.on) return;
+		const start = [e.clientX, e.clientY];
+		let moved = false;
+		const move = (ev) => {
+			if (!moved && Math.hypot(ev.clientX - start[0], ev.clientY - start[1]) < 6) return;
+			if (!moved) {
+				moved = true;
+				dragging = n;
+				n.held = true;
+				svg.classList.add('dragging');
+				alpha = Math.max(alpha, 0.5);
+				stopAt = performance.now() + 3000;
+				if (!raf) raf = requestAnimationFrame(frame);
+			}
+			const w = toWorld(ev);
+			if (!w) return;
+			n.x = w[0];
+			n.y = w[1];
+			stopAt = performance.now() + 3000;
+		};
+		const up = () => {
+			removeEventListener('pointermove', move);
+			removeEventListener('pointerup', up);
+			removeEventListener('pointercancel', up);
+			if (!moved) return;
+			n.held = false;
+			dragging = null;
+			justDragged = performance.now();
+			svg.classList.remove('dragging');
+			alpha = Math.max(alpha, 0.4);
+			stopAt = performance.now() + 3000;
+			if (!raf) raf = requestAnimationFrame(frame);
+		};
+		addEventListener('pointermove', move);
+		addEventListener('pointerup', up);
+		addEventListener('pointercancel', up);
+	}
+	// A drag is not a click: links don't open and groups don't toggle when a drag ends on them.
+	svg.addEventListener(
+		'click',
+		(e) => {
+			if (performance.now() - justDragged < 350) {
+				e.preventDefault();
+				e.stopPropagation();
+			}
+		},
+		true,
+	);
+
+	api = { tap: (id) => performance.now() - justDragged < 350 || tap(id), grab };
 	return api;
 }

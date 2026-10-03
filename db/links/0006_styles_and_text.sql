@@ -1,13 +1,19 @@
--- Link pages, 3 October 2026: per-item picture colour and size, a page tint, and Martin's Email group made a plain link.
+-- Link pages, 3 October 2026: per-item picture colour and size, dates and highlights, a page tint and centre picture,
+-- and Martin's Email group made a plain link.
 -- Separate tables (rather than new columns) so this file stays safe to run on every deploy.
-CREATE TABLE IF NOT EXISTS lp_node_style (
+CREATE TABLE IF NOT EXISTS lp_node_meta (
 	node_id INTEGER PRIMARY KEY REFERENCES lp_nodes(id) ON DELETE CASCADE,
-	tint TEXT NOT NULL DEFAULT '',   -- '' original colours, 'mono' the page's ink, or '#rrggbb'
-	zoom REAL NOT NULL DEFAULT 1     -- picture size within its circle, 0.6 to 2.4
+	tint TEXT NOT NULL DEFAULT '',   -- '' original colours, 'mono' the page's text colour, or '#rrggbb'
+	zoom REAL NOT NULL DEFAULT 1,    -- picture size within its circle, 0.6 to 2.4
+	day TEXT NOT NULL DEFAULT '',    -- optional short date: YY, YYMM or YYMMDD (diary entries)
+	highlight INTEGER NOT NULL DEFAULT 0
 );
-CREATE TABLE IF NOT EXISTS lp_page_style (
+CREATE TABLE IF NOT EXISTS lp_page_meta (
 	person_id INTEGER PRIMARY KEY REFERENCES lp_people(id) ON DELETE CASCADE,
-	accent TEXT NOT NULL DEFAULT ''  -- '' AMYBO green, or '#rrggbb'
+	accent TEXT NOT NULL DEFAULT '', -- '' AMYBO green, or '#rrggbb'
+	hub_icon TEXT NOT NULL DEFAULT '', -- the centre's picture when it isn't a photo
+	hub_tint TEXT NOT NULL DEFAULT '',
+	hub_zoom REAL NOT NULL DEFAULT 1
 );
 
 -- Martin's "Email" group held one link; it becomes that link, named Email, where the group was. Runs once.

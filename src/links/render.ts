@@ -3,7 +3,7 @@
 // touches the map; only then is /link-assets/graph.js fetched and the physics started.
 // Shared by the page Function (server) and the editor's live preview (browser), so it has no platform imports.
 import { icon } from './icons';
-import { type DiaryEntry, type LinkNode, type PageData, mediaUrl, pagePath, walk } from './model';
+import { type LinkNode, type PageData, byDate, mediaUrl, pagePath, walk } from './model';
 
 export const esc = (s: string) =>
 	String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
@@ -73,7 +73,6 @@ const nodeIcon = (n: LinkNode): string => {
 	if (n.kind === 'diary') return 'diary';
 	if (n.kind === 'support') return 'heart';
 	if (n.kind === 'text') return 'text';
-	if (n.kind === 'entry') return 'calendar';
 	if (n.kind === 'group') {
 		// A group wears the icon of its first link, so the map reads at a glance.
 		const first = [...walk(n.children)].find((c) => c.kind === 'link');
@@ -96,7 +95,8 @@ interface Ctx {
 }
 
 /** Visitors don't see an empty support note or an empty diary; the editor's preview shows everything. */
-const isHidden = (n: LinkNode, ctx: Ctx) => !ctx.preview && (((n.kind === 'support' || n.kind === 'text') && !n.body.trim()) || (n.kind === 'diary' && n.slug !== 'diary-all' && !ctx.data.diaryCount));
+/** Visitors don't see an empty support note; the editor's preview shows everything. */
+const isHidden = (n: LinkNode, ctx: Ctx) => !ctx.preview && n.kind === 'support' && !n.body.trim();
 
 /** The tree as visitors see it: hidden items and empty groups left out, and a group holding a single link shown as
  * that link under the group's name (an "Email" group with one contact form is just "Email"). */
@@ -104,6 +104,11 @@ function visible(nodes: LinkNode[], ctx: Ctx): LinkNode[] {
 	const out: LinkNode[] = [];
 	for (const n of nodes) {
 		if (isHidden(n, ctx)) continue;
+		if (n.kind === 'diary') {
+			const kids = visible(n.children, ctx);
+			if (kids.length || ctx.preview) out.push({ ...n, children: kids });
+			continue;
+		}
 		if (n.kind !== 'group') {
 			out.push(n);
 			continue;
@@ -116,24 +121,24 @@ function visible(nodes: LinkNode[], ctx: Ctx): LinkNode[] {
 	return out;
 }
 
-/** Diary entries become items under the diary, which then opens like a group; the last item is the full diary. */
-function withDiary(nodes: LinkNode[], ctx: Ctx): LinkNode[] {
+/** A title with its short date, if it has one ("First anode test 260822"). */
+const dated = (n: LinkNode) => (n.day ? `${n.label} ${n.day}` : n.label);
+
+/** A diary's items, newest first, with their dates in the title. If any are highlights, the diary shows those
+ * first and an "All" group with every entry. Anything else keeps its own order. */
+function withDiary(nodes: LinkNode[]): LinkNode[] {
 	return nodes.map((n) => {
-		if (n.kind === 'group') return { ...n, children: withDiary(n.children, ctx) };
-		if (n.kind !== 'diary' || !ctx.data.diaryRecent.length) return n;
-		const base = { url: '', image: '', seed: 0, position: 0, tint: '', zoom: 1, children: [], parent_id: n.id };
-		const entries: LinkNode[] = ctx.data.diaryRecent.map((e) => ({
-			...base,
-			id: -1_000_000 - e.id,
-			kind: 'entry',
-			slug: `entry-${e.id}`,
-			label: `${fmtDay(e.day)}: ${e.title}`,
-			icon: e.highlight ? 'star' : 'calendar',
-			body: e.body,
-		}));
-		const all = ctx.data.diaryCount > ctx.data.diaryRecent.length || ctx.data.highlightCount;
-		const more: LinkNode = { ...base, id: -2_000_000 - n.id, kind: 'diary', slug: 'diary-all', label: all ? 'All entries' : 'The diary page', icon: 'diary', body: '' };
-		return { ...n, children: [...entries, more] };
+		const children = withDiary(n.children);
+		if (n.kind !== 'diary') return { ...n, children };
+		const entries = children.map((c) => ({ ...c, label: dated(c) })).sort(byDate);
+		const highlights = entries.filter((e) => e.highlight);
+		if (!highlights.length) return { ...n, children: entries };
+		const all: LinkNode = {
+			id: -2_000_000 - n.id, parent_id: n.id, kind: 'group', slug: `${n.slug}-all`, label: 'All', url: '', icon: 'diary', image: '',
+			body: '', seed: 0, position: 0, tint: '', zoom: 1, day: '', highlight: 0,
+			children: entries.map((e) => ({ ...e, id: -3_000_000 - e.id, parent_id: -2_000_000 - n.id })),
+		};
+		return { ...n, children: [...highlights, all] };
 	});
 }
 
@@ -153,7 +158,7 @@ function renderList(nodes: LinkNode[], ctx: Ctx, level = 'root'): string {
 		.map((n) => {
 			if (opens(n))
 				return `<li><details${nm}><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${esc(n.label)}</summary><ul>${renderList(n.children, ctx, String(n.id))}</ul></details></li>`;
-			if (n.kind === 'support' || n.kind === 'text' || n.kind === 'entry')
+			if (n.kind === 'support' || n.kind === 'text')
 				return `<li><details${nm} id="l-note-${n.id}"><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${esc(n.label)}</summary><div class="note">${formatText(n.body)}</div></details></li>`;
 			return `<li><a data-n="${n.id}" href="${esc(hrefOf(n, ctx))}"${n.kind === 'link' ? tgt : ''}>${esc(n.label)}</a></li>`;
 		})
@@ -296,17 +301,18 @@ function graphData(roots: LinkNode[], ctx: Ctx) {
 		const href = hrefOf(n, ctx);
 		// Groups open, notes show their text: both are buttons. Links and the diary are plain links.
 		items.push(
-			opens(n) || n.kind === 'text' || n.kind === 'support' || n.kind === 'entry'
+			opens(n) || n.kind === 'text' || n.kind === 'support'
 				? `<g class="n l-${opens(n) ? 'group' : n.kind}" data-g="${n.id}" tabindex="0" role="button"${opens(n) ? ' aria-expanded="false"' : ''} aria-label="${esc(n.label)}">${body}</g>`
 				: `<a class="n l-${n.kind}" data-g="${n.id}" href="${esc(href)}" aria-label="${esc(n.label)}"${n.kind === 'link' ? tgt : ''}>${body}</a>`,
 		);
 	}
 	const p = ctx.data.person;
-	const hub =
-		p.kind === 'org'
-			? `<circle class="hub" r="42"/><image href="${esc(mediaUrl(p.photo))}" x="-30" y="-21" width="60" height="42" class="inv" preserveAspectRatio="xMidYMid meet"/>`
+	const hub = p.hub_icon
+		? `<circle class="hub" r="42"/>${iconMarkup(p.hub_icon, 0, 0, 42, 'hub', p.hub_tint, p.hub_zoom)}`
+		: p.kind === 'org'
+			? `<circle class="hub" r="42"/><image href="${esc(mediaUrl(p.photo))}" x="${round(-30 * p.hub_zoom)}" y="${round(-21 * p.hub_zoom)}" width="${round(60 * p.hub_zoom)}" height="${round(42 * p.hub_zoom)}" class="inv" preserveAspectRatio="xMidYMid meet"/>`
 			: p.photo
-				? `<circle class="hub" r="44"/><clipPath id="hubc"><circle r="42"/></clipPath><image href="${esc(mediaUrl(p.photo))}" x="-42" y="-42" width="84" height="84" clip-path="url(#hubc)" preserveAspectRatio="xMidYMid slice"/>`
+				? `<circle class="hub" r="44"/><clipPath id="hubc"><circle r="42"/></clipPath><image href="${esc(mediaUrl(p.photo))}" x="${round(-42 * p.hub_zoom)}" y="${round(-42 * p.hub_zoom)}" width="${round(84 * p.hub_zoom)}" height="${round(84 * p.hub_zoom)}" clip-path="url(#hubc)" preserveAspectRatio="xMidYMid slice"/>`
 				: `<circle class="hub" r="42"/><text class="initials" y="10">${esc(initials(p.name))}</text>`;
 	const svg = `<g class="edges">${edges.join('')}</g><g class="nodes">${items.join('')}</g><g class="hubg" data-g="0" role="button" tabindex="0" aria-label="${esc(p.name)}"><title>${esc(p.name)}</title>${hub}</g>`;
 	return { nodes, svg, view };
@@ -375,15 +381,16 @@ export function renderPage(data: PageData, opts: RenderOptions = {}): string {
 	const base = pagePath(p.handle);
 	const ctx: Ctx = { base, data, preview: !!opts.preview };
 	const canonical = `${opts.origin ?? 'https://amy.bo'}${base}`;
-	const roots = visible(withDiary(data.roots, ctx), ctx);
+	const roots = visible(withDiary(data.roots), ctx);
 	const description = p.bio || `${p.name}: links.`;
 	const relMe = [...walk(data.roots)]
 		.filter((n) => n.kind === 'link' && n.icon === 'mastodon')
 		.map((n) => `<link rel="me" href="${esc(n.url)}">`)
 		.join('');
 	const g = !p.basic_mode && roots.length ? graphData(roots, ctx) : null;
-	const keys = new Set<string>(g ? g.nodes.map((n) => n.icon) : []);
+	const keys = new Set<string>(g ? [...g.nodes.map((n) => n.icon), ...(p.hub_icon ? [p.hub_icon] : [])] : []);
 	const logoTints = new Set<string>([...walk(roots)].filter((n) => icon(nodeIcon(n)).logo && n.tint).map((n) => n.tint));
+	if (p.hub_icon && icon(p.hub_icon).logo && p.hub_tint) logoTints.add(p.hub_tint);
 
 	// With the map, its centre is the portrait; without it, the portrait (or logo) heads the list.
 	const portrait = g
@@ -417,30 +424,41 @@ ${g ? `<style>${linkStyles(roots)}</style>` : ''}
 </body></html>`;
 }
 
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/** A short date in words: 260822 is 22 August 2026, 2608 is August 2026, 26 is 2026. */
+const shortDay = (d: string) => {
+	const y = `20${d.slice(0, 2)}`;
+	const m = MONTHS[Number(d.slice(2, 4)) - 1];
+	if (d.length === 2 || !m) return y;
+	return d.length === 4 ? `${m} ${y}` : `${Number(d.slice(4, 6))} ${m} ${y}`;
+};
+
 const fmtDay = (d: string) => {
 	const t = new Date(`${d}T12:00:00Z`);
 	return Number.isNaN(+t) ? d : t.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 };
 
-export function renderDiary(data: PageData, entries: DiaryEntry[], view: 'all' | 'highlights', opts: RenderOptions = {}): string {
+export function renderDiary(data: PageData, entries: LinkNode[], view: 'all' | 'highlights', opts: RenderOptions = {}): string {
 	const p = data.person;
 	const base = pagePath(p.handle);
 	const canonical = `${opts.origin ?? 'https://amy.bo'}${base}/diary`;
 	const diaryNode = [...walk(data.roots)].find((n) => n.kind === 'diary');
 	const title = `${diaryNode?.label || 'Diary'} · ${p.name}`;
 	const seg = (v: 'all' | 'highlights', label: string) => (view === v ? `<span aria-current="page">${label}</span>` : `<a href="${base}/diary?view=${v}">${label}</a>`);
+	const heading = (e: LinkNode) =>
+		e.kind === 'link' ? `<a href="${base}/go/${encodeURIComponent(e.slug)}">${esc(e.label)}</a>` : esc(e.label);
 	const list = entries.length
 		? entries
 				.map(
 					(e) =>
-						`<article class="entry"><p class="day"><time datetime="${esc(e.day)}">${esc(fmtDay(e.day))}</time>${e.highlight ? ' <span class="star" aria-label="Highlight">★</span>' : ''}</p><h2>${esc(e.title)}</h2>${formatText(e.body)}</article>`,
+						`<article class="entry"><p class="day">${e.day ? `<time>${esc(shortDay(e.day))}</time>` : ''}${e.highlight ? ' <span class="star" aria-label="Highlight">★</span>' : ''}</p><h2>${heading(e)}</h2>${formatText(e.body)}</article>`,
 				)
 				.join('')
 		: `<p class="empty">${view === 'highlights' ? 'No highlights yet.' : 'No entries yet.'}</p>`;
 	return `${head(title, `${p.name}'s ${diaryNode?.label || 'diary'}`, canonical)}
 <body class="lp diary"${tintVars(p.accent)}><div class="shell"><main class="list">
 <header class="top"><p class="crumb"><a href="${base}">${esc(p.name)}</a></p><h1>${esc(diaryNode?.label || 'Diary')}</h1>
-<p class="seg">${seg('highlights', 'Highlights')} · ${seg('all', 'All entries')}</p></header>
+${data.highlightCount ? `<p class="seg">${seg('highlights', 'Highlights')} · ${seg('all', 'All entries')}</p>` : ''}</header>
 ${list}
 </main></div>
 ${FOOT}
@@ -450,7 +468,7 @@ ${FOOT}
 /** Loader: on the first touch, hover or keypress on the map, fetch the physics and hand over. ~1 KB. */
 /** The map's only script until it is used: a click (or Enter) on a group, or any tap on a phone, fetches
  * /link-assets/graph.js. Links on the map are plain links and work without it. */
-export const BOOT = `(()=>{const b=document.body,m=document.querySelector('.map');if(!m)return;let go;const rm=matchMedia('(prefers-reduced-motion: reduce)').matches;const vt=f=>document.startViewTransition&&!rm?document.startViewTransition(f):f();const small=()=>matchMedia('(max-width: 56rem)').matches;const load=()=>(go=go||import('/link-assets/graph.js').then(g=>g.start(m)));const act=(e,g)=>{e.preventDefault();load().then(x=>x.tap(+g.dataset.g))};m.addEventListener('click',e=>{if(small()&&!b.classList.contains('map-on')){e.preventDefault();vt(()=>b.classList.add('map-on'));load();return}const g=e.target.closest('g[data-g]');if(g)act(e,g)});m.addEventListener('keydown',e=>{const g=e.target.closest&&e.target.closest('g[data-g]');if(g&&(e.key==='Enter'||e.key===' '))act(e,g)});const off=()=>{if(b.classList.contains('map-on'))vt(()=>b.classList.remove('map-on'))};m.querySelector('.back').addEventListener('click',e=>{e.stopPropagation();off()});addEventListener('keydown',e=>{if(e.key==='Escape')off()})})();`;
+export const BOOT = `(()=>{const b=document.body,m=document.querySelector('.map');if(!m)return;let go;const rm=matchMedia('(prefers-reduced-motion: reduce)').matches;const vt=f=>document.startViewTransition&&!rm?document.startViewTransition(f):f();const small=()=>matchMedia('(max-width: 56rem)').matches;const load=()=>(go=go||import('/link-assets/graph.js').then(g=>g.start(m)));const act=(e,g)=>{e.preventDefault();load().then(x=>x.tap(+g.dataset.g))};m.addEventListener('click',e=>{if(small()&&!b.classList.contains('map-on')){e.preventDefault();vt(()=>b.classList.add('map-on'));load();return}const g=e.target.closest('g[data-g]');if(g)act(e,g)});m.addEventListener('pointerdown',e=>{if(small()&&!b.classList.contains('map-on'))return;const n=e.target.closest('[data-g]');if(n)load().then(x=>x.grab(e,+n.dataset.g))});m.addEventListener('keydown',e=>{const g=e.target.closest&&e.target.closest('g[data-g]');if(g&&(e.key==='Enter'||e.key===' '))act(e,g)});const off=()=>{if(b.classList.contains('map-on'))vt(()=>b.classList.remove('map-on'))};m.querySelector('.back').addEventListener('click',e=>{e.stopPropagation();off()});addEventListener('keydown',e=>{if(e.key==='Escape')off()})})();`;
 
 const CSS = `
 :root{--bg:#f6f8f4;--ink:#16210f;--muted:#66745f;--line:#d8e2cf;--accent:#3f9c00;--accent-ink:#1d6b00;--node:#fff;--ease:cubic-bezier(.2,.8,.2,1)}
@@ -491,7 +509,9 @@ details[open]>summary .tw{transform:rotate(90deg)}
 .mapsvg{display:block;width:100%;height:100%;overflow:visible}
 .mapsvg .edges line{stroke:var(--line);stroke-width:1.5}
 .mapsvg .halo circle{fill:var(--muted);opacity:.6;stroke:none}
-.mapsvg .n.open .halo,.mapsvg .n.shown .halo{display:none}
+.mapsvg .n.open .halo{display:none}
+.mapsvg.live .n,.mapsvg.live .hubg{cursor:grab}
+.mapsvg.dragging,.mapsvg.dragging .n,.mapsvg.dragging .hubg{cursor:grabbing}
 .mapsvg .hub{fill:var(--node);stroke:var(--line);stroke-width:1.5}
 .mapsvg .initials{font-size:28px;font-weight:650;text-anchor:middle;fill:var(--accent-ink)}
 .mapsvg .n,.mapsvg .hubg{cursor:pointer;outline:none}

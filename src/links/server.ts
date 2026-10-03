@@ -1,7 +1,7 @@
 // Link pages (amy.bo/~name and amy.bo/links): serving pages, counting clicks and views, serving uploaded images.
 // Privacy: only the page, the link slug and the UTC time are stored. No IP, user agent, referrer or cookie.
 import type { Env as EventsEnv } from '../../eventsandeye/src/env';
-import { HANDLE_RE, loadDiary, loadPage, walk } from './model';
+import { HANDLE_RE, byDate, diaryEntries, loadPage, walk } from './model';
 import { BOOT, renderDiary, renderPage } from './render';
 
 export interface Env extends EventsEnv {
@@ -86,8 +86,9 @@ export async function servePage(ctx: Ctx, handle: string, rest: string[]): Promi
 	if (first === 'diary') {
 		if (![...walk(data.roots)].some((n) => n.kind === 'diary')) return redirect(base);
 		const q = new URL(ctx.request.url).searchParams.get('view');
-		const view = q === 'all' || q === 'highlights' ? q : data.person.diary_default === 'highlights' && data.highlightCount ? 'highlights' : 'all';
-		const entries = await loadDiary(ctx.env.DB, data.person.id, view === 'highlights');
+		const view = q === 'all' || q === 'highlights' ? q : data.highlightCount ? 'highlights' : 'all';
+		const all = diaryEntries(data.roots).sort(byDate);
+		const entries = view === 'highlights' ? all.filter((e) => e.highlight) : all;
 		count(ctx, handle, '_diary');
 		return html(renderDiary(data, entries, view, { origin: ORIGIN }));
 	}

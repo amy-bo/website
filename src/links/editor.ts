@@ -1,7 +1,7 @@
 // The link-page editor (/links/edit/): sign in by emailed link, then edit your page with a live preview.
 // Plain DOM, no framework. State is a tree; every change re-renders the affected part and autosaves.
 import { guessIcon, icon } from './icons';
-import { type DiaryEntry, type LinkNode, type NodeKind, type PageData, buildTree } from './model';
+import { type LinkNode, type NodeKind, type PageData, buildTree, diaryEntries } from './model';
 import { esc, hostLine, renderPage } from './render';
 
 // ---------- types and state ----------
@@ -20,6 +20,9 @@ interface ENode {
 	/** Picture colour ('' original, 'mono', '#rrggbb') and size in its circle (0.6 to 1.6). */
 	tint: string;
 	zoom: number;
+	/** Optional short date (YY, YYMM, YYMMDD) and highlight, for diary entries. */
+	day: string;
+	highlight: number;
 	children: ENode[];
 	collapsed?: boolean;
 	/** The last address the server accepted; used while the one being typed isn't valid yet. */
@@ -36,12 +39,14 @@ interface Person {
 	basic_mode: number;
 	diary_default: 'all' | 'highlights';
 	accent: string;
+	hub_icon: string;
+	hub_tint: string;
+	hub_zoom: number;
 }
 
 interface MeResponse {
 	person: Person;
 	nodes: (Omit<LinkNode, 'children'> & { parent_id: number | null })[];
-	diary: DiaryEntry[];
 	stats: { slug: string; total: number; d30: number }[];
 	uploads: boolean;
 	icons: string[];
@@ -50,7 +55,6 @@ interface MeResponse {
 const S = {
 	person: null as Person | null,
 	tree: [] as ENode[],
-	diary: [] as DiaryEntry[],
 	stats: new Map<string, { total: number; d30: number }>(),
 	uploads: false,
 	icons: [] as string[],
@@ -148,7 +152,7 @@ const flatten = () => {
 				if (!n.savedUrl) return;
 				url = n.savedUrl;
 			}
-			out.push({ id: n.id, key: n.key, parent, kind: n.kind, label: n.label.trim() || 'Untitled', url, icon: n.icon, image: n.image, body: n.body, tint: n.tint, zoom: n.zoom } as never);
+			out.push({ id: n.id, key: n.key, parent, kind: n.kind, label: n.label.trim() || 'Untitled', url, icon: n.icon, image: n.image, body: n.body, tint: n.tint, zoom: n.zoom, day: n.day, highlight: !!n.highlight } as never);
 			add(n.children, n.key);
 		});
 	add(S.tree, null);
@@ -201,15 +205,18 @@ function preview() {
 				position: 0,
 				tint: n.tint,
 				zoom: n.zoom,
+				day: n.day,
+				highlight: n.highlight,
 				children: n.children.map((c) => toLink(c, myId)),
 			};
 		};
+		const roots = S.tree.map((n) => toLink(n, null));
+		const entries = diaryEntries(roots);
 		const data: PageData = {
 			person: { id: 0, ...S.person, basic_mode: S.person.basic_mode },
-			roots: S.tree.map((n) => toLink(n, null)),
-			diaryCount: S.diary.length,
-			highlightCount: S.diary.filter((d) => d.highlight).length,
-			diaryRecent: (S.person.diary_default === 'highlights' && S.diary.some((d) => d.highlight) ? S.diary.filter((d) => d.highlight) : S.diary).slice(0, 8),
+			roots,
+			diaryCount: entries.length,
+			highlightCount: entries.filter((e) => e.highlight).length,
 		};
 		// The preview is sandboxed (its own origin), so its scroll position can't be read; just redraw it.
 		$<HTMLIFrameElement>('#preview').srcdoc = renderPage(data, { preview: true });
@@ -232,29 +239,34 @@ const tileHtml = (n: { icon: string; image: string; kind?: NodeKind; tint?: stri
 
 const KIND_NAME: Record<NodeKind, string> = { group: 'group', link: 'link', text: 'text', diary: 'diary', support: 'support note' };
 
-function rowHtml(n: ENode, depth: number): string {
+/** Today as a short date, YYMMDD. */
+const today = () => new Date().toISOString().slice(2, 10).replace(/-/g, '');
+
+function rowHtml(n: ENode, depth: number, inDiary = false): string {
 	const st = n.slug ? S.stats.get(n.slug) : undefined;
 	const clicks = n.kind === 'link' && st ? `<span class="chip" title="Clicks in the last 30 days (all time ${st.total + n.seed})">${st.d30} in 30 days</span>` : '';
-	const tile = n.kind === 'group' ? '' : `<button type="button" class="tile" data-act="icon" aria-label="Change the picture for ${esc(n.label)}">${tileHtml(n)}</button>`;
+	const tile = `<button type="button" class="tile" data-act="icon" aria-label="Change the picture for ${esc(n.label)}">${tileHtml(n)}</button>`;
 	let fields = `<input class="lbl" data-f="label" value="${esc(n.label)}" aria-label="Name" placeholder="Name">`;
 	if (n.kind === 'link') fields += `<input class="url" data-f="url" value="${esc(n.url)}" aria-label="Web address" placeholder="https://" inputmode="url" spellcheck="false">`;
 	if (n.kind === 'support')
 		fields += `<textarea class="body" data-f="body" rows="3" aria-label="How you support AMYBO" placeholder="In your own words. Nobody needs to know about money: say only what you'd like to.">${esc(n.body)}</textarea>`;
 	if (n.kind === 'text') fields += `<textarea class="body" data-f="body" rows="3" aria-label="Text" placeholder="Anything you'd like to say. Links work as they are, or [like this](https://…).">${esc(n.body)}</textarea>`;
-	if (n.kind === 'diary')
-		fields += `<span class="sub">${S.diary.length ? `${S.diary.length} ${S.diary.length === 1 ? 'entry' : 'entries'}` : 'No entries yet, so visitors don\'t see it'} · add entries in the Diary section below</span>`;
-	const twisty =
-		n.kind === 'group'
-			? `<button type="button" class="tw${n.collapsed ? '' : ' open'}" data-act="fold" aria-expanded="${!n.collapsed}" aria-label="${n.collapsed ? 'Show' : 'Hide'} what's in ${esc(n.label)}"></button>`
-			: '';
-	const count = n.kind === 'group' ? `<span class="chip">${[...walkE(n.children)].filter((c) => c.kind !== 'group').length}</span>` : '';
-	const kids =
-		n.kind === 'group'
-			? `<ul class="kids"${n.collapsed ? ' hidden' : ''}>${n.children.map((c) => rowHtml(c, depth + 1)).join('')}<li class="addin"><button type="button" class="ghost" data-act="add-in">+ Add a link here</button></li></ul>`
-			: '';
+	// Inside a diary, every item can carry a short date and be a highlight.
+	const diaryBits = inDiary
+		? `<input class="day" data-f="day" value="${esc(n.day)}" aria-label="Date: YY, YYMM or YYMMDD" placeholder="${today()}" inputmode="numeric" maxlength="6" title="Date: 26, 2608 or 260822"><button type="button" class="star${n.highlight ? ' on' : ''}" data-act="star" aria-pressed="${!!n.highlight}" title="Highlight">${n.highlight ? '★' : '☆'}</button>`
+		: '';
+	const holds = n.kind === 'group' || n.kind === 'diary';
+	const twisty = holds
+		? `<button type="button" class="tw${n.collapsed ? '' : ' open'}" data-act="fold" aria-expanded="${!n.collapsed}" aria-label="${n.collapsed ? 'Show' : 'Hide'} what's in ${esc(n.label)}"></button>`
+		: '';
+	const count = holds ? `<span class="chip">${[...walkE(n.children)].filter((c) => c.kind !== 'group').length}</span>` : '';
+	const addText = n.kind === 'diary' ? '+ Add an entry' : '+ Add a link here';
+	const kids = holds
+		? `<ul class="kids"${n.collapsed ? ' hidden' : ''}>${n.children.map((c) => rowHtml(c, depth + 1, inDiary || n.kind === 'diary')).join('')}<li class="addin"><button type="button" class="ghost" data-act="add-in">${addText}</button></li></ul>`
+		: '';
 	return `<li class="row l-${n.kind}" data-key="${n.key}"><div class="rowin">
 <span class="grip" draggable="true" aria-hidden="true" title="Drag to move"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></span>
-${twisty}${tile}<div class="fields">${fields}</div>${count}${clicks}
+${twisty}${tile}<div class="fields">${fields}</div>${diaryBits}${count}${clicks}
 <button type="button" class="more" data-act="menu" aria-label="More for ${esc(n.label)}" aria-haspopup="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
 </div>${kids}</li>`;
 }
@@ -266,7 +278,6 @@ function renderTree() {
 	const hasSupport = [...walkE(S.tree)].some((n) => n.kind === 'support');
 	$('#add-diary').hidden = hasDiary;
 	$('#add-support').hidden = hasSupport;
-	$('#diary-card').hidden = !hasDiary;
 }
 
 function renderProfile() {
@@ -274,34 +285,21 @@ function renderProfile() {
 	$<HTMLInputElement>('#p-name').value = p.name;
 	$<HTMLTextAreaElement>('#p-bio').value = p.bio;
 	$('#p-count').textContent = `${p.bio.length}/300`;
-	$('#p-photo').innerHTML = p.photo ? `<img src="${esc(mediaUrl(p.photo))}" alt="">` : `<span>${esc(p.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2))}</span>`;
+	$('#p-photo').innerHTML = p.hub_icon
+		? tileHtml({ icon: p.hub_icon, image: '', tint: p.hub_tint, zoom: p.hub_zoom })
+		: p.photo
+			? `<img src="${esc(mediaUrl(p.photo))}" alt="">`
+			: `<span>${esc(p.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2))}</span>`;
 	$('#p-photo').classList.toggle('logo', p.kind === 'org');
 	$('#addr').textContent = pageUrl();
 	$<HTMLAnchorElement>('#view').href = p.handle === 'amybo' ? '/links' : `/~${p.handle}`;
 	$<HTMLInputElement>('#s-map').checked = !p.basic_mode;
-	for (const r of document.querySelectorAll<HTMLInputElement>('input[name="ddef"]')) r.checked = r.value === p.diary_default;
 	$('#who').textContent = p.email;
 	$<HTMLInputElement>('#s-tint').value = $<HTMLInputElement>('#s-tint-hex').value = p.accent || '#3f9c00';
 	$('#s-tint-reset').hidden = !p.accent;
 	$('#upload-note').hidden = S.uploads;
 }
 
-const fmtDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
-
-function renderDiary() {
-	const ul = $('#entries');
-	ul.innerHTML = S.diary.length
-		? S.diary
-				.map(
-					(e) => `<li class="entry${e.highlight ? ' hl' : ''}" data-id="${e.id}">
-<button type="button" class="star" data-act="star" aria-pressed="${!!e.highlight}" aria-label="${e.highlight ? 'Remove from' : 'Add to'} highlights">${e.highlight ? '★' : '☆'}</button>
-<div class="etext"><span class="eday">${esc(fmtDay(e.day))}</span><span class="etitle">${esc(e.title)}</span></div>
-<button type="button" class="ghost" data-act="edit">Edit</button></li>`,
-				)
-				.join('')
-		: `<li class="empty">No entries yet. Your first could be what you're working on now.</li>`;
-	preview();
-}
 
 // ---------- event handling for the tree ----------
 
@@ -310,6 +308,14 @@ function onTreeInput(e: Event) {
 	const row = t.closest<HTMLElement>('.row');
 	if (!row || !t.dataset.f) return;
 	const n = find(row.dataset.key!)!.node;
+	if (t.dataset.f === 'day') {
+		const v = t.value.replace(/\D/g, '').slice(0, 6);
+		t.value = v;
+		if (!/^(|\d{2}|\d{4}|\d{6})$/.test(v)) return; // waits until it's 2, 4 or 6 digits
+		n.day = v;
+		changed();
+		return;
+	}
 	(n as unknown as Record<string, string>)[t.dataset.f] = t.value;
 	if (t.dataset.f === 'url' && !n.image && (!n.icon || n.icon === 'globe' || n.icon === 'link')) {
 		n.icon = guessIcon(t.value.trim());
@@ -331,7 +337,7 @@ function openMenu(btn: HTMLElement, n: ENode) {
 	const items: [string, string, boolean][] = [
 		['up', 'Move up', i > 0],
 		['down', 'Move down', i < f.list.length - 1],
-		['indent', `Move into "${prev?.label ?? ''}"`, prev?.kind === 'group'],
+		['indent', `Move into "${prev?.label ?? ''}"`, prev?.kind === 'group' || prev?.kind === 'diary'],
 		['outdent', 'Move out of this group', !!f.parent],
 		['delete', `Delete this ${KIND_NAME[n.kind]}`, true],
 	];
@@ -371,7 +377,7 @@ function act(a: string, n: ENode) {
 	else if (a === 'down' && i < f.list.length - 1) [f.list[i + 1], f.list[i]] = [f.list[i], f.list[i + 1]];
 	else if (a === 'indent') {
 		const prev = f.list[i - 1];
-		if (prev?.kind !== 'group') return;
+		if (prev?.kind !== 'group' && prev?.kind !== 'diary') return;
 		f.list.splice(i, 1);
 		prev.children.push(n);
 		prev.collapsed = false;
@@ -416,7 +422,7 @@ function setupDrag() {
 		if (find(dragKey)!.node && row.closest(`.row[data-key="${dragKey}"]`)) return null; // not into itself
 		const r = rowin.getBoundingClientRect();
 		const y = (e.clientY - r.top) / r.height;
-		const group = row.classList.contains('l-group');
+		const group = row.classList.contains('l-group') || row.classList.contains('l-diary');
 		const pos = group && y > 0.3 && y < 0.7 ? 'in' : y < 0.5 ? 'before' : 'after';
 		return { row, rowin, pos };
 	};
@@ -497,7 +503,7 @@ interface Proposal {
 	favicon?: string;
 }
 
-function pickPicture(n: ENode, suggestions: Proposal | null = null): Promise<void> {
+function pickPicture(n: ENode, suggestions: Proposal | null = null, onChange: () => void = () => changed(true), uploadSize = 256): Promise<void> {
 	return new Promise((resolve) => {
 		const dlg = $<HTMLDialogElement>('#picker');
 		const grid = $('#icon-grid', dlg);
@@ -540,7 +546,7 @@ function pickPicture(n: ENode, suggestions: Proposal | null = null): Promise<voi
 			n.tint = !single ? '' : textBtn.checked ? 'mono' : /^#[0-9a-f]{6}$/i.test(hex.value) ? hex.value.toLowerCase() : 'mono';
 			n.zoom = Number(zoom.value) || 1;
 			drawGrid();
-			changed(true);
+			onChange();
 		};
 		const pickSingle = () => {
 			(dlg.querySelector('input[name="tint"][value="single"]') as HTMLInputElement).checked = true;
@@ -566,7 +572,7 @@ function pickPicture(n: ENode, suggestions: Proposal | null = null): Promise<voi
 		zoom.oninput = restyle;
 		const done = () => {
 			dlg.close();
-			changed(true);
+			onChange();
 			resolve();
 		};
 		const onClick = async (e: Event) => {
@@ -594,7 +600,7 @@ function pickPicture(n: ENode, suggestions: Proposal | null = null): Promise<voi
 			const file = (e.target as HTMLInputElement).files?.[0];
 			if (!file) return;
 			try {
-				n.image = await uploadBlob(file, 256);
+				n.image = await uploadBlob(file, uploadSize);
 				done();
 			} catch (err) {
 				toast((err as Error).message, 'err');
@@ -618,7 +624,7 @@ function addLink(into: ENode | null) {
 	const tile = $('#a-tile', dlg);
 	const hint = $('#a-hint', dlg);
 	let prop: Proposal | null = null;
-	const n: ENode = { key: newKey(), kind: 'link', label: '', url: '', icon: 'link', image: '', body: '', seed: 0, tint: '', zoom: 1, children: [] };
+	const n: ENode = { key: newKey(), kind: 'link', label: '', url: '', icon: 'link', image: '', body: '', seed: 0, tint: '', zoom: 1, day: '', highlight: 0, children: [] };
 	url.value = '';
 	name.value = '';
 	tile.innerHTML = tileHtml(n);
@@ -672,6 +678,7 @@ function addLink(into: ENode | null) {
 			if (n.icon === 'link' || n.icon === 'globe') n.icon = 'text';
 		}
 		n.label = name.value.trim() || prop?.title || hostLine(n.url);
+		if (into?.kind === 'diary') n.day = today(); // a new diary entry is dated today; change it in its row
 		(into ? into.children : S.tree).push(n);
 		if (into) into.collapsed = false;
 		dlg.close();
@@ -687,7 +694,7 @@ function addLink(into: ENode | null) {
 function addSpecial(kind: 'group' | 'text' | 'diary' | 'support') {
 	const labels = { group: 'New group', text: 'New text', diary: 'AMYBO diary', support: 'How I support AMYBO' };
 	const icons = { group: '', text: 'text', diary: 'diary', support: 'heart' };
-	const n: ENode = { key: newKey(), kind, label: labels[kind], url: '', icon: icons[kind], image: '', body: '', seed: 0, tint: '', zoom: 1, children: [] };
+	const n: ENode = { key: newKey(), kind, label: labels[kind], url: '', icon: icons[kind], image: '', body: '', seed: 0, tint: '', zoom: 1, day: '', highlight: 0, children: [] };
 	S.tree.push(n);
 	changed(true);
 	requestAnimationFrame(() => {
@@ -695,55 +702,6 @@ function addSpecial(kind: 'group' | 'text' | 'diary' | 'support') {
 		inp?.focus();
 		inp?.select();
 	});
-}
-
-// ---------- diary ----------
-
-function editEntry(e: DiaryEntry | null) {
-	const dlg = $<HTMLDialogElement>('#entry');
-	const today = new Date().toISOString().slice(0, 10);
-	$<HTMLInputElement>('#e-day', dlg).value = e?.day ?? today;
-	$<HTMLInputElement>('#e-title', dlg).value = e?.title ?? '';
-	$<HTMLTextAreaElement>('#e-body', dlg).value = e?.body ?? '';
-	$<HTMLInputElement>('#e-hl', dlg).checked = !!e?.highlight;
-	$('#e-delete', dlg).hidden = !e;
-	$('#entry-title', dlg).textContent = e ? 'Edit entry' : 'New diary entry';
-	$<HTMLFormElement>('#e-form', dlg).onsubmit = async (ev) => {
-		ev.preventDefault();
-		const body = {
-			id: e?.id,
-			day: $<HTMLInputElement>('#e-day', dlg).value,
-			title: $<HTMLInputElement>('#e-title', dlg).value,
-			body: $<HTMLTextAreaElement>('#e-body', dlg).value,
-			highlight: $<HTMLInputElement>('#e-hl', dlg).checked,
-		};
-		try {
-			const r = await api<{ id: number }>('diary', { body });
-			const entry: DiaryEntry = { id: r.id, day: body.day, title: body.title.trim(), body: body.body, highlight: body.highlight ? 1 : 0 };
-			S.diary = [entry, ...S.diary.filter((x) => x.id !== r.id)].sort((a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : b.id - a.id));
-			dlg.close();
-			renderDiary();
-			renderTree();
-			toast('Entry saved');
-		} catch (err) {
-			toast((err as Error).message, 'err');
-		}
-	};
-	$('#e-delete', dlg).onclick = async () => {
-		if (!e || !confirm(`Delete "${e.title}"?`)) return;
-		try {
-			await api(`diary?id=${e.id}`, { method: 'DELETE' });
-			S.diary = S.diary.filter((x) => x.id !== e.id);
-			dlg.close();
-			renderDiary();
-			renderTree();
-		} catch (err) {
-			toast((err as Error).message, 'err');
-		}
-	};
-	$('#e-cancel', dlg).onclick = () => dlg.close();
-	dlg.showModal();
-	$<HTMLInputElement>('#e-title', dlg).focus();
 }
 
 // ---------- sign-in ----------
@@ -770,14 +728,12 @@ async function load() {
 	S.person = me.person;
 	S.uploads = me.uploads;
 	S.icons = me.icons;
-	S.diary = me.diary;
 	S.stats = new Map(me.stats.map((s) => [s.slug, s]));
 	const tree = buildTree(me.nodes as Omit<LinkNode, 'children'>[]);
-	const conv = (n: LinkNode): ENode => ({ key: newKey(), id: n.id, slug: n.slug, kind: n.kind, label: n.label, url: n.url, savedUrl: n.url, icon: n.icon, image: n.image, body: n.body, seed: n.seed, tint: n.tint || '', zoom: n.zoom || 1, children: n.children.map(conv) });
+	const conv = (n: LinkNode): ENode => ({ key: newKey(), id: n.id, slug: n.slug, kind: n.kind, label: n.label, url: n.url, savedUrl: n.url, icon: n.icon, image: n.image, body: n.body, seed: n.seed, tint: n.tint || '', zoom: n.zoom || 1, day: n.day || '', highlight: n.highlight || 0, children: n.children.map(conv) });
 	S.tree = tree.map(conv);
 	renderProfile();
 	renderTree();
-	renderDiary();
 	show('editor');
 	status('All changes saved', 'ok');
 	preview();
@@ -831,12 +787,21 @@ function init() {
 		preview();
 		later('profile', saveProfile);
 	});
-	$('#p-photo').addEventListener('click', () => {
-		if (!S.uploads) {
-			toast("Photo uploads aren't switched on yet", 'err');
-			return;
-		}
-		$<HTMLInputElement>('#p-file').click();
+	$('#p-photo').addEventListener('click', async () => {
+		// The centre has the same picture options as any item: a photo, an icon or a logo, a colour and a size.
+		const p = S.person!;
+		const proxy: ENode = { key: 'hub', kind: 'link', label: p.name, url: '', icon: p.hub_icon, image: p.hub_icon ? '' : p.photo, body: '', seed: 0, tint: p.hub_tint, zoom: p.hub_zoom || 1, day: '', highlight: 0, children: [] };
+		await pickPicture(proxy, null, () => {
+			if (proxy.image) {
+				p.photo = proxy.image;
+				p.hub_icon = '';
+			} else p.hub_icon = proxy.icon;
+			p.hub_tint = proxy.tint;
+			p.hub_zoom = proxy.zoom;
+			renderProfile();
+			preview();
+			later('profile', saveProfile, 300);
+		}, p.kind === 'org' ? 512 : 384);
 	});
 	$('#p-file').addEventListener('change', async (e) => {
 		const file = (e.target as HTMLInputElement).files?.[0];
@@ -858,12 +823,6 @@ function init() {
 		preview();
 		later('profile', saveProfile, 0);
 	});
-	document.querySelectorAll<HTMLInputElement>('input[name="ddef"]').forEach((r) =>
-		r.addEventListener('change', () => {
-			S.person!.diary_default = r.value as 'all' | 'highlights';
-			later('profile', saveProfile, 0);
-		}),
-	);
 	$('#copy').addEventListener('click', async () => {
 		await navigator.clipboard?.writeText(`https://${pageUrl()}`);
 		toast('Address copied');
@@ -891,6 +850,10 @@ function init() {
 		} else if (a === 'menu') openMenu(b, n);
 		else if (a === 'icon') pickPicture(n);
 		else if (a === 'add-in') addLink(n);
+		else if (a === 'star') {
+			n.highlight = n.highlight ? 0 : 1;
+			changed(true);
+		}
 	});
 	setupDrag();
 	document.addEventListener('click', (e) => {
@@ -916,25 +879,6 @@ function init() {
 	});
 	$('#s-tint-reset').addEventListener('click', () => setTint(''));
 
-	// diary
-	$('#new-entry').addEventListener('click', () => editEntry(null));
-	$('#entries').addEventListener('click', async (e) => {
-		const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
-		const li = b?.closest<HTMLElement>('.entry');
-		if (!b || !li) return;
-		const entry = S.diary.find((x) => x.id === Number(li.dataset.id))!;
-		if (b.dataset.act === 'edit') editEntry(entry);
-		if (b.dataset.act === 'star') {
-			entry.highlight = entry.highlight ? 0 : 1;
-			renderDiary();
-			try {
-				await api('diary', { body: entry });
-			} catch (err) {
-				toast((err as Error).message, 'err');
-			}
-		}
-	});
-
 	// phone: switch between editing and the preview
 	document.querySelectorAll<HTMLButtonElement>('[data-pane]').forEach((b) =>
 		b.addEventListener('click', () => {
@@ -953,7 +897,7 @@ async function saveProfile() {
 	const send = async () => {
 		const p = S.person;
 		if (!p) return;
-		await api('profile', { method: 'PUT', body: { name: p.name, bio: p.bio, photo: p.photo, basic_mode: !!p.basic_mode, diary_default: p.diary_default, accent: p.accent } });
+		await api('profile', { method: 'PUT', body: { name: p.name, bio: p.bio, photo: p.photo, basic_mode: !!p.basic_mode, diary_default: p.diary_default, accent: p.accent, hub_icon: p.hub_icon, hub_tint: p.hub_tint, hub_zoom: p.hub_zoom } });
 	};
 	profileSaving = (profileSaving ?? Promise.resolve()).catch(() => {}).then(send);
 	await profileSaving;
