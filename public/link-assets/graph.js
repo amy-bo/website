@@ -407,8 +407,10 @@ export function start(map) {
 		}),
 	);
 
-	function setFocus(n, fromMap = false) {
+	function setFocus(n, fromMap = false, record = fromMap) {
 		if (!n || n === focus) return;
+		// Each move is a step in the browser's history, so Back (or Cmd+Z) retraces it.
+		if (record) history.pushState({ lp: n.id }, '', n === hub ? location.pathname + location.search : `#${encodeURIComponent(n.slug)}`);
 		focus = n;
 		const p = n.parent != null ? byId.get(n.parent) : null;
 		const d = p ? Math.hypot(n.x - p.x, n.y - p.y) || 1 : 1;
@@ -536,6 +538,24 @@ export function start(map) {
 		true,
 	);
 
-	api = { tap: (id) => performance.now() - justDragged < 350 || tap(id), grab };
+	/** Go to an item by id (from its address, an alias, or Back): open what holds it, and point it out. */
+	function goto(id, record = false) {
+		const n = byId.get(id);
+		if (!n) return;
+		setFocus(n.kind === 'group' ? n : byId.get(n.parent) ?? hub, true, record);
+		if (n.el) {
+			n.el.classList.remove('flash');
+			void n.el.getBoundingClientRect();
+			n.el.classList.add('flash');
+		}
+	}
+	addEventListener('popstate', () => {
+		const slug = decodeURIComponent(location.hash.slice(1));
+		const n = slug ? [...byId.values()].find((x) => x.slug === slug) : hub;
+		if (n === hub) setFocus(hub, true, false);
+		else if (n) goto(n.id, false);
+	});
+
+	api = { tap: (id) => performance.now() - justDragged < 350 || tap(id), grab, goto };
 	return api;
 }

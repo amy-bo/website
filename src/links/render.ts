@@ -92,6 +92,8 @@ interface Ctx {
 	base: string;
 	data: PageData;
 	preview: boolean;
+	/** Every item's address on this page (its slug), for aliases. */
+	slugs: Set<string>;
 }
 
 /** Visitors don't see an empty support note or an empty diary; the editor's preview shows everything. */
@@ -122,15 +124,16 @@ function visible(nodes: LinkNode[], ctx: Ctx): LinkNode[] {
 }
 
 
-/** A diary's items, newest first, with their dates in the title. If any are highlights, the diary shows those
- * first and an "All" group with every entry. Anything else keeps its own order. */
+/** Dates and stars work the same in every group (the diary is just a group like any other): if any of its items
+ * have dates, they sort newest first; if any are starred, the starred ones come first and an "All" group holds
+ * everything. Groups without either keep their own order. */
 function withDiary(nodes: LinkNode[]): LinkNode[] {
 	return nodes.map((n) => {
 		const children = withDiary(n.children);
-		if (n.kind !== 'diary') return { ...n, children };
-		const entries = [...children].sort(byDate);
+		if (n.kind !== 'diary' && n.kind !== 'group') return { ...n, children };
+		const entries = children.some((c) => c.day) ? [...children].sort(byDate) : children;
 		const highlights = entries.filter((e) => e.highlight);
-		if (!highlights.length) return { ...n, children: entries };
+		if (!highlights.length || highlights.length === entries.length) return { ...n, children: entries };
 		const all: LinkNode = {
 			id: -2_000_000 - n.id, parent_id: n.id, kind: 'group', slug: `${n.slug}-all`, label: 'All', url: '', icon: 'diary', image: '',
 			body: '', seed: 0, position: 0, tint: '', zoom: 1, day: '', highlight: 0, dk_linked: 1, dk_icon: '', dk_tint: '', dk_zoom: 1,
@@ -143,7 +146,17 @@ function withDiary(nodes: LinkNode[]): LinkNode[] {
 /** Items that open (a group, or a diary with entries). */
 const opens = (n: LinkNode) => n.kind === 'group' || (n.kind === 'diary' && n.children.length > 0);
 
+/** A link to an item on this same page (its address, like amy.bo/~martin#socials) is an alias: it carries you to
+ * the original rather than away. Returns the original's slug, or ''. */
+function aliasOf(n: LinkNode, ctx: Ctx): string {
+	if (n.kind !== 'link') return '';
+	const m = /^(?:https?:\/\/[^/]+)?(\/~[a-z0-9-]+|\/links)\/?#([a-z0-9-]+)$/i.exec(n.url.trim());
+	if (!m || m[1].toLowerCase() !== ctx.base) return '';
+	return ctx.slugs.has(m[2]) && m[2] !== n.slug ? m[2] : '';
+}
+
 const hrefOf = (n: LinkNode, ctx: Ctx) =>
+	aliasOf(n, ctx) ? `#${aliasOf(n, ctx)}` :
 	n.kind === 'link' ? (ctx.preview ? safeUrl(n.url) : `${ctx.base}/go/${encodeURIComponent(n.slug)}`) : n.kind === 'diary' ? `${ctx.base}/diary` : '';
 
 // ---- the list: plain text, a twisty for each group ----
@@ -158,10 +171,11 @@ function renderList(nodes: LinkNode[], ctx: Ctx, level = 'root'): string {
 	return nodes
 		.map((n) => {
 			if (opens(n))
-				return `<li><details${nm}><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${titled(n)}</summary><ul>${renderList(n.children, ctx, String(n.id))}</ul></details></li>`;
+				return `<li><details${nm}><summary data-n="${n.id}" data-s="${esc(n.slug)}"><span class="tw" aria-hidden="true">&gt;</span>${titled(n)}</summary><ul>${renderList(n.children, ctx, String(n.id))}</ul></details></li>`;
 			if (n.kind === 'support' || n.kind === 'text')
-				return `<li><details${nm} id="l-note-${n.id}"><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${titled(n)}</summary><div class="note">${formatText(n.body)}</div></details></li>`;
-			return `<li><a data-n="${n.id}" href="${esc(hrefOf(n, ctx))}"${n.kind === 'link' ? tgt : ''}>${titled(n)}</a></li>`;
+				return `<li><details${nm} id="l-note-${n.id}"><summary data-n="${n.id}" data-s="${esc(n.slug)}"><span class="tw" aria-hidden="true">&gt;</span>${titled(n)}</summary><div class="note">${formatText(n.body)}</div></details></li>`;
+			const alias = aliasOf(n, ctx);
+			return `<li><a data-n="${n.id}" data-s="${esc(n.slug)}" href="${esc(hrefOf(n, ctx))}"${alias ? ' class="alias"' : n.kind === 'link' ? tgt : ''}>${titled(n)}</a></li>`;
 		})
 		.join('');
 }
@@ -170,6 +184,9 @@ function renderList(nodes: LinkNode[], ctx: Ctx, level = 'root'): string {
 
 interface GNode {
 	id: number;
+	slug: string;
+	/** For an alias: the slug of the original it carries you to. */
+	alias?: string;
 	parent: number | null;
 	kind: string;
 	label: string;
@@ -294,7 +311,7 @@ function graphData(roots: LinkNode[], ctx: Ctx) {
 	const visit = (list: LinkNode[], parent: number | null) =>
 		list.forEach((n) => {
 			const p = pos.get(n.id)!;
-			nodes.push({ id: n.id, parent, kind: opens(n) ? 'group' : n.kind, label: n.day ? `${n.label} ${n.day}` : n.label, href: hrefOf(n, ctx), pic: picture(n, 0, 0, p.r, `l${n.id}`) + halo(n, 0, 0, p.r), icon: nodeIcon(n), x: p.x, y: p.y, r: p.r });
+			nodes.push({ id: n.id, slug: n.slug, alias: aliasOf(n, ctx) || undefined, parent, kind: opens(n) ? 'group' : n.kind, label: n.day ? `${n.label} ${n.day}` : n.label, href: hrefOf(n, ctx), pic: picture(n, 0, 0, p.r, `l${n.id}`) + halo(n, 0, 0, p.r), icon: nodeIcon(n), x: p.x, y: p.y, r: p.r });
 			visit(n.children, n.id);
 		});
 	visit(roots, null);
@@ -393,7 +410,7 @@ const FOOT = `<footer class="foot"><a href="https://amybo.org/">AMYBO</a> · cli
 export function renderPage(data: PageData, opts: RenderOptions = {}): string {
 	const p = data.person;
 	const base = pagePath(p.handle);
-	const ctx: Ctx = { base, data, preview: !!opts.preview };
+	const ctx: Ctx = { base, data, preview: !!opts.preview, slugs: new Set([...walk(data.roots)].map((n) => n.slug)) };
 	const canonical = `${opts.origin ?? 'https://amy.bo'}${base}`;
 	const roots = visible(withDiary(data.roots), ctx);
 	const description = p.bio || `${p.name}: links.`;
@@ -423,8 +440,7 @@ export function renderPage(data: PageData, opts: RenderOptions = {}): string {
 <svg class="mapsvg" viewBox="${g.view.join(' ')}">${g.svg}</svg>
 <button type="button" class="back" aria-label="Back to the list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/></svg></button>
 </aside>
-<script type="application/json" id="l-data">${JSON.stringify({ nodes: g.nodes, preview: ctx.preview }).replace(/</g, '\\u003c')}</script>
-<script>${BOOT}</script>`
+<script type="application/json" id="l-data">${JSON.stringify({ nodes: g.nodes, preview: ctx.preview }).replace(/</g, '\\u003c')}</script>`
 		: '';
 
 	return `${head(p.name, description, canonical, relMe)}
@@ -438,6 +454,7 @@ ${map}
 </div>
 ${FOOT}
 ${g ? `<style>${linkStyles(roots)}</style>` : ''}
+<script>${BOOT}</script>
 </body></html>`;
 }
 
@@ -485,7 +502,7 @@ ${FOOT}
 /** Loader: on the first touch, hover or keypress on the map, fetch the physics and hand over. ~1 KB. */
 /** The map's only script until it is used: a click (or Enter) on a group, or any tap on a phone, fetches
  * /link-assets/graph.js. Links on the map are plain links and work without it. */
-export const BOOT = `(()=>{const b=document.body,m=document.querySelector('.map');if(!m)return;let go;const rm=matchMedia('(prefers-reduced-motion: reduce)').matches;const vt=f=>document.startViewTransition&&!rm?document.startViewTransition(f):f();const small=()=>matchMedia('(max-width: 56rem)').matches;const load=()=>(go=go||import('/link-assets/graph.js').then(g=>g.start(m)));const act=(e,g)=>{e.preventDefault();load().then(x=>x.tap(+g.dataset.g))};m.addEventListener('click',e=>{if(small()&&!b.classList.contains('map-on')){e.preventDefault();vt(()=>b.classList.add('map-on'));load();return}const g=e.target.closest('g[data-g]');if(g)act(e,g)});m.addEventListener('pointerdown',e=>{if(small()&&!b.classList.contains('map-on'))return;const n=e.target.closest('[data-g]');if(n)load().then(x=>x.grab(e,+n.dataset.g))});m.addEventListener('keydown',e=>{const g=e.target.closest&&e.target.closest('g[data-g]');if(g&&(e.key==='Enter'||e.key===' '))act(e,g)});const off=()=>{if(b.classList.contains('map-on'))vt(()=>b.classList.remove('map-on'))};m.querySelector('.back').addEventListener('click',e=>{e.stopPropagation();off()});addEventListener('keydown',e=>{if(e.key==='Escape')off()})})();`;
+export const BOOT = `(()=>{const b=document.body,m=document.querySelector('.map');let go;const rm=matchMedia('(prefers-reduced-motion: reduce)').matches;const vt=f=>document.startViewTransition&&!rm?document.startViewTransition(f):f();const small=()=>matchMedia('(max-width: 56rem)').matches;const load=()=>m?(go=go||import('/link-assets/graph.js').then(g=>g.start(m))):Promise.resolve(null);const show=s=>{const t=document.querySelector('.tree [data-s="'+CSS.escape(s)+'"]');if(!t)return;for(let d=t.closest('details');d;d=d.parentElement.closest('details'))d.open=true;if(t.tagName==='SUMMARY')t.parentElement.open=true;t.scrollIntoView({block:'nearest',behavior:rm?'auto':'smooth'});t.classList.remove('flash');void t.offsetWidth;t.classList.add('flash');const n=+t.dataset.n;if(m&&!small())load().then(x=>x&&x.goto(n))};const fromHash=()=>{const s=decodeURIComponent(location.hash.slice(1));if(s)show(s)};addEventListener('hashchange',fromHash);if(location.hash)fromHash();addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'&&!e.target.closest('input,textarea,[contenteditable]')){e.preventDefault();e.shiftKey?history.forward():history.back()}});if(!m)return;const act=(e,g)=>{e.preventDefault();load().then(x=>x.tap(+g.dataset.g))};m.addEventListener('click',e=>{if(small()&&!b.classList.contains('map-on')){e.preventDefault();vt(()=>b.classList.add('map-on'));load();return}const g=e.target.closest('g[data-g]');if(g)act(e,g)});m.addEventListener('pointerdown',e=>{if(small()&&!b.classList.contains('map-on'))return;const n=e.target.closest('[data-g]');if(n)load().then(x=>x.grab(e,+n.dataset.g))});m.addEventListener('keydown',e=>{const g=e.target.closest&&e.target.closest('g[data-g]');if(g&&(e.key==='Enter'||e.key===' '))act(e,g)});const off=()=>{if(b.classList.contains('map-on'))vt(()=>b.classList.remove('map-on'))};m.querySelector('.back').addEventListener('click',e=>{e.stopPropagation();off()});addEventListener('keydown',e=>{if(e.key==='Escape')off()})})();`;
 
 const CSS = `
 :root{--bg:#f6f8f4;--ink:#16210f;--muted:#66745f;--line:#d8e2cf;--accent:#3f9c00;--accent-ink:#1d6b00;--node:#fff;--ease:cubic-bezier(.2,.8,.2,1)}
@@ -517,6 +534,9 @@ summary{list-style:none;-webkit-tap-highlight-color:transparent}
 summary::-webkit-details-marker{display:none}
 .tw{display:inline-block;width:1.15em;transition:transform .25s var(--ease);transform-origin:.3em 55%}
 details[open]>summary .tw{transform:rotate(90deg)}
+.tree .alias::after{content:" ↩";color:var(--muted);font-weight:300}
+.tree .flash{animation:flash 1.2s ease-out}
+@keyframes flash{0%,30%{color:var(--accent-ink);background:color-mix(in srgb,var(--accent) 14%,transparent)}}
 .tree .d{font-weight:300;color:var(--muted);font-variant-numeric:tabular-nums;letter-spacing:.02em;margin-left:.15em}
 .note{padding:.2em 0 .6em 1.15em;color:var(--muted);font-size:.95em}
 .note p,.entry p{margin:0 0 .6em}
@@ -528,6 +548,8 @@ details[open]>summary .tw{transform:rotate(90deg)}
 .map{position:sticky;top:2rem;aspect-ratio:1;max-height:calc(100vh - 4rem);width:100%;justify-self:center}
 .mapsvg{display:block;width:100%;height:100%;overflow:visible}
 .mapsvg .edges line{stroke:var(--line);stroke-width:1.5}
+.mapsvg .n.flash>circle{animation:nflash 1.2s ease-out}
+@keyframes nflash{0%,40%{stroke:var(--accent);stroke-width:5}}
 .mapsvg .halo circle{fill:var(--muted);opacity:.6;stroke:none}
 .mapsvg .n.open .halo{display:none}
 .mapsvg.live .n,.mapsvg.live .hubg{cursor:grab}

@@ -132,7 +132,7 @@ try {
 		check('the list is words only: no addresses, counts or icons', !r.text.includes('class="host"') && !r.text.includes('class="count"') && !/<nav[^]*?<svg[^]*?<\/nav>/.test(r.text));
 		check('no instructions on the page', !/touch to explore|click to|tap to/i.test(r.text));
 		check('one portrait only (the map\'s centre)', !r.text.includes('class="avatar"') && (r.text.match(/martin-currie\.jpg/g) || []).length === 1);
-		check('a group with one link is just that link (Email)', /<a data-n="\d+" href="\/~martin\/go\/email">Email<\/a>/.test(r.text), (/.{0,80}go\/email.{0,40}/.exec(r.text) || [''])[0]);
+		check('a group with one link is just that link (Email)', /<a data-n="\d+" data-s="[a-z0-9-]+" href="\/~martin\/go\/email">Email<\/a>/.test(r.text), (/.{0,80}go\/email.{0,40}/.exec(r.text) || [''])[0]);
 		check('hovering one lights up the other (CSS only)', r.text.includes(':has([data-n=') && r.text.includes(':has([data-g='));
 		const pics = JSON.parse(/<script type="application\/json" id="l-data">([^<]*)<\/script>/.exec(r.text)[1].replace(/\\u003c/g, '<')).nodes.map((n) => n.icon);
 		check('every picture on the map is different', new Set(pics).size === pics.length, pics.join(' '));
@@ -272,6 +272,7 @@ try {
 			{ key: 'pat', parent: 'help', kind: 'link', label: 'Patreon', url: 'https://patreon.com/x', icon: 'patreon', tint: 'mono', zoom: 1.3 },
 			{ key: 'txt', parent: null, kind: 'text', label: 'About my lab', body: 'We grow **things**.', tint: '#ff0000' },
 			{ key: 'lg', parent: null, kind: 'link', label: 'AMYBO', url: 'https://amybo.org/', icon: 'amybo', tint: '#00aa00' },
+			{ key: 'al', parent: null, kind: 'link', label: 'Back to AMYBO', url: 'https://amy.bo/~vee#amybo', icon: 'link' },
 			{ key: 'dk', parent: null, kind: 'link', label: 'Two-tone', url: 'https://example.org/2', icon: 'github', dk_linked: 0, dk_icon: 'gitlab', dk_tint: '#ffaa00', dk_zoom: 1.5 },
 		];
 		check('bad colours are refused', (await req('PUT', '/api/links/nodes', { nodes: [...base, { key: 'bad', parent: null, kind: 'link', label: 'x', url: 'https://x.org', tint: 'red' }] }, C)).status === 400);
@@ -283,6 +284,8 @@ try {
 		check('one twisty open per level (named details)', /<details name="l-\d+">/.test(pg.text) || /<details name="l-root"/.test(pg.text));
 		check('text items show their text in the list', pg.text.includes('About my lab') && pg.text.includes('We grow <strong>things</strong>.'));
 		check('monochrome and own-colour pictures', pg.text.includes('--brand:var(--ink)') && pg.text.includes('--brand:#ff0000'));
+		check('a link to an item on the same page is an alias', /class="alias"/.test(pg.text) && /href="#[a-z0-9-]+" class="alias"/.test(pg.text));
+		check('list items carry their address', /data-s="/.test(pg.text));
 		check('an unlinked dark picture is drawn for dark mode only', /<g class="lt">[^]*?#i-github[^]*?<\/g><g class="dk">[^]*?#i-gitlab[^]*?--brand:#ffaa00/.test(pg.text));
 		check('a single-colour logo gets its colour filter', pg.text.includes('<filter id="lt-00aa00"') && pg.text.includes('filter="url(#lt-00aa00)"'));
 		check('the page tint is applied', pg.text.includes('data-tint style="--t:#aa3377'));

@@ -233,9 +233,10 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 		if (d > 30) return fail('Items can go thirty levels deep at most');
 	}
 
-	// New items get a slug that has never been used on this page, so old clicks never land on a new link.
+	// Every item's address (its slug, as in amy.bo/~name#socials) comes from its name, and is never one used before on
+	// this page, so old clicks never land on a new link. Once set it stays, so aliases to it keep working.
 	const slugFor = (n: InNode) => {
-		const base = n.kind === 'group' ? `group-${slugify(n.label)}` : n.kind === 'link' ? slugify(n.label) : n.kind;
+		const base = slugify(n.label) || n.kind;
 		let s = base;
 		for (let i = 2; usedSlugs.has(s); i++) s = `${base}-${i}`;
 		usedSlugs.add(s);
@@ -290,16 +291,23 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 			)
 			.bind(idOf.get(n.key)!, n.dk_linked === false || n.dk_linked === 0 ? 0 : 1, n.dk_icon ?? '', String(n.dk_tint ?? '').toLowerCase(), cleanZoom(n.dk_zoom)),
 	);
+	// Older items with placeholder addresses ("group-5", "text") take their name's, once.
+	const placeholder = /^(group|entry|text|note)(-\d+)?$|^group-new-group(-\d+)?$/;
+	const renames = list
+		.filter((n) => n.id != null && n.kind !== 'link' && placeholder.test(existingById.get(n.id)!.slug) && slugify(n.label) !== 'link')
+		.map((n) => db.prepare('UPDATE lp_nodes SET slug = ? WHERE id = ? AND person_id = ?').bind(slugFor(n), n.id!, p.id));
 	const deletes = existing.filter((r) => !keep.has(r.id)).map((r) => db.prepare('DELETE FROM lp_nodes WHERE id = ? AND person_id = ?').bind(r.id, p.id));
 	const imagesBefore = await imagesInUse(db, p.id);
 	try {
-		await db.batch([...updates, ...styles, ...darks, ...deletes, db.prepare('UPDATE lp_people SET updated_at = ? WHERE id = ?').bind(nowIso(), p.id)]);
+		await db.batch([...updates, ...renames, ...styles, ...darks, ...deletes, db.prepare('UPDATE lp_people SET updated_at = ? WHERE id = ?').bind(nowIso(), p.id)]);
 	} catch (e) {
 		if (fresh.length) await db.batch(fresh.map((n) => db.prepare('DELETE FROM lp_nodes WHERE id = ? AND person_id = ?').bind(idOf.get(n.key)!, p.id))).catch(() => {});
 		throw e;
 	}
 	forgetImages(ctx, imagesBefore, await imagesInUse(db, p.id));
-	return json({ ok: true, ids: Object.fromEntries(idOf) });
+	const slugRows = (await db.prepare('SELECT id, slug FROM lp_nodes WHERE person_id = ?').bind(p.id).all<{ id: number; slug: string }>()).results;
+	const slugById = new Map(slugRows.map((r) => [r.id, r.slug]));
+	return json({ ok: true, ids: Object.fromEntries(idOf), slugs: Object.fromEntries([...idOf].map(([k, id]) => [k, slugById.get(id)])) });
 }
 
 // ---- images ----

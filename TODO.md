@@ -4,6 +4,8 @@ Open work on amybo.org. Done work is in [CHANGELOG.md](CHANGELOG.md). Abandoned 
 
 ## Open
 
+- [ ] **Link pages: shake to undo on phones** — Back already retraces map moves; shake needs DeviceMotion permission on iOS (a tap to allow), so it wants a small opt-in.
+
 - [ ] **"Contact Martin" heading on the contact form:** contact.andeye.com should read a `heading` parameter (brief in brain2 andeye/contact-form-links, 3 October); amy.bo/~martin already sends it.
 - [ ] **amy.bo/~martin and amy.bo/links live:** switch on the `amybo-redirects` Worker from `workers/amy-bo/` (repository variable `DEPLOY_AMYBO_WORKER=true` plus Workers Routes edit on amy.bo for the deploy token, or paste it into the dashboard); it adds the `www.amy.bo/*` route (www currently times out at old AWS addresses). Delete the disabled "Redirect amy.bo to amybo.org" rule. Set Martin's real sign-in email on /admin/links/ (seeded as a placeholder). Export Linktree's analytics CSV before about 9 October.
 - [ ] **Link pages: image uploads.** Create the R2 bucket `amybo-links` (EU jurisdiction) and give the deploy token R2 read; the next deploy binds it. Then invite the first volunteers from /admin/links/.

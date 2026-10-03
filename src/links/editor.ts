@@ -172,21 +172,83 @@ let saving: Promise<void> | null = null;
 async function saveNodes() {
 	const send = async () => {
 		const { nodes, pending } = flatten();
-		const r = await api<{ ids: Record<string, number> }>('nodes', { method: 'PUT', body: { nodes } });
+		const r = await api<{ ids: Record<string, number>; slugs: Record<string, string> }>('nodes', { method: 'PUT', body: { nodes } });
 		const sent = new Map(nodes.map((x) => [x.key, x.url]));
 		for (const n of walkE(S.tree)) {
 			if (r.ids[n.key] != null) n.id = r.ids[n.key];
+			if (r.slugs?.[n.key]) n.slug = r.slugs[n.key];
 			if (n.kind === 'link' && sent.has(n.key) && validUrl(n.url)) n.savedUrl = n.url.trim();
 		}
+		remember();
 		if (pending.length) throw new Error(`Saved, except the address for "${pending[0]}": it needs to start https://`);
 	};
 	// One save at a time, so new items never get created twice.
 	saving = (saving ?? Promise.resolve()).catch(() => {}).then(send);
 	await saving;
 }
+// ---------- undo: every change this session is a step back ----------
+const undoStack: string[] = [];
+const redoStack: string[] = [];
+let lastSnap = '';
+let snapTimer = 0;
+// Steps leave out what saving fills in (ids, addresses), so a save never looks like a change; restoring puts back
+// those that the server still has, and anything it no longer has is created afresh.
+const VOLATILE = new Set(['id', 'slug', 'savedUrl', 'collapsed']);
+const snapshot = () => JSON.stringify({ tree: S.tree, person: S.person }, (k, v) => (VOLATILE.has(k) ? undefined : v));
+const saved = new Map<string, { id: number; slug?: string; savedUrl?: string }>();
+const remember = () => {
+	saved.clear();
+	for (const n of walkE(S.tree)) if (n.id != null) saved.set(n.key, { id: n.id, slug: n.slug, savedUrl: n.savedUrl });
+};
+/** Records the current state as an undo step (typing is grouped: one step per pause). */
+function record(now = false) {
+	clearTimeout(snapTimer);
+	const take = () => {
+		const snap = snapshot();
+		if (snap === lastSnap) return;
+		if (lastSnap) undoStack.push(lastSnap);
+		redoStack.length = 0;
+		lastSnap = snap;
+	};
+	if (now) take();
+	else snapTimer = window.setTimeout(take, 500);
+}
+function restore(snap: string) {
+	const st = JSON.parse(snap);
+	const open = new Map([...walkE(S.tree)].map((n) => [n.key, n.collapsed]));
+	S.tree = st.tree;
+	for (const n of walkE(S.tree)) {
+		Object.assign(n, saved.get(n.key) ?? { id: undefined, slug: '' });
+		n.collapsed = open.get(n.key);
+	}
+	S.person = st.person;
+	lastSnap = snap;
+	renderProfile();
+	renderTree();
+	preview();
+	later('nodes', saveNodes, 200);
+	later('profile', saveProfile, 200);
+}
+function undo() {
+	record(true);
+	const prev = undoStack.pop();
+	if (!prev) return toast('Nothing to undo');
+	redoStack.push(lastSnap);
+	restore(prev);
+	toast('Undone');
+}
+function redo() {
+	const next = redoStack.pop();
+	if (!next) return toast('Nothing to redo');
+	undoStack.push(lastSnap);
+	restore(next);
+	toast('Redone');
+}
+
 const changed = (structural = false) => {
 	if (structural) renderTree();
 	preview();
+	record(structural);
 	later('nodes', saveNodes);
 };
 
@@ -255,6 +317,8 @@ const KIND_NAME: Record<NodeKind, string> = { group: 'group', link: 'link', text
 /** Today as a short date, YYMMDD. */
 const today = () => new Date().toISOString().slice(2, 10).replace(/-/g, '');
 
+const openDates = new Set<string>();
+
 function rowHtml(n: ENode, depth: number, inDiary = false): string {
 	const st = n.slug ? S.stats.get(n.slug) : undefined;
 	const clicks = n.kind === 'link' && st ? `<span class="chip" title="Clicks in the last 30 days (all time ${st.total + n.seed})">${st.d30} in 30 days</span>` : '';
@@ -264,10 +328,13 @@ function rowHtml(n: ENode, depth: number, inDiary = false): string {
 	if (n.kind === 'support')
 		fields += `<textarea class="body" data-f="body" rows="3" aria-label="How you support AMYBO" placeholder="In your own words. Nobody needs to know about money: say only what you'd like to.">${esc(n.body)}</textarea>`;
 	if (n.kind === 'text') fields += `<textarea class="body" data-f="body" rows="3" aria-label="Text" placeholder="Anything you'd like to say. Links work as they are, or [like this](https://…).">${esc(n.body)}</textarea>`;
-	// Inside a diary, every item can carry a short date and be a highlight.
-	const diaryBits = inDiary
-		? `<input class="day" data-f="day" value="${esc(n.day)}" aria-label="Date: YY, YYMM or YYMMDD" placeholder="${today()}" inputmode="numeric" maxlength="6" title="Date: 26, 2608 or 260822"><button type="button" class="star${n.highlight ? ' on' : ''}" data-act="star" aria-pressed="${!!n.highlight}" title="Highlight">${n.highlight ? '★' : '☆'}</button>`
-		: '';
+	// Every item can carry a short date and a star. Both stay faint until set; the date field opens on the calendar.
+	const dateOpen = !!n.day || openDates.has(n.key);
+	const diaryBits =
+		(dateOpen
+			? `<input class="day" data-f="day" value="${esc(n.day)}" aria-label="Date: YY, YYMM or YYMMDD" placeholder="${today()}" inputmode="numeric" maxlength="6" title="Date: 26, 2608 or 260822">`
+			: `<button type="button" class="cal" data-act="date" title="Add a date" aria-label="Add a date to ${esc(n.label)}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></button>`) +
+		`<button type="button" class="star${n.highlight ? ' on' : ''}" data-act="star" aria-pressed="${!!n.highlight}" title="${n.highlight ? 'Starred: shown first in its group' : 'Star: show it first in its group'}">${n.highlight ? '★' : '☆'}</button>`;
 	const holds = n.kind === 'group' || n.kind === 'diary';
 	const twisty = holds
 		? `<button type="button" class="tw${n.collapsed ? '' : ' open'}" data-act="fold" aria-expanded="${!n.collapsed}" aria-label="${n.collapsed ? 'Show' : 'Hide'} what's in ${esc(n.label)}"></button>`
@@ -352,6 +419,7 @@ function openMenu(btn: HTMLElement, n: ENode) {
 		['down', 'Move down', i < f.list.length - 1],
 		['indent', `Move into "${prev?.label ?? ''}"`, prev?.kind === 'group' || prev?.kind === 'diary'],
 		['outdent', 'Move out of this group', !!f.parent],
+		['address', "Copy this item's address (paste it into another link to make an alias)", !!n.slug],
 		['delete', `Delete this ${KIND_NAME[n.kind]}`, true],
 	];
 	const m = h(
@@ -398,6 +466,13 @@ function act(a: string, n: ENode) {
 		const pf = find(f.parent.key)!;
 		f.list.splice(i, 1);
 		pf.list.splice(pf.list.indexOf(f.parent) + 1, 0, n);
+	} else if (a === 'address') {
+		const url = `https://${pageUrl()}#${n.slug}`;
+		navigator.clipboard?.writeText(url).then(
+			() => toast('Address copied: paste it into a link to make an alias'),
+			() => prompt('This item\'s address:', url),
+		);
+		return;
 	} else if (a === 'delete') {
 		const what = n.kind === 'group' && n.children.length ? `the group "${n.label}" and everything in it` : `"${n.label}"`;
 		if (!confirm(`Delete ${what}?`)) return;
@@ -788,6 +863,18 @@ function addLink(into: ENode | null) {
 		n.url = v;
 		n.icon = guessIcon(v);
 		tile.innerHTML = tileHtml(n);
+		const own = new RegExp(`/(~${S.person!.handle}|links)/?#([a-z0-9-]+)$`, 'i').exec(v);
+		const original = own ? [...walkE(S.tree)].find((x) => x.slug === own[2]) : undefined;
+		if (original) {
+			if (!name.value || name.dataset.auto) {
+				name.value = original.label;
+				name.dataset.auto = '1';
+			}
+			n.icon = original.icon;
+			tile.innerHTML = tileHtml(n);
+			hint.textContent = `An alias: it will take visitors to "${original.label}" on your page.`;
+			return;
+		}
 		if (!/^(https?:\/\/[^\s.]+\.[^\s]+|mailto:\S+@\S+)$/i.test(v)) return;
 		const mine = ++seq;
 		hint.textContent = 'Looking…';
@@ -887,6 +974,8 @@ async function load() {
 	renderProfile();
 	renderTree();
 	show('editor');
+	lastSnap = snapshot();
+	remember();
 	status('All changes saved', 'ok');
 	preview();
 }
@@ -995,6 +1084,13 @@ function init() {
 	const tree = $('#tree');
 	tree.addEventListener('input', onTreeInput);
 	tree.addEventListener('keydown', onTreeKey);
+	addEventListener('keydown', (e) => {
+		if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z' || document.querySelector('dialog[open]')) return;
+		// In a text field, the field's own undo comes first; outside one, the whole editor's.
+		if ((e.target as HTMLElement).closest('input,textarea') && !e.altKey) return;
+		e.preventDefault();
+		e.shiftKey ? redo() : undo();
+	});
 	tree.addEventListener('click', (e) => {
 		const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
 		const row = b?.closest<HTMLElement>('.row');
@@ -1007,7 +1103,12 @@ function init() {
 		} else if (a === 'menu') openMenu(b, n);
 		else if (a === 'icon') pickPicture(n);
 		else if (a === 'add-in') addLink(n);
-		else if (a === 'star') {
+		else if (a === 'date') {
+			openDates.add(n.key);
+			if (!n.day) n.day = '';
+			renderTree();
+			requestAnimationFrame(() => document.querySelector<HTMLInputElement>(`.row[data-key="${n.key}"] .day`)?.focus());
+		} else if (a === 'star') {
 			n.highlight = n.highlight ? 0 : 1;
 			changed(true);
 		}
@@ -1017,6 +1118,8 @@ function init() {
 		if (!(e.target as HTMLElement).closest('.menu,[data-act="menu"]')) closeMenus();
 	});
 	$('#add-link').addEventListener('click', () => addLink(null));
+	$('#undo').addEventListener('click', undo);
+	$('#redo').addEventListener('click', redo);
 	$('#add-group').addEventListener('click', () => addSpecial('group'));
 	$('#add-diary').addEventListener('click', () => addSpecial('diary'));
 	$('#add-support').addEventListener('click', () => addSpecial('support'));
@@ -1050,6 +1153,7 @@ function init() {
 
 let profileSaving: Promise<void> | null = null;
 async function saveProfile() {
+	record();
 	// One at a time, each sending the latest state, so an older save can never land after a newer one.
 	const send = async () => {
 		const p = S.person;
