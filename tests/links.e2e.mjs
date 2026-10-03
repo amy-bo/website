@@ -272,6 +272,7 @@ try {
 			{ key: 'pat', parent: 'help', kind: 'link', label: 'Patreon', url: 'https://patreon.com/x', icon: 'patreon', tint: 'mono', zoom: 1.3 },
 			{ key: 'txt', parent: null, kind: 'text', label: 'About my lab', body: 'We grow **things**.', tint: '#ff0000' },
 			{ key: 'lg', parent: null, kind: 'link', label: 'AMYBO', url: 'https://amybo.org/', icon: 'amybo', tint: '#00aa00' },
+			{ key: 'dk', parent: null, kind: 'link', label: 'Two-tone', url: 'https://example.org/2', icon: 'github', dk_linked: 0, dk_icon: 'gitlab', dk_tint: '#ffaa00', dk_zoom: 1.5 },
 		];
 		check('bad colours are refused', (await req('PUT', '/api/links/nodes', { nodes: [...base, { key: 'bad', parent: null, kind: 'link', label: 'x', url: 'https://x.org', tint: 'red' }] }, C)).status === 400);
 		const sv = await req('PUT', '/api/links/nodes', { nodes: [...base, ...extra] }, C);
@@ -282,6 +283,7 @@ try {
 		check('one twisty open per level (named details)', /<details name="l-\d+">/.test(pg.text) || /<details name="l-root"/.test(pg.text));
 		check('text items show their text in the list', pg.text.includes('About my lab') && pg.text.includes('We grow <strong>things</strong>.'));
 		check('monochrome and own-colour pictures', pg.text.includes('--brand:var(--ink)') && pg.text.includes('--brand:#ff0000'));
+		check('an unlinked dark picture is drawn for dark mode only', /<g class="lt">[^]*?#i-github[^]*?<\/g><g class="dk">[^]*?#i-gitlab[^]*?--brand:#ffaa00/.test(pg.text));
 		check('a single-colour logo gets its colour filter', pg.text.includes('<filter id="lt-00aa00"') && pg.text.includes('filter="url(#lt-00aa00)"'));
 		check('the page tint is applied', pg.text.includes('data-tint style="--t:#aa3377'));
 		check('the tint must be a colour', (await req('PUT', '/api/links/profile', { name: 'Vee', accent: 'pink' }, C)).status === 400);
@@ -301,7 +303,8 @@ try {
 		const de = await req('PUT', '/api/links/nodes', { nodes: [...keep8, ...entries] }, C);
 		check('diary entries save as items', de.status === 200, de.text);
 		let pgd = await req('GET', '/~vee');
-		const order = ['Newer 261001', 'Older 260901', 'Paper 2609'].map((t) => pgd.text.indexOf(t));
+		const nav = (t) => (/<nav[^]*?<\/nav>/.exec(t) || [''])[0];
+		const order = ['Newer <span class="d">261001</span>', 'Older <span class="d">260901</span>', 'Paper <span class="d">2609</span>'].map((t) => nav(pgd.text).indexOf(t));
 		check('diary entries show newest first, with short dates in their titles', order.every((v, i) => v > 0 && (i === 0 || v > order[i - 1])), order.join(','));
 		check('no highlights: no All group', !/>All<\/summary>/.test(pgd.text));
 		const d = await req('GET', '/~vee/diary');
@@ -309,7 +312,8 @@ try {
 		check('diary links are safe', d.text.includes('href="https://amybo.org/" rel="nofollow ugc noopener"'));
 		await req('PUT', '/api/links/nodes', { nodes: [...keep8, { ...entries[0] }, { ...entries[1], highlight: true }, entries[2]] }, C);
 		pgd = await req('GET', '/~vee');
-		check('with a highlight: highlights first, then an All group with everything', /Newer 261001[^]*>All<\/summary>[^]*Newer 261001[^]*Older 260901/.test(pgd.text));
+		check('with a highlight: highlights first, then an All group with everything', /Newer <span class="d">261001[^]*>All<\/summary>[^]*Newer <span class="d">261001[^]*Older <span class="d">260901/.test(nav(pgd.text)));
+		check('dates are set apart in a lighter weight', nav(pgd.text).includes('<span class="d">2609</span>'));
 		const hl = await req('GET', '/~vee/diary?view=highlights');
 		check('the diary page can show highlights only', hl.text.includes('Newer') && !hl.text.includes('Older'));
 		const hubp = await req('PUT', '/api/links/profile', { name: 'Vee Volunteer', bio: 'Builds things', hub_icon: 'flask', hub_tint: '#123456', hub_zoom: 1.4 }, C);

@@ -119,6 +119,10 @@ export async function saveProfile(ctx: Ctx): Promise<Response> {
 	const hubTint = str(b.hub_tint, 7);
 	if (hubIcon && !ICON_KEYS.includes(hubIcon)) return fail('Unknown picture for the centre');
 	if (!TINT_RE.test(hubTint)) return fail('The centre colour must be like #3f9c00');
+	const hubDkIcon = str(b.hub_dk_icon, 40);
+	const hubDkTint = str(b.hub_dk_tint, 7);
+	if (hubDkIcon && !ICON_KEYS.includes(hubDkIcon)) return fail('Unknown dark-mode picture for the centre');
+	if (!TINT_RE.test(hubDkTint)) return fail('The centre dark-mode colour must be like #3f9c00');
 	const before = await imagesInUse(ctx.env.DB, p.id);
 	await ctx.env.DB.batch([
 		ctx.env.DB.prepare('UPDATE lp_people SET name = ?, bio = ?, photo = ?, basic_mode = ?, diary_default = ?, updated_at = ? WHERE id = ?').bind(
@@ -134,6 +138,10 @@ export async function saveProfile(ctx: Ctx): Promise<Response> {
 			`INSERT INTO lp_page_meta (person_id, accent, hub_icon, hub_tint, hub_zoom) VALUES (?, ?, ?, ?, ?)
 			 ON CONFLICT(person_id) DO UPDATE SET accent = excluded.accent, hub_icon = excluded.hub_icon, hub_tint = excluded.hub_tint, hub_zoom = excluded.hub_zoom`,
 		).bind(p.id, accent.toLowerCase(), hubIcon, hubTint.toLowerCase(), cleanZoom(b.hub_zoom)),
+		ctx.env.DB.prepare(
+			`INSERT INTO lp_page_dark (person_id, linked, icon, tint, zoom) VALUES (?, ?, ?, ?, ?)
+			 ON CONFLICT(person_id) DO UPDATE SET linked = excluded.linked, icon = excluded.icon, tint = excluded.tint, zoom = excluded.zoom`,
+		).bind(p.id, b.hub_dk_linked === false || b.hub_dk_linked === 0 ? 0 : 1, hubDkIcon, hubDkTint.toLowerCase(), cleanZoom(b.hub_dk_zoom)),
 	]);
 	forgetImages(ctx, before, await imagesInUse(ctx.env.DB, p.id));
 	return json({ ok: true });
@@ -153,6 +161,10 @@ interface InNode {
 	zoom?: number;
 	day?: string;
 	highlight?: boolean | number;
+	dk_linked?: boolean | number;
+	dk_icon?: string;
+	dk_tint?: string;
+	dk_zoom?: number;
 }
 
 const slugify = (s: string) =>
@@ -198,6 +210,8 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 		if (n.id != null && !existingById.has(n.id)) return fail('The page data is out of date; please reload the editor');
 		if (n.icon && !ICON_KEYS.includes(n.icon)) n.icon = '';
 		if (!TINT_RE.test(String(n.tint ?? ''))) return fail(`The colour for "${label}" must be like #3f9c00`);
+		if (n.dk_icon && !ICON_KEYS.includes(n.dk_icon)) n.dk_icon = '';
+		if (!TINT_RE.test(String(n.dk_tint ?? ''))) return fail(`The dark-mode colour for "${label}" must be like #3f9c00`);
 		if (!/^(|\d{2}|\d{4}|\d{6})$/.test(String(n.day ?? ''))) return fail(`The date for "${label}" must be YY, YYMM or YYMMDD, like 2608 or 260822`);
 		if (!okImage(str(n.image, 300), p.handle)) return fail(`The image for "${label}" is not one of your uploads`);
 		keys.set(n.key, n);
@@ -216,7 +230,7 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 	for (const n of list) {
 		const d = depth(n);
 		if (d === Infinity) return fail('The page data is muddled; please reload the editor');
-		if (d > 4) return fail('Groups can go five levels deep at most');
+		if (d > 30) return fail('Items can go thirty levels deep at most');
 	}
 
 	// New items get a slug that has never been used on this page, so old clicks never land on a new link.
@@ -268,10 +282,18 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 			)
 			.bind(idOf.get(n.key)!, String(n.tint ?? '').toLowerCase(), cleanZoom(n.zoom), String(n.day ?? ''), n.highlight ? 1 : 0),
 	);
+	const darks = list.map((n) =>
+		db
+			.prepare(
+				`INSERT INTO lp_node_dark (node_id, linked, icon, tint, zoom) VALUES (?, ?, ?, ?, ?)
+				 ON CONFLICT(node_id) DO UPDATE SET linked = excluded.linked, icon = excluded.icon, tint = excluded.tint, zoom = excluded.zoom`,
+			)
+			.bind(idOf.get(n.key)!, n.dk_linked === false || n.dk_linked === 0 ? 0 : 1, n.dk_icon ?? '', String(n.dk_tint ?? '').toLowerCase(), cleanZoom(n.dk_zoom)),
+	);
 	const deletes = existing.filter((r) => !keep.has(r.id)).map((r) => db.prepare('DELETE FROM lp_nodes WHERE id = ? AND person_id = ?').bind(r.id, p.id));
 	const imagesBefore = await imagesInUse(db, p.id);
 	try {
-		await db.batch([...updates, ...styles, ...deletes, db.prepare('UPDATE lp_people SET updated_at = ? WHERE id = ?').bind(nowIso(), p.id)]);
+		await db.batch([...updates, ...styles, ...darks, ...deletes, db.prepare('UPDATE lp_people SET updated_at = ? WHERE id = ?').bind(nowIso(), p.id)]);
 	} catch (e) {
 		if (fresh.length) await db.batch(fresh.map((n) => db.prepare('DELETE FROM lp_nodes WHERE id = ? AND person_id = ?').bind(idOf.get(n.key)!, p.id))).catch(() => {});
 		throw e;

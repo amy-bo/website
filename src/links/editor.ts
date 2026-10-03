@@ -23,6 +23,11 @@ interface ENode {
 	/** Optional short date (YY, YYMM, YYMMDD) and highlight, for diary entries. */
 	day: string;
 	highlight: number;
+	/** Dark-mode picture: used when dk_linked is 0. */
+	dk_linked: number;
+	dk_icon: string;
+	dk_tint: string;
+	dk_zoom: number;
 	children: ENode[];
 	collapsed?: boolean;
 	/** The last address the server accepted; used while the one being typed isn't valid yet. */
@@ -42,6 +47,10 @@ interface Person {
 	hub_icon: string;
 	hub_tint: string;
 	hub_zoom: number;
+	hub_dk_linked: number;
+	hub_dk_icon: string;
+	hub_dk_tint: string;
+	hub_dk_zoom: number;
 }
 
 interface MeResponse {
@@ -152,7 +161,7 @@ const flatten = () => {
 				if (!n.savedUrl) return;
 				url = n.savedUrl;
 			}
-			out.push({ id: n.id, key: n.key, parent, kind: n.kind, label: n.label.trim() || 'Untitled', url, icon: n.icon, image: n.image, body: n.body, tint: n.tint, zoom: n.zoom, day: n.day, highlight: !!n.highlight } as never);
+			out.push({ id: n.id, key: n.key, parent, kind: n.kind, label: n.label.trim() || 'Untitled', url, icon: n.icon, image: n.image, body: n.body, tint: n.tint, zoom: n.zoom, day: n.day, highlight: !!n.highlight, dk_linked: n.dk_linked, dk_icon: n.dk_icon, dk_tint: n.dk_tint, dk_zoom: n.dk_zoom } as never);
 			add(n.children, n.key);
 		});
 	add(S.tree, null);
@@ -207,6 +216,10 @@ function preview() {
 				zoom: n.zoom,
 				day: n.day,
 				highlight: n.highlight,
+				dk_linked: n.dk_linked,
+				dk_icon: n.dk_icon,
+				dk_tint: n.dk_tint,
+				dk_zoom: n.dk_zoom,
 				children: n.children.map((c) => toLink(c, myId)),
 			};
 		};
@@ -392,7 +405,44 @@ function act(a: string, n: ENode) {
 		toast(`Deleted ${n.label}`);
 	}
 	changed(true);
-	requestAnimationFrame(() => document.querySelector<HTMLElement>(`.row[data-key="${n.key}"] .more`)?.focus());
+	requestAnimationFrame(() => document.querySelector<HTMLElement>(`.row[data-key="${n.key}"] ${keyboardMove ? '.lbl' : '.more'}`)?.focus());
+	keyboardMove = false;
+}
+let keyboardMove = false;
+
+/** Outliner keys in a row's name field: Tab and Shift+Tab move it into the group above or out of its group;
+ * Option/Alt with the up and down arrows moves it among its neighbours; Enter starts a new item below it. */
+function onTreeKey(e: KeyboardEvent) {
+	const t = e.target as HTMLElement;
+	if (!t.matches('.lbl')) return;
+	const row = t.closest<HTMLElement>('.row');
+	if (!row) return;
+	const f = find(row.dataset.key!);
+	if (!f) return;
+	const n = f.node;
+	let a = '';
+	if (e.key === 'Tab') a = e.shiftKey ? 'outdent' : 'indent';
+	else if (e.altKey && e.key === 'ArrowUp') a = 'up';
+	else if (e.altKey && e.key === 'ArrowDown') a = 'down';
+	else if (e.key === 'Enter' && !e.shiftKey) {
+		e.preventDefault();
+		const fresh: ENode = { key: newKey(), kind: 'text', label: '', url: '', icon: 'text', image: '', body: '', seed: 0, tint: '', zoom: 1, day: f.parent?.kind === 'diary' ? today() : '', highlight: 0, dk_linked: 1, dk_icon: '', dk_tint: '', dk_zoom: 1, children: [] };
+		f.list.splice(f.list.indexOf(n) + 1, 0, fresh);
+		changed(true);
+		requestAnimationFrame(() => document.querySelector<HTMLElement>(`.row[data-key="${fresh.key}"] .lbl`)?.focus());
+		return;
+	}
+	if (!a) return;
+	e.preventDefault();
+	const i = f.list.indexOf(n);
+	const prev = f.list[i - 1];
+	if (a === 'indent' && prev?.kind !== 'group' && prev?.kind !== 'diary') {
+		toast('Tab moves an item into the group just above it');
+		return;
+	}
+	if (a === 'outdent' && !f.parent) return;
+	keyboardMove = true;
+	act(a, n);
 }
 
 // Drag and drop: drop on the top or bottom half of a row to go before or after it; on the middle of a group to go inside.
@@ -503,6 +553,65 @@ interface Proposal {
 	favicon?: string;
 }
 
+type Mode = 'light' | 'dark';
+const MODE_COLOURS = {
+	light: { bg: '#f6f8f4', node: '#ffffff', line: '#d8e2cf', ink: '#16210f', accent: '#1d6b00' },
+	dark: { bg: '#0b1208', node: '#142010', line: '#24361d', ink: '#e6f0df', accent: '#b7e27c' },
+};
+
+const lum = (hex: string) => {
+	const n = parseInt(hex.replace('#', ''), 16);
+	return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255).reduce((a, v, i) => a + [0.2126, 0.7152, 0.0722][i] * (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4), 0);
+};
+
+/** Exactly how a picture looks on the page in one mode: page background, the node's circle, and its picture with the
+ * same colour rules the page uses (brand colours adjusted for the background, logos inverted for dark when linked). */
+function previewSvg(n: ENode, mode: Mode): string {
+	const c = MODE_COLOURS[mode];
+	const own = mode === 'dark' && n.dk_linked === 0;
+	const key = (own ? n.dk_icon : '') || n.icon || (n.kind === 'diary' ? 'diary' : n.kind === 'support' ? 'heart' : n.kind === 'text' ? 'text' : n.kind === 'group' ? 'folder' : 'link');
+	const tint = own ? n.dk_tint : n.tint;
+	const z = Math.min(2.4, Math.max(0.6, (own ? n.dk_zoom : n.zoom) || 1));
+	const r = 22;
+	const id = `pv${mode}${Math.random().toString(36).slice(2, 7)}`;
+	const single = tint === 'mono' ? c.ink : /^#[0-9a-f]{6}$/i.test(tint) ? tint : '';
+	let pic = '';
+	if (n.image) {
+		pic = `<clipPath id="${id}c"><circle cx="32" cy="32" r="${r - 1.5}"/></clipPath><image href="${esc(mediaUrl(n.image))}" x="${32 - r * z}" y="${32 - r * z}" width="${2 * r * z}" height="${2 * r * z}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id}c)"/>`;
+	} else {
+		const i = icon(key);
+		if (i.logo) {
+			const l = i.logo;
+			const bg = l.bg ? `<circle cx="32" cy="32" r="${r - 1}" fill="${l.bg}"/>` : '';
+			if (l.cover) {
+				const s2 = (r * 2 - 3) * z;
+				pic = `<clipPath id="${id}c"><circle cx="32" cy="32" r="${r - 1.5}"/></clipPath><image href="${esc(l.src)}" x="${32 - s2 / 2}" y="${32 - s2 / 2}" width="${s2}" height="${s2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id}c)"/>`;
+			} else {
+				const w = r * (l.scale ?? 1.3) * z;
+				const filt = single
+					? `<filter id="${id}f" color-interpolation-filters="sRGB"><feFlood flood-color="${single}"/><feComposite in2="SourceAlpha" operator="in"/></filter>`
+					: '';
+				const style = !single && l.invert && mode === 'dark' && !own ? ' style="filter:invert(1) hue-rotate(180deg) brightness(1.15)"' : '';
+				pic = `${filt}${bg}<image href="${esc(l.src)}" x="${32 - w / 2}" y="${32 - w / 2}" width="${w}" height="${w}" preserveAspectRatio="xMidYMid meet"${single ? ` filter="url(#${id}f)"` : ''}${style}/>`;
+			}
+		} else {
+			const s2 = r * 1.05 * z;
+			let colour = single;
+			if (!colour) {
+				if (i.brand && i.hex) {
+					const L = lum(i.hex);
+					colour = mode === 'light' ? (L > 0.55 ? c.ink : `#${i.hex}`) : L < 0.12 ? c.ink : `#${i.hex}`;
+				} else colour = c.accent;
+			}
+			const paint = i.brand ? `fill="${colour}"` : `fill="none" stroke="${colour}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"`;
+			pic = `<svg x="${32 - s2 / 2}" y="${32 - s2 / 2}" width="${s2}" height="${s2}" viewBox="0 0 24 24" ${paint}>${i.svg.replace(/fill="currentColor"/g, `fill="${colour}"`)}</svg>`;
+		}
+	}
+	return `<svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="12" fill="${c.bg}"/><circle cx="32" cy="32" r="${r}" fill="${c.node}" stroke="${c.line}" stroke-width="1.5"/>${pic}</svg>`;
+}
+
+/** The picture dialog. Light and dark each show live; click one to edit it. The chain between them links dark to
+ * light; unlinking gives dark its own picture, colour and size, and relinking keeps those for next time. */
 function pickPicture(n: ENode, suggestions: Proposal | null = null, onChange: () => void = () => changed(true), uploadSize = 256): Promise<void> {
 	return new Promise((resolve) => {
 		const dlg = $<HTMLDialogElement>('#picker');
@@ -510,47 +619,73 @@ function pickPicture(n: ENode, suggestions: Proposal | null = null, onChange: ()
 		const search = $<HTMLInputElement>('#icon-search', dlg);
 		const sug = $('#suggested', dlg);
 		$('#picker-title', dlg).textContent = `Picture for "${n.label || 'this link'}"`;
+		let mode: Mode = 'light';
+		const own = () => mode === 'dark' && n.dk_linked === 0;
+		// Values for the mode being edited.
+		const cur = () => (own() ? { icon: n.dk_icon || n.icon, tint: n.dk_tint, zoom: n.dk_zoom } : { icon: n.icon, tint: n.tint, zoom: n.zoom });
+		const unlink = () => {
+			if (n.dk_linked === 0) return;
+			n.dk_linked = 0;
+			// First time apart: dark starts as a copy of light. Later, it keeps what was chosen for it.
+			if (!n.dk_icon && !n.dk_tint && (n.dk_zoom || 1) === 1) {
+				n.dk_icon = n.icon;
+				n.dk_tint = n.tint;
+				n.dk_zoom = n.zoom;
+			}
+		};
+		const set = (patch: { icon?: string; tint?: string; zoom?: number }) => {
+			if (mode === 'dark') {
+				unlink();
+				if (patch.icon !== undefined) n.dk_icon = patch.icon;
+				if (patch.tint !== undefined) n.dk_tint = patch.tint;
+				if (patch.zoom !== undefined) n.dk_zoom = patch.zoom;
+			} else Object.assign(n, patch);
+		};
+		const drawModes = () => {
+			$('#pv-light', dlg).innerHTML = previewSvg(n, 'light');
+			$('#pv-dark', dlg).innerHTML = previewSvg(n, 'dark');
+			dlg.querySelectorAll<HTMLElement>('.mode').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
+			const chain = $('#chain', dlg);
+			chain.setAttribute('aria-pressed', String(n.dk_linked !== 0));
+			chain.title = n.dk_linked !== 0 ? 'Light and dark are linked: dark follows light. Click to give dark its own.' : 'Dark has its own picture. Click to link it to light again (its own choices are kept).';
+			chain.classList.toggle('broken', n.dk_linked === 0);
+			$('#pick-mode-note', dlg).textContent = mode === 'dark' ? (n.dk_linked === 0 ? 'Editing dark mode' : 'Editing dark mode: a change gives dark its own picture') : 'Editing light mode';
+		};
 		const drawGrid = () => {
 			const q = search.value.trim().toLowerCase();
+			const c = cur();
 			grid.innerHTML = S.icons
 				.filter((k) => !q || k.includes(q) || icon(k).title.toLowerCase().includes(q))
 				.slice(0, 160)
-				.map((k) => `<button type="button" class="ichoice${!n.image && n.icon === k ? ' on' : ''}" data-icon="${esc(k)}" title="${esc(icon(k).title)}">${tileHtml({ icon: k, image: '', tint: n.tint })}</button>`)
+				.map((k) => `<button type="button" class="ichoice${!n.image && c.icon === k ? ' on' : ''}" data-icon="${esc(k)}" title="${esc(icon(k).title)}">${tileHtml({ icon: k, image: '', tint: c.tint })}</button>`)
 				.join('');
 		};
-		search.value = '';
-		drawGrid();
-		const guess = guessIcon(n.url);
-		const sugg: string[] = [`<button type="button" class="sugg" data-icon="${esc(guess)}">${tileHtml({ icon: guess, image: '' })}<span>${esc(icon(guess).title)} icon</span></button>`];
-		if (S.uploads && suggestions?.favicon) sugg.push(`<button type="button" class="sugg" data-remote="${esc(suggestions.favicon)}" data-fit="1"><img src="/api/links/remote-image?url=${encodeURIComponent(suggestions.favicon)}" alt=""><span>The site's icon</span></button>`);
-		if (S.uploads && suggestions?.image) sugg.push(`<button type="button" class="sugg" data-remote="${esc(suggestions.image)}"><img src="/api/links/remote-image?url=${encodeURIComponent(suggestions.image)}" alt=""><span>The site's picture</span></button>`);
-		sug.innerHTML = sugg.join('');
-		$('#pick-upload', dlg).hidden = !S.uploads;
-		// Colour and size for this item's picture: original colours, or a single colour (the page's text colour,
-		// which adapts to light and dark, or one fixed colour).
-		const logo = !n.image ? icon(n.icon).logo : undefined;
-		const canSingle = !n.image && !(logo && logo.cover);
-		$('#tint-single-wrap', dlg).hidden = !canSingle;
-		const isSingle = canSingle && !!n.tint;
-		for (const r of dlg.querySelectorAll<HTMLInputElement>('input[name="tint"]')) r.checked = r.value === (isSingle ? 'single' : 'orig');
 		const colour = $<HTMLInputElement>('#tint-colour', dlg);
 		const hex = $<HTMLInputElement>('#tint-hex', dlg);
 		const textBtn = $<HTMLInputElement>('#tint-text', dlg);
-		const fixed = /^#[0-9a-f]{6}$/i.test(n.tint);
-		colour.value = hex.value = fixed ? n.tint : '#3f9c00';
-		textBtn.checked = n.tint === 'mono' || !fixed;
 		const zoom = $<HTMLInputElement>('#pick-zoom', dlg);
-		zoom.value = String(n.zoom || 1);
-		const restyle = () => {
-			const single = dlg.querySelector<HTMLInputElement>('input[name="tint"]:checked')?.value === 'single';
-			n.tint = !single ? '' : textBtn.checked ? 'mono' : /^#[0-9a-f]{6}$/i.test(hex.value) ? hex.value.toLowerCase() : 'mono';
-			n.zoom = Number(zoom.value) || 1;
+		const syncControls = () => {
+			const c = cur();
+			const logo = !n.image ? icon(c.icon).logo : undefined;
+			const canSingle = !n.image && !(logo && logo.cover);
+			$('#tint-single-wrap', dlg).hidden = !canSingle;
+			for (const r of dlg.querySelectorAll<HTMLInputElement>('input[name="tint"]')) r.checked = r.value === (canSingle && c.tint ? 'single' : 'orig');
+			const fixed = /^#[0-9a-f]{6}$/i.test(c.tint);
+			colour.value = hex.value = fixed ? c.tint : '#3f9c00';
+			textBtn.checked = c.tint === 'mono' || !fixed;
+			zoom.value = String(c.zoom || 1);
+		};
+		const refresh = () => {
+			drawModes();
 			drawGrid();
 			onChange();
 		};
-		const pickSingle = () => {
-			(dlg.querySelector('input[name="tint"][value="single"]') as HTMLInputElement).checked = true;
+		const restyle = () => {
+			const single = dlg.querySelector<HTMLInputElement>('input[name="tint"]:checked')?.value === 'single';
+			set({ tint: !single ? '' : textBtn.checked ? 'mono' : /^#[0-9a-f]{6}$/i.test(hex.value) ? hex.value.toLowerCase() : 'mono', zoom: Number(zoom.value) || 1 });
+			refresh();
 		};
+		const pickSingle = () => ((dlg.querySelector('input[name="tint"][value="single"]') as HTMLInputElement).checked = true);
 		dlg.querySelectorAll<HTMLInputElement>('input[name="tint"]').forEach((r) => (r.onchange = restyle));
 		textBtn.onchange = () => {
 			pickSingle();
@@ -570,45 +705,62 @@ function pickPicture(n: ENode, suggestions: Proposal | null = null, onChange: ()
 			restyle();
 		};
 		zoom.oninput = restyle;
-		const done = () => {
+
+		search.value = '';
+		const guess = guessIcon(n.url);
+		const sugg: string[] = [`<button type="button" class="sugg" data-icon="${esc(guess)}">${tileHtml({ icon: guess, image: '' })}<span>${esc(icon(guess).title)} icon</span></button>`];
+		if (S.uploads && suggestions?.favicon) sugg.push(`<button type="button" class="sugg" data-remote="${esc(suggestions.favicon)}" data-fit="1"><img src="/api/links/remote-image?url=${encodeURIComponent(suggestions.favicon)}" alt=""><span>The site's icon</span></button>`);
+		if (S.uploads && suggestions?.image) sugg.push(`<button type="button" class="sugg" data-remote="${esc(suggestions.image)}"><img src="/api/links/remote-image?url=${encodeURIComponent(suggestions.image)}" alt=""><span>The site's picture</span></button>`);
+		sug.innerHTML = sugg.join('');
+		$('#pick-upload', dlg).hidden = !S.uploads;
+		syncControls();
+		drawModes();
+		drawGrid();
+
+		const finish = () => {
 			dlg.close();
-			onChange();
 			resolve();
 		};
-		const onClick = async (e: Event) => {
+		dlg.onclick = async (e: Event) => {
 			const b = (e.target as HTMLElement).closest<HTMLElement>('button');
 			if (!b) return;
-			if (b.dataset.icon) {
-				n.icon = b.dataset.icon;
-				n.image = '';
-				done();
+			if (b.dataset.mode) {
+				mode = b.dataset.mode as Mode;
+				syncControls();
+				drawModes();
+				drawGrid();
+			} else if (b.id === 'chain') {
+				if (n.dk_linked === 0) n.dk_linked = 1;
+				else unlink();
+				syncControls();
+				refresh();
+			} else if (b.dataset.icon) {
+				set({ icon: b.dataset.icon });
+				if (mode === 'light') n.image = '';
+				syncControls();
+				refresh();
 			} else if (b.dataset.remote) {
 				b.classList.add('busy');
 				try {
 					n.image = await fromRemote(b.dataset.remote, 256, !b.dataset.fit);
-					done();
+					refresh();
 				} catch (err) {
 					toast((err as Error).message, 'err');
-					b.classList.remove('busy');
 				}
-			} else if (b.id === 'pick-close') {
-				dlg.close();
-				resolve();
-			}
+				b.classList.remove('busy');
+			} else if (b.id === 'pick-close' || b.id === 'pick-done') finish();
 		};
-		const onFile = async (e: Event) => {
+		$<HTMLInputElement>('#pick-file', dlg).onchange = async (e: Event) => {
 			const file = (e.target as HTMLInputElement).files?.[0];
 			if (!file) return;
 			try {
 				n.image = await uploadBlob(file, uploadSize);
-				done();
+				refresh();
 			} catch (err) {
 				toast((err as Error).message, 'err');
 			}
 		};
 		search.oninput = drawGrid;
-		dlg.onclick = onClick;
-		$<HTMLInputElement>('#pick-file', dlg).onchange = onFile;
 		dlg.onclose = () => resolve();
 		dlg.showModal();
 		search.focus();
@@ -624,7 +776,7 @@ function addLink(into: ENode | null) {
 	const tile = $('#a-tile', dlg);
 	const hint = $('#a-hint', dlg);
 	let prop: Proposal | null = null;
-	const n: ENode = { key: newKey(), kind: 'link', label: '', url: '', icon: 'link', image: '', body: '', seed: 0, tint: '', zoom: 1, day: '', highlight: 0, children: [] };
+	const n: ENode = { key: newKey(), kind: 'link', label: '', url: '', icon: 'link', image: '', body: '', seed: 0, tint: '', zoom: 1, day: '', highlight: 0, dk_linked: 1, dk_icon: '', dk_tint: '', dk_zoom: 1, children: [] };
 	url.value = '';
 	name.value = '';
 	tile.innerHTML = tileHtml(n);
@@ -694,7 +846,7 @@ function addLink(into: ENode | null) {
 function addSpecial(kind: 'group' | 'text' | 'diary' | 'support') {
 	const labels = { group: 'New group', text: 'New text', diary: 'AMYBO diary', support: 'How I support AMYBO' };
 	const icons = { group: '', text: 'text', diary: 'diary', support: 'heart' };
-	const n: ENode = { key: newKey(), kind, label: labels[kind], url: '', icon: icons[kind], image: '', body: '', seed: 0, tint: '', zoom: 1, day: '', highlight: 0, children: [] };
+	const n: ENode = { key: newKey(), kind, label: labels[kind], url: '', icon: icons[kind], image: '', body: '', seed: 0, tint: '', zoom: 1, day: '', highlight: 0, dk_linked: 1, dk_icon: '', dk_tint: '', dk_zoom: 1, children: [] };
 	S.tree.push(n);
 	changed(true);
 	requestAnimationFrame(() => {
@@ -730,7 +882,7 @@ async function load() {
 	S.icons = me.icons;
 	S.stats = new Map(me.stats.map((s) => [s.slug, s]));
 	const tree = buildTree(me.nodes as Omit<LinkNode, 'children'>[]);
-	const conv = (n: LinkNode): ENode => ({ key: newKey(), id: n.id, slug: n.slug, kind: n.kind, label: n.label, url: n.url, savedUrl: n.url, icon: n.icon, image: n.image, body: n.body, seed: n.seed, tint: n.tint || '', zoom: n.zoom || 1, day: n.day || '', highlight: n.highlight || 0, children: n.children.map(conv) });
+	const conv = (n: LinkNode): ENode => ({ key: newKey(), id: n.id, slug: n.slug, kind: n.kind, label: n.label, url: n.url, savedUrl: n.url, icon: n.icon, image: n.image, body: n.body, seed: n.seed, tint: n.tint || '', zoom: n.zoom || 1, day: n.day || '', highlight: n.highlight || 0, dk_linked: n.dk_linked ?? 1, dk_icon: n.dk_icon || '', dk_tint: n.dk_tint || '', dk_zoom: n.dk_zoom || 1, children: n.children.map(conv) });
 	S.tree = tree.map(conv);
 	renderProfile();
 	renderTree();
@@ -790,7 +942,7 @@ function init() {
 	$('#p-photo').addEventListener('click', async () => {
 		// The centre has the same picture options as any item: a photo, an icon or a logo, a colour and a size.
 		const p = S.person!;
-		const proxy: ENode = { key: 'hub', kind: 'link', label: p.name, url: '', icon: p.hub_icon, image: p.hub_icon ? '' : p.photo, body: '', seed: 0, tint: p.hub_tint, zoom: p.hub_zoom || 1, day: '', highlight: 0, children: [] };
+		const proxy: ENode = { key: 'hub', kind: 'link', label: p.name, url: '', icon: p.hub_icon, image: p.hub_icon ? '' : p.photo, body: '', seed: 0, tint: p.hub_tint, zoom: p.hub_zoom || 1, day: '', highlight: 0, dk_linked: 1, dk_icon: '', dk_tint: '', dk_zoom: 1, children: [] };
 		await pickPicture(proxy, null, () => {
 			if (proxy.image) {
 				p.photo = proxy.image;
@@ -798,6 +950,10 @@ function init() {
 			} else p.hub_icon = proxy.icon;
 			p.hub_tint = proxy.tint;
 			p.hub_zoom = proxy.zoom;
+			p.hub_dk_linked = proxy.dk_linked;
+			p.hub_dk_icon = proxy.dk_icon;
+			p.hub_dk_tint = proxy.dk_tint;
+			p.hub_dk_zoom = proxy.dk_zoom;
 			renderProfile();
 			preview();
 			later('profile', saveProfile, 300);
@@ -838,6 +994,7 @@ function init() {
 	// tree
 	const tree = $('#tree');
 	tree.addEventListener('input', onTreeInput);
+	tree.addEventListener('keydown', onTreeKey);
 	tree.addEventListener('click', (e) => {
 		const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
 		const row = b?.closest<HTMLElement>('.row');
@@ -897,7 +1054,7 @@ async function saveProfile() {
 	const send = async () => {
 		const p = S.person;
 		if (!p) return;
-		await api('profile', { method: 'PUT', body: { name: p.name, bio: p.bio, photo: p.photo, basic_mode: !!p.basic_mode, diary_default: p.diary_default, accent: p.accent, hub_icon: p.hub_icon, hub_tint: p.hub_tint, hub_zoom: p.hub_zoom } });
+		await api('profile', { method: 'PUT', body: { name: p.name, bio: p.bio, photo: p.photo, basic_mode: !!p.basic_mode, diary_default: p.diary_default, accent: p.accent, hub_icon: p.hub_icon, hub_tint: p.hub_tint, hub_zoom: p.hub_zoom, hub_dk_linked: p.hub_dk_linked, hub_dk_icon: p.hub_dk_icon, hub_dk_tint: p.hub_dk_tint, hub_dk_zoom: p.hub_dk_zoom } });
 	};
 	profileSaving = (profileSaving ?? Promise.resolve()).catch(() => {}).then(send);
 	await profileSaving;

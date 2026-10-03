@@ -15,6 +15,22 @@ CREATE TABLE IF NOT EXISTS lp_page_meta (
 	hub_tint TEXT NOT NULL DEFAULT '',
 	hub_zoom REAL NOT NULL DEFAULT 1
 );
+-- A picture's dark-mode version. While linked it follows the light one; unlinking uses these, and relinking
+-- keeps them for next time.
+CREATE TABLE IF NOT EXISTS lp_node_dark (
+	node_id INTEGER PRIMARY KEY REFERENCES lp_nodes(id) ON DELETE CASCADE,
+	linked INTEGER NOT NULL DEFAULT 1,
+	icon TEXT NOT NULL DEFAULT '',
+	tint TEXT NOT NULL DEFAULT '',
+	zoom REAL NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS lp_page_dark (
+	person_id INTEGER PRIMARY KEY REFERENCES lp_people(id) ON DELETE CASCADE,
+	linked INTEGER NOT NULL DEFAULT 1,
+	icon TEXT NOT NULL DEFAULT '',
+	tint TEXT NOT NULL DEFAULT '',
+	zoom REAL NOT NULL DEFAULT 1
+);
 
 -- Martin's "Email" group held one link; it becomes that link, named Email, where the group was. Runs once.
 UPDATE lp_nodes SET parent_id = NULL, label = 'Email',

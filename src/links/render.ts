@@ -121,8 +121,6 @@ function visible(nodes: LinkNode[], ctx: Ctx): LinkNode[] {
 	return out;
 }
 
-/** A title with its short date, if it has one ("First anode test 260822"). */
-const dated = (n: LinkNode) => (n.day ? `${n.label} ${n.day}` : n.label);
 
 /** A diary's items, newest first, with their dates in the title. If any are highlights, the diary shows those
  * first and an "All" group with every entry. Anything else keeps its own order. */
@@ -130,12 +128,12 @@ function withDiary(nodes: LinkNode[]): LinkNode[] {
 	return nodes.map((n) => {
 		const children = withDiary(n.children);
 		if (n.kind !== 'diary') return { ...n, children };
-		const entries = children.map((c) => ({ ...c, label: dated(c) })).sort(byDate);
+		const entries = [...children].sort(byDate);
 		const highlights = entries.filter((e) => e.highlight);
 		if (!highlights.length) return { ...n, children: entries };
 		const all: LinkNode = {
 			id: -2_000_000 - n.id, parent_id: n.id, kind: 'group', slug: `${n.slug}-all`, label: 'All', url: '', icon: 'diary', image: '',
-			body: '', seed: 0, position: 0, tint: '', zoom: 1, day: '', highlight: 0,
+			body: '', seed: 0, position: 0, tint: '', zoom: 1, day: '', highlight: 0, dk_linked: 1, dk_icon: '', dk_tint: '', dk_zoom: 1,
 			children: entries.map((e) => ({ ...e, id: -3_000_000 - e.id, parent_id: -2_000_000 - n.id })),
 		};
 		return { ...n, children: [...highlights, all] };
@@ -150,6 +148,9 @@ const hrefOf = (n: LinkNode, ctx: Ctx) =>
 
 // ---- the list: plain text, a twisty for each group ----
 
+/** A title, with its short date after it in a lighter weight if it has one. */
+const titled = (n: LinkNode) => `${esc(n.label)}${n.day ? ` <span class="d">${esc(n.day)}</span>` : ''}`;
+
 function renderList(nodes: LinkNode[], ctx: Ctx, level = 'root'): string {
 	const tgt = ctx.preview ? ' target="_blank" rel="noopener"' : '';
 	// Twisties sharing a name open one at a time (the browser does it), matching the map's one branch at a time.
@@ -157,10 +158,10 @@ function renderList(nodes: LinkNode[], ctx: Ctx, level = 'root'): string {
 	return nodes
 		.map((n) => {
 			if (opens(n))
-				return `<li><details${nm}><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${esc(n.label)}</summary><ul>${renderList(n.children, ctx, String(n.id))}</ul></details></li>`;
+				return `<li><details${nm}><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${titled(n)}</summary><ul>${renderList(n.children, ctx, String(n.id))}</ul></details></li>`;
 			if (n.kind === 'support' || n.kind === 'text')
-				return `<li><details${nm} id="l-note-${n.id}"><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${esc(n.label)}</summary><div class="note">${formatText(n.body)}</div></details></li>`;
-			return `<li><a data-n="${n.id}" href="${esc(hrefOf(n, ctx))}"${n.kind === 'link' ? tgt : ''}>${esc(n.label)}</a></li>`;
+				return `<li><details${nm} id="l-note-${n.id}"><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${titled(n)}</summary><div class="note">${formatText(n.body)}</div></details></li>`;
+			return `<li><a data-n="${n.id}" href="${esc(hrefOf(n, ctx))}"${n.kind === 'link' ? tgt : ''}>${titled(n)}</a></li>`;
 		})
 		.join('');
 }
@@ -239,7 +240,7 @@ function tintFilters(tints: Set<string>): string {
 }
 
 /** A node's picture, centred on (x, y). `uid` keeps clip-path ids unique; `zoom` sizes the picture in its circle. */
-function iconMarkup(key: string, x: number, y: number, r: number, uid: string | number = '', tint = '', zoom = 1): string {
+function iconMarkup(key: string, x: number, y: number, r: number, uid: string | number = '', tint = '', zoom = 1, forDark = false): string {
 	const i = icon(key);
 	const z = Math.min(2.4, Math.max(0.6, zoom || 1));
 	if (i.logo) {
@@ -254,11 +255,19 @@ function iconMarkup(key: string, x: number, y: number, r: number, uid: string | 
 		// colour recolours the logo's shape (its transparent background stays clear).
 		const w = r * (l.scale ?? 1.3) * z;
 		const single = tintFilterId(tint);
-		const cls = !single && l.invert ? ' class="inv"' : '';
+		const cls = !single && l.invert && !forDark ? ' class="inv"' : '';
 		return `${bg}<image href="${esc(l.src)}" x="${round(x - w / 2)}" y="${round(y - w / 2)}" width="${round(w)}" height="${round(w)}" preserveAspectRatio="xMidYMid meet"${cls}${single ? ` filter="url(#${single})"` : ''}/>`;
 	}
 	const s = round(r * 1.05 * z);
 	return `<use href="#i-${esc(key)}" class="${i.brand ? 'ib' : 'il'}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${s}" height="${s}"${tintStyle(key, tint)}/>`;
+}
+
+/** A node's picture for both modes: one drawing while light and dark are linked; two (one shown per mode) when not. */
+function picture(n: LinkNode, x: number, y: number, r: number, uid: string): string {
+	const light = iconMarkup(nodeIcon(n), x, y, r, uid, n.tint, n.zoom);
+	if (n.dk_linked !== 0) return light;
+	const dark = iconMarkup(n.dk_icon || nodeIcon(n), x, y, r, `${uid}d`, n.dk_tint, n.dk_zoom, true);
+	return `<g class="lt">${light}</g><g class="dk">${dark}</g>`;
 }
 
 /** Small dots on the far side of a group from its parent, one per item it holds: groups open, everything else is
@@ -270,10 +279,12 @@ function halo(n: LinkNode, x: number, y: number, r: number, angle = 0): string {
 	const ring = r + 8;
 	const step = k > 1 ? Math.min(0.42, Math.PI / (k - 1)) : 0;
 	const dot = round(Math.max(1.2, Math.min(3.4, (step || 1) * ring * 0.36)));
-	const dots = Array.from({ length: k }, (_, i) => {
-		const a = angle + (i - (k - 1) / 2) * step;
-		return `<circle cx="${round(x + Math.cos(a) * ring)}" cy="${round(y + Math.sin(a) * ring)}" r="${dot}"/>`;
-	}).join('');
+	const dots = n.children
+		.map((c, i) => {
+			const a = angle + (i - (k - 1) / 2) * step;
+			return `<circle data-d="${c.id}" cx="${round(x + Math.cos(a) * ring)}" cy="${round(y + Math.sin(a) * ring)}" r="${dot}"/>`;
+		})
+		.join('');
 	return `<g class="halo" aria-hidden="true">${dots}</g>`;
 }
 
@@ -283,7 +294,7 @@ function graphData(roots: LinkNode[], ctx: Ctx) {
 	const visit = (list: LinkNode[], parent: number | null) =>
 		list.forEach((n) => {
 			const p = pos.get(n.id)!;
-			nodes.push({ id: n.id, parent, kind: opens(n) ? 'group' : n.kind, label: n.label, href: hrefOf(n, ctx), pic: iconMarkup(nodeIcon(n), 0, 0, p.r, `l${n.id}`, n.tint, n.zoom) + halo(n, 0, 0, p.r), icon: nodeIcon(n), x: p.x, y: p.y, r: p.r });
+			nodes.push({ id: n.id, parent, kind: opens(n) ? 'group' : n.kind, label: n.day ? `${n.label} ${n.day}` : n.label, href: hrefOf(n, ctx), pic: picture(n, 0, 0, p.r, `l${n.id}`) + halo(n, 0, 0, p.r), icon: nodeIcon(n), x: p.x, y: p.y, r: p.r });
 			visit(n.children, n.id);
 		});
 	visit(roots, null);
@@ -297,7 +308,7 @@ function graphData(roots: LinkNode[], ctx: Ctx) {
 	for (const n of roots) {
 		const p = pos.get(n.id)!;
 		edges.push(`<line data-e="${n.id}" x1="0" y1="0" x2="${p.x}" y2="${p.y}"/>`);
-		const body = `<title>${esc(n.label)}</title><circle cx="${p.x}" cy="${p.y}" r="${p.r}"/>${iconMarkup(nodeIcon(n), p.x, p.y, p.r, `s${n.id}`, n.tint, n.zoom)}${halo(n, p.x, p.y, p.r, Math.atan2(p.y, p.x))}`;
+		const body = `<title>${esc(n.label)}</title><circle cx="${p.x}" cy="${p.y}" r="${p.r}"/>${picture(n, p.x, p.y, p.r, `s${n.id}`)}${halo(n, p.x, p.y, p.r, Math.atan2(p.y, p.x))}`;
 		const href = hrefOf(n, ctx);
 		// Groups open, notes show their text: both are buttons. Links and the diary are plain links.
 		items.push(
@@ -307,12 +318,14 @@ function graphData(roots: LinkNode[], ctx: Ctx) {
 		);
 	}
 	const p = ctx.data.person;
+	const hubDark = p.hub_dk_linked === 0 ? iconMarkup(p.hub_dk_icon || p.hub_icon || 'person', 0, 0, 42, 'hubd', p.hub_dk_tint, p.hub_dk_zoom, true) : '';
+	const hubPic = (light: string) => (hubDark ? `<g class="lt">${light}</g><g class="dk">${hubDark}</g>` : light);
 	const hub = p.hub_icon
-		? `<circle class="hub" r="42"/>${iconMarkup(p.hub_icon, 0, 0, 42, 'hub', p.hub_tint, p.hub_zoom)}`
+		? `<circle class="hub" r="42"/>${hubPic(iconMarkup(p.hub_icon, 0, 0, 42, 'hub', p.hub_tint, p.hub_zoom))}`
 		: p.kind === 'org'
-			? `<circle class="hub" r="42"/><image href="${esc(mediaUrl(p.photo))}" x="${round(-30 * p.hub_zoom)}" y="${round(-21 * p.hub_zoom)}" width="${round(60 * p.hub_zoom)}" height="${round(42 * p.hub_zoom)}" class="inv" preserveAspectRatio="xMidYMid meet"/>`
+			? `<circle class="hub" r="42"/>${hubPic(`<image href="${esc(mediaUrl(p.photo))}" x="${round(-30 * p.hub_zoom)}" y="${round(-21 * p.hub_zoom)}" width="${round(60 * p.hub_zoom)}" height="${round(42 * p.hub_zoom)}" class="inv" preserveAspectRatio="xMidYMid meet"/>`)}`
 			: p.photo
-				? `<circle class="hub" r="44"/><clipPath id="hubc"><circle r="42"/></clipPath><image href="${esc(mediaUrl(p.photo))}" x="${round(-42 * p.hub_zoom)}" y="${round(-42 * p.hub_zoom)}" width="${round(84 * p.hub_zoom)}" height="${round(84 * p.hub_zoom)}" clip-path="url(#hubc)" preserveAspectRatio="xMidYMid slice"/>`
+				? `<circle class="hub" r="44"/>${hubPic(`<clipPath id="hubc"><circle r="42"/></clipPath><image href="${esc(mediaUrl(p.photo))}" x="${round(-42 * p.hub_zoom)}" y="${round(-42 * p.hub_zoom)}" width="${round(84 * p.hub_zoom)}" height="${round(84 * p.hub_zoom)}" clip-path="url(#hubc)" preserveAspectRatio="xMidYMid slice"/>`)}`
 				: `<circle class="hub" r="42"/><text class="initials" y="10">${esc(initials(p.name))}</text>`;
 	const svg = `<g class="edges">${edges.join('')}</g><g class="nodes">${items.join('')}</g><g class="hubg" data-g="0" role="button" tabindex="0" aria-label="${esc(p.name)}"><title>${esc(p.name)}</title>${hub}</g>`;
 	return { nodes, svg, view };
@@ -327,7 +340,8 @@ function linkStyles(roots: LinkNode[]): string {
 			const ids = [n.id, ...chain];
 			rules.push(
 				`.lp:has([data-n="${n.id}"]:is(:hover,:focus-visible)) :is(${ids.map((i) => `[data-g="${i}"]`).join(',')})>circle{stroke:var(--accent);stroke-width:3}` +
-					`.lp:has([data-g="${n.id}"]:is(:hover,:focus-visible)) :is(${ids.map((i) => `[data-n="${i}"]`).join(',')}){color:var(--accent-ink)}`,
+					`.lp:has([data-g="${n.id}"]:is(:hover,:focus-visible)) :is(${ids.map((i) => `[data-n="${i}"]`).join(',')}){color:var(--accent-ink)}` +
+					`.lp:has([data-n="${n.id}"]:is(:hover,:focus-visible)) :is(${ids.map((i) => `[data-d="${i}"]`).join(',')}){fill:var(--accent);opacity:1}`,
 			);
 			visit(n.children, ids);
 		});
@@ -388,9 +402,12 @@ export function renderPage(data: PageData, opts: RenderOptions = {}): string {
 		.map((n) => `<link rel="me" href="${esc(n.url)}">`)
 		.join('');
 	const g = !p.basic_mode && roots.length ? graphData(roots, ctx) : null;
-	const keys = new Set<string>(g ? [...g.nodes.map((n) => n.icon), ...(p.hub_icon ? [p.hub_icon] : [])] : []);
+	const darkKeys = [...walk(roots)].filter((n) => n.dk_linked === 0 && n.dk_icon).map((n) => n.dk_icon);
+	const keys = new Set<string>(g ? [...g.nodes.map((n) => n.icon), ...darkKeys, ...(p.hub_icon ? [p.hub_icon] : []), ...(p.hub_dk_linked === 0 ? [p.hub_dk_icon || p.hub_icon || 'person'] : [])] : []);
 	const logoTints = new Set<string>([...walk(roots)].filter((n) => icon(nodeIcon(n)).logo && n.tint).map((n) => n.tint));
 	if (p.hub_icon && icon(p.hub_icon).logo && p.hub_tint) logoTints.add(p.hub_tint);
+	for (const n of walk(roots)) if (n.dk_linked === 0 && n.dk_tint && icon(n.dk_icon || nodeIcon(n)).logo) logoTints.add(n.dk_tint);
+	if (p.hub_dk_linked === 0 && p.hub_dk_tint) logoTints.add(p.hub_dk_tint);
 
 	// With the map, its centre is the portrait; without it, the portrait (or logo) heads the list.
 	const portrait = g
@@ -474,6 +491,8 @@ const CSS = `
 :root{--bg:#f6f8f4;--ink:#16210f;--muted:#66745f;--line:#d8e2cf;--accent:#3f9c00;--accent-ink:#1d6b00;--node:#fff;--ease:cubic-bezier(.2,.8,.2,1)}
 @media (prefers-color-scheme:dark){:root{--bg:#0b1208;--ink:#e6f0df;--muted:#97a88e;--line:#24361d;--accent:#87bd25;--accent-ink:#b7e27c;--node:#142010}.inv{filter:invert(1) hue-rotate(180deg) brightness(1.15)}}
 [data-tint]{--accent:var(--t);--accent-ink:var(--ti)}
+.mapsvg .dk{display:none}
+@media (prefers-color-scheme:dark){.mapsvg .lt{display:none}.mapsvg .dk{display:inline}}
 @media (prefers-color-scheme:dark){[data-tint]{--accent:var(--td);--accent-ink:var(--tid)}}
 *{box-sizing:border-box}
 html{background:var(--bg);-webkit-text-size-adjust:100%}
@@ -498,6 +517,7 @@ summary{list-style:none;-webkit-tap-highlight-color:transparent}
 summary::-webkit-details-marker{display:none}
 .tw{display:inline-block;width:1.15em;transition:transform .25s var(--ease);transform-origin:.3em 55%}
 details[open]>summary .tw{transform:rotate(90deg)}
+.tree .d{font-weight:300;color:var(--muted);font-variant-numeric:tabular-nums;letter-spacing:.02em;margin-left:.15em}
 .note{padding:.2em 0 .6em 1.15em;color:var(--muted);font-size:.95em}
 .note p,.entry p{margin:0 0 .6em}
 .note a,.entry a{color:var(--accent-ink);text-underline-offset:2px}

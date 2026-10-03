@@ -131,9 +131,11 @@ export function start(map) {
 	function dots(n) {
 		const el0 = n === hub ? hubEl : n.el;
 		if (!el0) return;
-		const hidden = role.has(n) ? n.children.filter((c) => !role.has(c)).length : 0;
-		if (hidden === n.dotCount) return;
-		n.dotCount = hidden;
+		const hiddenKids = role.has(n) ? n.children.filter((c) => !role.has(c)) : [];
+		const hidden = hiddenKids.length;
+		const sig = hiddenKids.map((c) => c.id).join(',');
+		if (sig === n.dotSig) return;
+		n.dotSig = sig;
 		n.dotG?.remove();
 		n.dotG = null;
 		if (!hidden) return;
@@ -143,7 +145,7 @@ export function start(map) {
 		const dot = Math.max(1.2, Math.min(3.4, (step || 1) * ring * 0.36));
 		for (let i = 0; i < hidden; i++) {
 			const a = (i - (hidden - 1) / 2) * step;
-			g.append(el('circle', { cx: (Math.cos(a) * ring).toFixed(1), cy: (Math.sin(a) * ring).toFixed(1), r: dot.toFixed(1) }));
+			g.append(el('circle', { 'data-d': hiddenKids[i].id, cx: (Math.cos(a) * ring).toFixed(1), cy: (Math.sin(a) * ring).toFixed(1), r: dot.toFixed(1) }));
 		}
 		n.dotG = g;
 		el0.append(g);

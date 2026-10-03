@@ -73,7 +73,7 @@
 				</section>
 
 				<section class="card" aria-labelledby="h-links">
-					<div class="cardhead"><h2 id="h-links">Links</h2><span class="fine">Drag to reorder, or use ⋯</span></div>
+					<div class="cardhead"><h2 id="h-links">Links</h2><span class="fine" title="In a name: Tab and Shift+Tab move into or out of a group, Option+↑/↓ move up and down, Enter adds an item below">Drag, use ⋯, or Tab · Shift+Tab · ⌥↑↓ · Enter</span></div>
 					<ul id="tree" class="tree"></ul>
 					<div class="adds">
 						<button id="add-link" class="primary">+ Add a link</button>
@@ -109,6 +109,12 @@
 
 	<dialog id="picker" aria-labelledby="picker-title">
 		<div class="pickhead"><h2 id="picker-title">Picture</h2><button type="button" id="pick-close" class="icon-btn" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+		<div class="modes">
+			<button type="button" class="mode on" data-mode="light"><span id="pv-light" class="pv"></span><span>Light</span></button>
+			<button type="button" id="chain" class="chain" aria-pressed="true" aria-label="Link dark mode to light mode"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="whole" d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/><path class="halves" d="M9.5 6.5L11 5a4 4 0 0 1 6 0 4 4 0 0 1 0 6l-1.5 1.5M14.5 17.5L13 19a4 4 0 0 1-6 0 4 4 0 0 1 0-6l1.5-1.5M4 4l3 3M20 20l-3-3"/></svg></button>
+			<button type="button" class="mode" data-mode="dark"><span id="pv-dark" class="pv"></span><span>Dark</span></button>
+		</div>
+		<p id="pick-mode-note" class="fine modenote"></p>
 		<div id="suggested" class="suggested"></div>
 		<label id="pick-upload" class="uploadbtn"><input id="pick-file" type="file" accept="image/*" /> Upload your own</label>
 		<fieldset class="pickstyle">
@@ -121,6 +127,7 @@
 		<label class="pickzoom">Size <input id="pick-zoom" type="range" min="0.6" max="2.4" step="0.05" /></label>
 		<input id="icon-search" type="search" placeholder="Search icons" aria-label="Search icons" />
 		<div id="icon-grid" class="grid"></div>
+		<div class="actions"><button type="button" id="pick-done" class="primary">Done</button></div>
 	</dialog>
 
 	<div id="toasts" class="toasts"></div>
@@ -261,6 +268,18 @@
 	.seg{border:0;padding:0;margin:.6rem 0 0;display:flex;gap:1rem;flex-wrap:wrap;align-items:center;font-size:.9rem}
 	.seg legend{float:left;font-weight:600;font-size:.8rem;color:var(--muted);margin-right:.4rem}
 	.seg input,.switch input,.hl-toggle input{width:auto}
+	.modes{display:flex;align-items:center;justify-content:center;gap:.5rem;margin:.2rem 0 .2rem}
+	.mode{display:grid;justify-items:center;gap:.25rem;background:none;border:2px solid transparent;border-radius:16px;padding:.35rem .5rem;font-size:.78rem;font-weight:600;color:var(--muted);cursor:pointer}
+	.mode.on{border-color:var(--accent);color:var(--ink)}
+	.pv{display:block;width:4.5rem;height:4.5rem}
+	.pv svg{width:100%;height:100%;display:block}
+	.chain{width:2.4rem;height:2.4rem;border-radius:50%;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;cursor:pointer;color:var(--accent-ink)}
+	.chain svg{width:1.2rem;height:1.2rem;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+	.chain .halves{display:none}
+	.chain.broken{color:var(--muted)}
+	.chain.broken .whole{display:none}
+	.chain.broken .halves{display:inline}
+	.modenote{text-align:center;margin:.1rem 0 .7rem}
 	.pickstyle{border:0;padding:0;margin:0 0 .6rem;display:flex;flex-wrap:wrap;gap:.4rem .9rem;align-items:center;font-size:.9rem}
 	.pickstyle legend,.pickzoom{font-weight:600;font-size:.8rem;color:var(--muted)}
 	.pickstyle input[type=radio],.pickstyle input[type=checkbox]{width:auto}
