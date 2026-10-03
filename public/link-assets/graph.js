@@ -71,7 +71,7 @@ export function start(map) {
 	const SIZE = { focus: 25, child: 20, parent: 19, anc: 15, sib: 14 };
 	const radius = (n) => {
 		const r = role.get(n);
-		if (n === hub) return r === 'focus' ? 44 : r === 'parent' ? 32 : 26;
+		if (n === hub) return r === 'focus' ? 44 : r === 'parent' ? 40 : 34;
 		return SIZE[r] ?? 18;
 	};
 
@@ -183,6 +183,20 @@ export function start(map) {
 				n.vy += (dy / d) * push;
 			}
 		}
+		// Soft walls at the edges of the map: the view never zooms or pans, so everything is kept inside it.
+		const pad = 10;
+		for (const n of shown) {
+			if (n === focus) continue;
+			const r = radius(n) + pad;
+			const x0 = cam[0] + r;
+			const x1 = cam[0] + cam[2] - r;
+			const y0 = cam[1] + r;
+			const y1 = cam[1] + cam[3] - r;
+			if (n.x < x0) n.vx += (x0 - n.x) * 0.25;
+			if (n.x > x1) n.vx -= (n.x - x1) * 0.25;
+			if (n.y < y0) n.vy += (y0 - n.y) * 0.25;
+			if (n.y > y1) n.vy -= (n.y - y1) * 0.25;
+		}
 		let energy = 0;
 		for (const n of live) {
 			if (n === focus) {
@@ -243,7 +257,6 @@ export function start(map) {
 	// ---- camera: the focus keeps its place on screen; only the zoom changes, around it, to fit what's open ----
 	const box = () => svg.getBoundingClientRect();
 	let cam = svg.getAttribute('viewBox').split(/\s+/).map(Number);
-	let anchor = null; // the focus's place on screen, as fractions of the map's width and height
 	let holdUntil = 0;
 	/** Where a node is on screen, as fractions of the map's box. */
 	function screenFraction(n) {
@@ -271,48 +284,9 @@ export function start(map) {
 		svg.setAttribute('viewBox', cam.map((v) => v.toFixed(1)).join(' '));
 	}
 	fitAspect();
-	// The starting scale, in viewBox width per box width, kept as the box changes size (e.g. full screen on a phone).
-	const scale0 = cam[2] / (box().width || 1);
-	let baseW = cam[2];
-	const rebase = () => {
-		const b = box();
-		if (b.width) baseW = scale0 * b.width;
-	};
-	if (window.ResizeObserver) new ResizeObserver(() => {
-		fitAspect();
-		rebase();
-	}).observe(svg);
-	function camTarget() {
-		const b = box();
-		const aspect = b.width / Math.max(b.height, 1) || 1;
-		if (!anchor) anchor = screenFraction(focus);
-		// Never closer than 12% to an edge, so there is always some room around it to open into.
-		anchor = anchor.map((u) => Math.min(Math.max(u, 0.12), 0.88));
-		const [u, v] = anchor;
-		// The scale stays as it started, so the map never shrinks as you go deeper. It widens only if the focus's
-		// own items wouldn't fit; the parent and the other groups may run off the edge (tap back to reach them).
-		let w = baseW;
-		for (const n of byId.values()) {
-			const rl = role.get(n);
-			if (rl !== 'focus' && rl !== 'child') continue;
-			const r = radius(n) + 20;
-			if (n.x - r < focus.x) w = Math.max(w, (focus.x - (n.x - r)) / u);
-			if (n.x + r > focus.x) w = Math.max(w, (n.x + r - focus.x) / (1 - u));
-			if (n.y - r < focus.y) w = Math.max(w, ((focus.y - (n.y - r)) / v) * aspect);
-			if (n.y + r > focus.y) w = Math.max(w, ((n.y + r - focus.y) / (1 - v)) * aspect);
-		}
-		const h = w / aspect;
-		return [focus.x - u * w, focus.y - v * h, w, h];
-	}
-	function moveCam(snap) {
-		const t = camTarget();
-		let moved = 0;
-		cam = cam.map((c, i) => {
-			const v = snap ? t[i] : c + (t[i] - c) * 0.08;
-			moved += Math.abs(v - c);
-			return v;
-		});
-		return moved;
+	if (window.ResizeObserver) new ResizeObserver(() => fitAspect()).observe(svg);
+	function moveCam() {
+		return 0; // the view is fixed: nothing zooms or pans, so what you touch stays under your finger
 	}
 
 	// ---- loop: only while something is moving ----
@@ -321,7 +295,7 @@ export function start(map) {
 	const frame = () => {
 		raf = 0;
 		const e = tick();
-		const m = moveCam(false);
+		const m = moveCam();
 		draw();
 		// Run while things move, but never more than 3 seconds after a tap: then everything is frozen where it is.
 		const now = performance.now();
@@ -332,7 +306,6 @@ export function start(map) {
 		alpha = 1;
 		if (reduce()) {
 			for (let i = 0; i < 400; i++) tick();
-			moveCam(true);
 			draw();
 			return;
 		}
@@ -366,7 +339,6 @@ export function start(map) {
 	function setFocus(n, fromMap = false) {
 		if (!n || n === focus) return;
 		focus = n;
-		anchor = null;
 		const p = n.parent != null ? byId.get(n.parent) : null;
 		const d = p ? Math.hypot(n.x - p.x, n.y - p.y) || 1 : 1;
 		away = p ? [(n.x - p.x) / d, (n.y - p.y) / d] : [0, -1];
