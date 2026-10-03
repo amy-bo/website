@@ -79,6 +79,8 @@ export async function servePage(ctx: Ctx, handle: string, rest: string[]): Promi
 		count(ctx, handle, slug);
 		return redirect(row.url);
 	}
+	// amy.bo/~name/edit: the editor lives in one place for everyone.
+	if (first === 'edit') return redirect('/links/edit/');
 	const data = await loadPage(ctx.env.DB, handle);
 	if (!data) return notFound();
 	if (first === 'diary') {
@@ -127,7 +129,7 @@ export const onTildeRequest = async (ctx: Ctx) => {
 /** Function entry for functions/links/…: AMYBO's own page, its images, and (falling through) the editor. */
 export const onLinksRequest = async (ctx: Ctx) => {
 	const rest = restOf(ctx);
-	if (rest[0] === 'edit') return ctx.next();
+	if (rest[0] === 'edit') return rest.length === 1 && !new URL(ctx.request.url).pathname.endsWith('/') ? redirect('/links/edit/') : ctx.next();
 	if (rest[0] === 'media') return serveMedia(ctx, rest.slice(1).join('/'));
 	return servePage(ctx, 'amybo', rest);
 };

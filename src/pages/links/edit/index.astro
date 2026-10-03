@@ -213,7 +213,7 @@
 	.kids{margin:.45rem 0 0 1.4rem;padding-left:.7rem;border-left:1.5px solid var(--line)}
 	.row .rowin{display:flex;align-items:center;gap:.55rem;padding:.45rem .5rem .45rem .3rem;border:1px solid var(--line);border-radius:16px;background:var(--card);transition:box-shadow .15s,border-color .15s,opacity .15s}
 	.row .rowin:focus-within{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
-	.row.group>.rowin{background:var(--tile);border-color:transparent}
+	.row.lp-group>.rowin{background:var(--tile);border-color:transparent}
 	.row.dragging>.rowin{opacity:.35}
 	.drop-before{box-shadow:0 -3px 0 var(--accent)}
 	.drop-after{box-shadow:0 3px 0 var(--accent)}
@@ -237,12 +237,12 @@
 	.fields input,.fields textarea{background:transparent;border-color:transparent;padding:.15rem .4rem;border-radius:8px}
 	.fields input:hover,.fields textarea:hover{border-color:var(--line)}
 	.fields .lbl{font-weight:600}
-	.row.group .lbl{font-size:.8rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+	.row.lp-group>.rowin .lbl{font-size:.8rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 	.fields .url{font-size:.82rem;color:var(--muted)}
 	.fields .body{margin-top:.3rem;background:var(--bg);border-color:var(--line);font-size:.9rem}
 	.sub{font-size:.8rem;color:var(--muted);padding:0 .4rem}
 	.chip{flex:none;font-size:.72rem;font-weight:600;color:var(--muted);background:var(--tile);border-radius:99px;padding:.1rem .5rem;white-space:nowrap}
-	.row.group .chip{background:var(--card)}
+	.row.lp-group>.rowin .chip{background:var(--card)}
 	.more{flex:none;width:30px;height:30px;border:0;background:none;border-radius:8px;display:grid;place-items:center;color:var(--muted)}
 	.more svg{width:18px;height:18px;fill:currentColor}
 	.more:hover{background:var(--tile);color:var(--ink)}

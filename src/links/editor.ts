@@ -204,10 +204,8 @@ function preview() {
 			diaryCount: S.diary.length,
 			highlightCount: S.diary.filter((d) => d.highlight).length,
 		};
-		const frame = $<HTMLIFrameElement>('#preview');
-		const y = frame.contentWindow?.scrollY ?? 0;
-		frame.srcdoc = renderPage(data, { preview: true });
-		frame.onload = () => frame.contentWindow?.scrollTo(0, y);
+		// The preview is sandboxed (its own origin), so its scroll position can't be read; just redraw it.
+		$<HTMLIFrameElement>('#preview').srcdoc = renderPage(data, { preview: true });
 	}, 250);
 }
 
@@ -241,7 +239,7 @@ function rowHtml(n: ENode, depth: number): string {
 		n.kind === 'group'
 			? `<ul class="kids"${n.collapsed ? ' hidden' : ''}>${n.children.map((c) => rowHtml(c, depth + 1)).join('')}<li class="addin"><button type="button" class="ghost" data-act="add-in">+ Add a link here</button></li></ul>`
 			: '';
-	return `<li class="row ${n.kind}" data-key="${n.key}"><div class="rowin">
+	return `<li class="row lp-${n.kind}" data-key="${n.key}"><div class="rowin">
 <span class="grip" draggable="true" aria-hidden="true" title="Drag to move"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></span>
 ${twisty}${tile}<div class="fields">${fields}</div>${count}${clicks}
 <button type="button" class="more" data-act="menu" aria-label="More for ${esc(n.label)}" aria-haspopup="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
@@ -399,7 +397,7 @@ function setupDrag() {
 		if (find(dragKey)!.node && row.closest(`.row[data-key="${dragKey}"]`)) return null; // not into itself
 		const r = rowin.getBoundingClientRect();
 		const y = (e.clientY - r.top) / r.height;
-		const group = row.classList.contains('group');
+		const group = row.classList.contains('lp-group');
 		const pos = group && y > 0.3 && y < 0.7 ? 'in' : y < 0.5 ? 'before' : 'after';
 		return { row, rowin, pos };
 	};

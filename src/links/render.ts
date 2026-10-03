@@ -163,8 +163,17 @@ function layout(top: LinkNode[]): Map<number, { x: number; y: number; r: number;
 		// About 40 px of arc per item, within this branch's share of the circle; a crowded ring moves outwards.
 		const R = Math.max(ringR, (k * 40) / (sector * 0.95));
 		const spread = Math.min(sector * 0.95, (k * 40) / R);
+		// First level: down the page in list order, alternating right and left of the centre.
+		// Deeper levels: a fan beyond the parent, its places handed out top to bottom in list order.
+		const angles =
+			depth === 1
+				? list.map((_, i) => {
+						const phi = (Math.PI * (i + 0.5)) / k;
+						return Math.atan2(-Math.cos(phi), (i % 2 === 0 ? 1 : -1) * Math.sin(phi));
+					})
+				: list.map((_, i) => centre - spread / 2 + ((i + 0.5) * spread) / k).sort((a, b) => Math.sin(a) - Math.sin(b));
 		list.forEach((n, i) => {
-			const a = depth === 1 ? -Math.PI / 2 + i * sector : centre - spread / 2 + ((i + 0.5) * spread) / k;
+			const a = angles[i];
 			const rr = depth === 1 ? R1 : R;
 			pos.set(n.id, { x: round(Math.cos(a) * rr), y: round(Math.sin(a) * rr), r: radiusFor(n, depth), depth });
 			if (n.children.length) place(n.children, depth + 1, a, rr + (depth === 1 ? 100 : 82));
@@ -193,13 +202,29 @@ function iconMarkup(key: string, x: number, y: number, r: number, uid: string | 
 	return `<use href="#i-${esc(key)}" class="${i.brand ? 'ib' : 'il'}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${s}" height="${s}"${brandStyle(key)}/>`;
 }
 
+/** Small dots on the far side of a group from its parent, one per item it holds: groups open, everything else is
+ * a link. `angle` points away from the parent (radians); the live map turns the arc as the group moves. With many
+ * items the arc widens up to a half circle and the dots get smaller to fit. */
+function halo(n: LinkNode, x: number, y: number, r: number, angle = 0): string {
+	if (n.kind !== 'group' || !n.children.length) return '';
+	const k = n.children.length;
+	const ring = r + 8;
+	const step = k > 1 ? Math.min(0.42, Math.PI / (k - 1)) : 0;
+	const dot = round(Math.max(1.2, Math.min(3.4, (step || 1) * ring * 0.36)));
+	const dots = Array.from({ length: k }, (_, i) => {
+		const a = angle + (i - (k - 1) / 2) * step;
+		return `<circle cx="${round(x + Math.cos(a) * ring)}" cy="${round(y + Math.sin(a) * ring)}" r="${dot}"/>`;
+	}).join('');
+	return `<g class="halo" aria-hidden="true">${dots}</g>`;
+}
+
 function graphData(roots: LinkNode[], ctx: Ctx) {
 	const pos = layout(roots);
 	const nodes: GNode[] = [];
 	const visit = (list: LinkNode[], parent: number | null) =>
 		list.forEach((n) => {
 			const p = pos.get(n.id)!;
-			nodes.push({ id: n.id, parent, kind: n.kind, label: n.label, href: n.kind === 'support' ? '#lp-support' : hrefOf(n, ctx), pic: iconMarkup(nodeIcon(n), 0, 0, p.r, `l${n.id}`), icon: nodeIcon(n), x: p.x, y: p.y, r: p.r });
+			nodes.push({ id: n.id, parent, kind: n.kind, label: n.label, href: n.kind === 'support' ? '#lp-support' : hrefOf(n, ctx), pic: iconMarkup(nodeIcon(n), 0, 0, p.r, `l${n.id}`) + halo(n, 0, 0, p.r), icon: nodeIcon(n), x: p.x, y: p.y, r: p.r });
 			visit(n.children, n.id);
 		});
 	visit(roots, null);
@@ -209,23 +234,16 @@ function graphData(roots: LinkNode[], ctx: Ctx) {
 
 	const tgt = ctx.preview ? ' target="_blank" rel="noopener"' : '';
 	const edges: string[] = [];
-	const buds: string[] = [];
 	const items: string[] = [];
 	for (const n of roots) {
 		const p = pos.get(n.id)!;
 		edges.push(`<line data-e="${n.id}" x1="0" y1="0" x2="${p.x}" y2="${p.y}"/>`);
-		// Small buds hint at what a group holds, on the side it will open towards.
-		n.children.forEach((c) => {
-			const q = pos.get(c.id)!;
-			const d = Math.hypot(q.x - p.x, q.y - p.y) || 1;
-			buds.push(`<circle class="bud" data-b="${n.id}" cx="${round(p.x + ((q.x - p.x) / d) * (p.r + 9))}" cy="${round(p.y + ((q.y - p.y) / d) * (p.r + 9))}" r="3"/>`);
-		});
-		const body = `<title>${esc(n.label)}</title><circle cx="${p.x}" cy="${p.y}" r="${p.r}"/>${iconMarkup(nodeIcon(n), p.x, p.y, p.r, `s${n.id}`)}`;
+		const body = `<title>${esc(n.label)}</title><circle cx="${p.x}" cy="${p.y}" r="${p.r}"/>${iconMarkup(nodeIcon(n), p.x, p.y, p.r, `s${n.id}`)}${halo(n, p.x, p.y, p.r, Math.atan2(p.y, p.x))}`;
 		const href = n.kind === 'support' ? '#lp-support' : hrefOf(n, ctx);
 		items.push(
 			n.kind === 'group'
-				? `<g class="n group" data-g="${n.id}" tabindex="0" role="button" aria-expanded="false" aria-label="${esc(n.label)}">${body}</g>`
-				: `<a class="n ${n.kind}" data-g="${n.id}" href="${esc(href)}" aria-label="${esc(n.label)}"${n.kind === 'link' ? tgt : ''}>${body}</a>`,
+				? `<g class="n lp-group" data-g="${n.id}" tabindex="0" role="button" aria-expanded="false" aria-label="${esc(n.label)}">${body}</g>`
+				: `<a class="n lp-${n.kind}" data-g="${n.id}" href="${esc(href)}" aria-label="${esc(n.label)}"${n.kind === 'link' ? tgt : ''}>${body}</a>`,
 		);
 	}
 	const p = ctx.data.person;
@@ -235,7 +253,7 @@ function graphData(roots: LinkNode[], ctx: Ctx) {
 			: p.photo
 				? `<circle class="hub" r="44"/><clipPath id="hubc"><circle r="42"/></clipPath><image href="${esc(mediaUrl(p.photo))}" x="-42" y="-42" width="84" height="84" clip-path="url(#hubc)" preserveAspectRatio="xMidYMid slice"/>`
 				: `<circle class="hub" r="42"/><text class="initials" y="10">${esc(initials(p.name))}</text>`;
-	const svg = `<g class="edges">${edges.join('')}</g><g class="buds">${buds.join('')}</g><g class="nodes">${items.join('')}</g><g class="hubg" data-g="0" role="button" tabindex="0" aria-label="${esc(p.name)}"><title>${esc(p.name)}</title>${hub}</g>`;
+	const svg = `<g class="edges">${edges.join('')}</g><g class="nodes">${items.join('')}</g><g class="hubg" data-g="0" role="button" tabindex="0" aria-label="${esc(p.name)}"><title>${esc(p.name)}</title>${hub}</g>`;
 	return { nodes, svg, view };
 }
 
@@ -401,16 +419,16 @@ details[open]>summary .tw{transform:rotate(90deg)}
 .map{position:sticky;top:2rem;aspect-ratio:1;max-height:calc(100vh - 4rem);width:100%;justify-self:center}
 .mapsvg{display:block;width:100%;height:100%;overflow:visible}
 .mapsvg .edges line{stroke:var(--line);stroke-width:1.5}
-.mapsvg .bud{fill:var(--line)}
+.mapsvg .halo circle{fill:var(--muted);opacity:.6;stroke:none}
+.mapsvg .n.open .halo,.mapsvg .n.shown .halo{display:none}
 .mapsvg .hub{fill:var(--node);stroke:var(--line);stroke-width:1.5}
 .mapsvg .initials{font-size:28px;font-weight:650;text-anchor:middle;fill:var(--accent-ink)}
 .mapsvg .n,.mapsvg .hubg{cursor:pointer;outline:none}
 .mapsvg circle{vector-effect:non-scaling-stroke}
 .mapsvg.live{touch-action:none}
 .mapsvg .edges line{transition:opacity .3s}
-.mapsvg .bud{transition:opacity .2s}
 .mapsvg .n>circle{fill:var(--node);stroke:var(--line);stroke-width:1.5;transition:stroke .15s,stroke-width .15s}
-.mapsvg .n.group>circle{stroke:color-mix(in srgb,var(--accent) 40%,var(--line))}
+.mapsvg .n.lp-group>circle{stroke:color-mix(in srgb,var(--accent) 40%,var(--line))}
 .mapsvg .n:hover>circle,.mapsvg .n:focus-visible>circle,.mapsvg .n.open>circle{stroke:var(--accent);stroke-width:3}
 .mapsvg use{color:var(--accent-ink)}
 svg.ib,use.ib{fill:var(--brand,currentColor)}

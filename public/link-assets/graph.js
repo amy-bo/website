@@ -15,7 +15,6 @@ export function start(map) {
 	const edgeLayer = svg.querySelector('.edges');
 	const nodeLayer = svg.querySelector('.nodes');
 	const hubEl = svg.querySelector('.hubg');
-	svg.querySelector('.buds')?.remove();
 	svg.classList.add('live');
 
 	// ---- the tree ----
@@ -43,8 +42,8 @@ export function start(map) {
 		if (n.el) return n.el;
 		const e =
 			n.kind === 'group'
-				? el('g', { class: 'n group', 'data-g': n.id, tabindex: 0, role: 'button', 'aria-label': n.label })
-				: el('a', { class: `n ${n.kind}`, 'data-g': n.id, href: n.href, 'aria-label': n.label });
+				? el('g', { class: 'n lp-group', 'data-g': n.id, tabindex: 0, role: 'button', 'aria-label': n.label })
+				: el('a', { class: `n lp-${n.kind}`, 'data-g': n.id, href: n.href, 'aria-label': n.label });
 		if (n.kind === 'link' && data.preview) {
 			e.setAttribute('target', '_blank');
 			e.setAttribute('rel', 'noopener');
@@ -92,9 +91,11 @@ export function start(map) {
 				let dx = gp && gp.on ? from.x - gp.x : n.x - from.x;
 				let dy = gp && gp.on ? from.y - gp.y : n.y - from.y;
 				const d = Math.hypot(dx, dy) || 1;
-				const k = from.children.indexOf(n);
-				const spread = ((k - (from.children.length - 1) / 2) / Math.max(from.children.length, 1)) * 2.2;
-				const a = Math.atan2(dy / d, dx / d) + spread;
+				// Places in the fan are handed out top to bottom in list order, so the map reads like the list.
+				const sibs = from.children;
+				const fan = sibs.map((_, i) => ((i - (sibs.length - 1) / 2) / Math.max(sibs.length, 1)) * 2.2).map((sp) => Math.atan2(dy / d, dx / d) + sp);
+				fan.sort((p, q) => Math.sin(p) - Math.sin(q));
+				const a = fan[Math.max(0, sibs.indexOf(n))];
 				n.x = from.x + Math.cos(a) * 14;
 				n.y = from.y + Math.sin(a) * 14;
 				n.vx = Math.cos(a) * 4;
@@ -109,9 +110,12 @@ export function start(map) {
 			n.top = show ? (role.get(n) === 'anc' ? 0.55 : 1) : 0;
 		}
 		nodeLayer.append(hubEl);
+		const onPath = new Set([focus, ...ancestors(focus)]);
 		for (const n of byId.values()) {
 			if (n.el) {
 				n.el.classList.toggle('open', n === focus && n.kind === 'group');
+				// Groups whose items are on show (the focus and the way back to the centre) need no dots.
+				n.el.classList.toggle('shown', onPath.has(n));
 				if (n.kind === 'group') n.el.setAttribute('aria-expanded', String(n === focus));
 			}
 		}
@@ -183,6 +187,21 @@ export function start(map) {
 				n.vy += (dy / d) * push;
 			}
 		}
+		// Keep each family in list order from top to bottom: a gentle nudge whenever two neighbours swap.
+		const families = [focus.children];
+		if (parentOfFocus) families.push(parentOfFocus.children);
+		for (const fam of families) {
+			const vis = fam.filter((c) => role.has(c));
+			for (let i = 0; i + 1 < vis.length; i++) {
+				const a = vis[i];
+				const b = vis[i + 1];
+				const over = a.y - (b.y - 16);
+				if (over > 0) {
+					if (a !== focus) a.vy -= over * 0.15;
+					if (b !== focus) b.vy += over * 0.15;
+				}
+			}
+		}
 		// Soft walls at the edges of the map: the view never zooms or pans, so everything is kept inside it.
 		const pad = 10;
 		for (const n of shown) {
@@ -235,6 +254,12 @@ export function start(map) {
 		for (const n of byId.values()) {
 			if (!n.on || !n.el) continue;
 			n.el.setAttribute('transform', `translate(${n.x.toFixed(1)} ${n.y.toFixed(1)}) scale(${n.s.toFixed(3)})`);
+			// A group's dots point away from the line to its parent.
+			const halo = n.halo ?? (n.halo = n.el.querySelector('.halo') || false);
+			if (halo) {
+				const p = byId.get(n.parent) ?? hub;
+				halo.setAttribute('transform', `rotate(${((Math.atan2(n.y - p.y, n.x - p.x) * 180) / Math.PI).toFixed(1)})`);
+			}
 			n.el.style.opacity = n.op.toFixed(2);
 			if (n.edge && n !== hub) {
 				const p = byId.get(n.parent) ?? hub;
@@ -367,7 +392,7 @@ export function start(map) {
 
 	// A support note on the map opens it in the list.
 	nodeLayer.addEventListener('click', (e) => {
-		const a = e.target.closest && e.target.closest('a.n.support');
+		const a = e.target.closest && e.target.closest('a.n.lp-support');
 		if (!a) return;
 		e.preventDefault();
 		map.querySelector('.back')?.click();
