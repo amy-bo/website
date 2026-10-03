@@ -178,7 +178,7 @@ function iconMarkup(key: string, x: number, y: number, r: number): string {
 	const i = icon(key);
 	if (i.logo) {
 		const l = i.logo;
-		const s = l.cover ? r * 2 - 3 : r * 1.45;
+		const s = l.cover ? r * 2 - 3 : r * 1.3;
 		const id = `c${Math.abs(Math.round(x * 7 + y * 13))}`;
 		const clip = l.cover ? ` clip-path="url(#${id})"` : '';
 		return `${l.cover ? `<clipPath id="${id}"><circle cx="${x}" cy="${y}" r="${round(r - 1.5)}"/></clipPath>` : ''}<image href="${esc(l.src)}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${round(s)}" height="${round(s)}" preserveAspectRatio="xMidYMid ${l.cover ? 'slice' : 'meet'}"${clip}${l.invert ? ' class="inv"' : ''}/>`;
@@ -411,8 +411,8 @@ svg.il,use.il{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:roun
 .back{display:none}
 @media (max-width:56rem){
 .has-map .shell{grid-template-columns:minmax(0,30rem);gap:1rem;padding-top:max(1.2rem,env(safe-area-inset-top))}
-.has-map .map{position:relative;top:0;order:-1;max-height:22rem;cursor:zoom-in}
-.map-on .map{position:fixed;inset:0;max-height:none;aspect-ratio:auto;z-index:5;background:var(--bg);cursor:default;padding:4.5rem 1rem 1rem}
+.has-map .map{position:relative;top:0;order:-1;max-height:none;width:min(100%,24rem);margin:-14% auto -12%;cursor:zoom-in}
+.map-on .map{position:fixed;inset:0;max-height:none;width:auto;margin:0;aspect-ratio:auto;z-index:5;background:var(--bg);cursor:default;padding:4.5rem 1rem 1rem}
 .map-on .list,.map-on .foot{visibility:hidden}
 .map-on .back{display:grid;place-items:center;position:fixed;top:max(1rem,env(safe-area-inset-top));left:1rem;width:2.75rem;height:2.75rem;border-radius:50%;border:1px solid var(--line);background:var(--node);color:var(--ink);cursor:pointer;view-transition-name:lp-list}
 .back svg{width:1.2rem;height:1.2rem;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
