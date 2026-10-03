@@ -28,9 +28,8 @@ const LINE: Record<string, [string, string]> = {
 	calendar: ['Event', '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],
 	video: ['Video', '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/>'],
 	shop: ['Shop', '<path d="M4 9l1-5h14l1 5M4 9h16v11H4zM9 20v-6h6v6"/>'],
-	amybo: ['AMYBO', ''],
-	andeye: ['andeye', ''],
-	aqueum: ['Aqueum', ''],
+	people: ['People', '<circle cx="9" cy="8" r="3.2"/><path d="M3 19.5a6 6 0 0 1 12 0"/><circle cx="16.8" cy="9.2" r="2.6"/><path d="M15.2 14.4A4.8 4.8 0 0 1 21.5 19"/>'],
+	stuff: ['Stuff', '<circle cx="7.5" cy="7.5" r="3.5"/><rect x="13" y="4" width="7" height="7" rx="1.2"/><path d="M7.5 13.5l4 7h-8z"/><path d="M16.5 13.2l1 2.2 2.4.3-1.8 1.6.5 2.4-2.1-1.2-2.1 1.2.5-2.4-1.8-1.6 2.4-.3z"/>'],
 	linkedin: ['LinkedIn', ''],
 };
 
@@ -39,13 +38,22 @@ export type IconSpec = { key: string; title: string; svg: string; brand: boolean
 /** Real logos, drawn as pictures in a circle. `invert`: flip for dark mode; `cover`: fill the circle. */
 export interface Logo {
 	src: string;
+	/** Flip for dark mode (black-on-white artwork). */
 	invert?: boolean;
+	/** Fill the whole circle (photographic logos). */
 	cover?: boolean;
+	/** Circle colour behind the logo. */
+	bg?: string;
+	/** Logo width as a multiple of the circle's radius (default 1.3). */
+	scale?: number;
 }
 const LOGOS: Record<string, [string, Logo]> = {
-	amybo: ['AMYBO', { src: '/link-media/amybo.svg', invert: true }],
-	andeye: ['andeye', { src: '/link-media/logo-andeye.png' }],
-	aqueum: ['Aqueum', { src: '/link-media/logo-aqueum-q.jpg', cover: true }],
+	amybo: ['AMYBO', { src: '/link-media/amybo.svg', invert: true, scale: 1.2 }],
+	'amybo-dark': ['AMYBO (light on dark)', { src: '/link-media/amybo-dark.svg', bg: '#111a0d', scale: 1.2 }],
+	andeye: ['andeye', { src: '/link-media/logo-andeye.png', scale: 1.75 }],
+	'andeye-inv': ['andeye (white on blue)', { src: '/link-media/logo-andeye-inv.png', bg: '#4fb6f0', scale: 1.75 }],
+	aqueum: ['Aqueum', { src: '/link-media/logo-aqueum-a.jpg', cover: true }],
+	'aqueum-q': ['Aqueum q', { src: '/link-media/logo-aqueum-q.jpg', cover: true }],
 };
 
 /** The <svg> markup for an icon key, or the link icon when unknown. */
@@ -61,7 +69,7 @@ export function icon(key: string): IconSpec {
 }
 
 /** Every icon a person can choose from, for the editor. */
-export const ICON_KEYS = [...Object.keys(LINE), ...Object.keys(BRANDS)];
+export const ICON_KEYS = [...Object.keys(LOGOS), ...Object.keys(LINE), ...Object.keys(BRANDS)];
 
 const DOMAINS: [RegExp, string][] = [
 	[/(^|\.)youtube\.com$|^youtu\.be$/, 'youtube'],

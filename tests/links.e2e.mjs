@@ -134,6 +134,9 @@ try {
 		check('one portrait only (the map\'s centre)', !r.text.includes('class="avatar"') && (r.text.match(/martin-currie\.jpg/g) || []).length === 1);
 		check('a group with one link is just that link (Email)', /<a data-n="\d+" href="\/~martin\/go\/email">Email<\/a>/.test(r.text), (/.{0,80}go\/email.{0,40}/.exec(r.text) || [''])[0]);
 		check('hovering one lights up the other (CSS only)', r.text.includes(':has([data-n=') && r.text.includes(':has([data-g='));
+		const pics = JSON.parse(/<script type="application\/json" id="lp-data">([^<]*)<\/script>/.exec(r.text)[1].replace(/\\u003c/g, '<')).nodes.map((n) => n.icon);
+		check('every picture on the map is different', new Set(pics).size === pics.length, pics.join(' '));
+		check('the email link asks for a "Contact Martin" heading', (await req('GET', '/~martin/go/email')).headers.get('location').includes('heading=Contact%20Martin'));
 		check('the map uses the real logos', r.text.includes('/link-media/logo-andeye.png') || r.text.includes('/link-media/amybo.svg'));
 		check('the footer sits outside the content, at the bottom', /<\/div>\s*<footer class="foot">/.test(r.text));
 		check('no script runs a loop before the map is touched', !/requestAnimationFrame|setInterval/.test(r.text));

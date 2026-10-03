@@ -140,7 +140,7 @@ interface GNode {
 	kind: string;
 	label: string;
 	href: string;
-	/** The node's picture, as SVG markup centred on (x, y). */
+	/** The node's picture, as SVG markup centred on (0, 0), for the live map. */
 	pic: string;
 	icon: string;
 	x: number;
@@ -174,14 +174,20 @@ function layout(top: LinkNode[]): Map<number, { x: number; y: number; r: number;
 	return pos;
 }
 
-function iconMarkup(key: string, x: number, y: number, r: number): string {
+/** A node's picture, centred on (x, y). `uid` keeps clip-path ids unique on the page. */
+function iconMarkup(key: string, x: number, y: number, r: number, uid: string | number = ''): string {
 	const i = icon(key);
 	if (i.logo) {
 		const l = i.logo;
-		const s = l.cover ? r * 2 - 3 : r * 1.3;
-		const id = `c${Math.abs(Math.round(x * 7 + y * 13))}`;
-		const clip = l.cover ? ` clip-path="url(#${id})"` : '';
-		return `${l.cover ? `<clipPath id="${id}"><circle cx="${x}" cy="${y}" r="${round(r - 1.5)}"/></clipPath>` : ''}<image href="${esc(l.src)}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${round(s)}" height="${round(s)}" preserveAspectRatio="xMidYMid ${l.cover ? 'slice' : 'meet'}"${clip}${l.invert ? ' class="inv"' : ''}/>`;
+		const bg = l.bg ? `<circle class="bg" cx="${x}" cy="${y}" r="${round(r - 1)}" style="fill:${esc(l.bg)};stroke:none"/>` : '';
+		if (l.cover) {
+			const s = r * 2 - 3;
+			const id = `c${uid || Math.abs(Math.round(x * 7 + y * 13))}`;
+			return `<clipPath id="${id}"><circle cx="${x}" cy="${y}" r="${round(r - 1.5)}"/></clipPath><image href="${esc(l.src)}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${round(s)}" height="${round(s)}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`;
+		}
+		// Natural proportions, never squeezed: the box is the logo's width, and "meet" keeps its shape.
+		const w = r * (l.scale ?? 1.3);
+		return `${bg}<image href="${esc(l.src)}" x="${round(x - w / 2)}" y="${round(y - w / 2)}" width="${round(w)}" height="${round(w)}" preserveAspectRatio="xMidYMid meet"${l.invert ? ' class="inv"' : ''}/>`;
 	}
 	const s = round(r * 1.05);
 	return `<use href="#i-${esc(key)}" class="${i.brand ? 'ib' : 'il'}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${s}" height="${s}"${brandStyle(key)}/>`;
@@ -193,7 +199,7 @@ function graphData(roots: LinkNode[], ctx: Ctx) {
 	const visit = (list: LinkNode[], parent: number | null) =>
 		list.forEach((n) => {
 			const p = pos.get(n.id)!;
-			nodes.push({ id: n.id, parent, kind: n.kind, label: n.label, href: n.kind === 'support' ? '#lp-support' : hrefOf(n, ctx), pic: iconMarkup(nodeIcon(n), p.x, p.y, p.r), icon: nodeIcon(n), x: p.x, y: p.y, r: p.r });
+			nodes.push({ id: n.id, parent, kind: n.kind, label: n.label, href: n.kind === 'support' ? '#lp-support' : hrefOf(n, ctx), pic: iconMarkup(nodeIcon(n), 0, 0, p.r, `l${n.id}`), icon: nodeIcon(n), x: p.x, y: p.y, r: p.r });
 			visit(n.children, n.id);
 		});
 	visit(roots, null);
@@ -214,7 +220,7 @@ function graphData(roots: LinkNode[], ctx: Ctx) {
 			const d = Math.hypot(q.x - p.x, q.y - p.y) || 1;
 			buds.push(`<circle class="bud" data-b="${n.id}" cx="${round(p.x + ((q.x - p.x) / d) * (p.r + 9))}" cy="${round(p.y + ((q.y - p.y) / d) * (p.r + 9))}" r="3"/>`);
 		});
-		const body = `<title>${esc(n.label)}</title><circle cx="${p.x}" cy="${p.y}" r="${p.r}"/>${iconMarkup(nodeIcon(n), p.x, p.y, p.r)}`;
+		const body = `<title>${esc(n.label)}</title><circle cx="${p.x}" cy="${p.y}" r="${p.r}"/>${iconMarkup(nodeIcon(n), p.x, p.y, p.r, `s${n.id}`)}`;
 		const href = n.kind === 'support' ? '#lp-support' : hrefOf(n, ctx);
 		items.push(
 			n.kind === 'group'
@@ -229,7 +235,7 @@ function graphData(roots: LinkNode[], ctx: Ctx) {
 			: p.photo
 				? `<circle class="hub" r="44"/><clipPath id="hubc"><circle r="42"/></clipPath><image href="${esc(mediaUrl(p.photo))}" x="-42" y="-42" width="84" height="84" clip-path="url(#hubc)" preserveAspectRatio="xMidYMid slice"/>`
 				: `<circle class="hub" r="42"/><text class="initials" y="10">${esc(initials(p.name))}</text>`;
-	const svg = `<g class="edges">${edges.join('')}</g><g class="buds">${buds.join('')}</g><g class="nodes">${items.join('')}</g><g class="hubg"><title>${esc(p.name)}</title>${hub}</g>`;
+	const svg = `<g class="edges">${edges.join('')}</g><g class="buds">${buds.join('')}</g><g class="nodes">${items.join('')}</g><g class="hubg" data-g="0" role="button" tabindex="0" aria-label="${esc(p.name)}"><title>${esc(p.name)}</title>${hub}</g>`;
 	return { nodes, svg, view };
 }
 
@@ -357,7 +363,7 @@ ${FOOT}
 /** Loader: on the first touch, hover or keypress on the map, fetch the physics and hand over. ~1 KB. */
 /** The map's only script until it is used: a click (or Enter) on a group, or any tap on a phone, fetches
  * /link-assets/graph.js. Links on the map are plain links and work without it. */
-export const BOOT = `(()=>{const b=document.body,m=document.querySelector('.map');if(!m)return;let go;const rm=matchMedia('(prefers-reduced-motion: reduce)').matches;const vt=f=>document.startViewTransition&&!rm?document.startViewTransition(f):f();const small=()=>matchMedia('(max-width: 56rem)').matches;const load=()=>(go=go||import('/link-assets/graph.js').then(g=>g.start(m)));const act=(e,g)=>{e.preventDefault();load().then(x=>g&&x.toggle(+g.dataset.g))};m.addEventListener('click',e=>{if(small()&&!b.classList.contains('map-on')){e.preventDefault();vt(()=>b.classList.add('map-on'));load();return}const g=e.target.closest('g.n[data-g]');if(g)act(e,g)});m.addEventListener('keydown',e=>{const g=e.target.closest&&e.target.closest('g.n[data-g]');if(g&&(e.key==='Enter'||e.key===' '))act(e,g)});const off=()=>{if(b.classList.contains('map-on'))vt(()=>b.classList.remove('map-on'))};m.querySelector('.back').addEventListener('click',e=>{e.stopPropagation();off()});addEventListener('keydown',e=>{if(e.key==='Escape')off()})})();`;
+export const BOOT = `(()=>{const b=document.body,m=document.querySelector('.map');if(!m)return;let go;const rm=matchMedia('(prefers-reduced-motion: reduce)').matches;const vt=f=>document.startViewTransition&&!rm?document.startViewTransition(f):f();const small=()=>matchMedia('(max-width: 56rem)').matches;const load=()=>(go=go||import('/link-assets/graph.js').then(g=>g.start(m)));const act=(e,g)=>{e.preventDefault();load().then(x=>x.tap(+g.dataset.g))};m.addEventListener('click',e=>{if(small()&&!b.classList.contains('map-on')){e.preventDefault();vt(()=>b.classList.add('map-on'));load();return}const g=e.target.closest('g[data-g]');if(g)act(e,g)});m.addEventListener('keydown',e=>{const g=e.target.closest&&e.target.closest('g[data-g]');if(g&&(e.key==='Enter'||e.key===' '))act(e,g)});const off=()=>{if(b.classList.contains('map-on'))vt(()=>b.classList.remove('map-on'))};m.querySelector('.back').addEventListener('click',e=>{e.stopPropagation();off()});addEventListener('keydown',e=>{if(e.key==='Escape')off()})})();`;
 
 const CSS = `
 :root{--bg:#f6f8f4;--ink:#16210f;--muted:#66745f;--line:#d8e2cf;--accent:#3f9c00;--accent-ink:#1d6b00;--node:#fff;--ease:cubic-bezier(.2,.8,.2,1)}
@@ -398,7 +404,9 @@ details[open]>summary .tw{transform:rotate(90deg)}
 .mapsvg .bud{fill:var(--line)}
 .mapsvg .hub{fill:var(--node);stroke:var(--line);stroke-width:1.5}
 .mapsvg .initials{font-size:28px;font-weight:650;text-anchor:middle;fill:var(--accent-ink)}
-.mapsvg .n{cursor:pointer;outline:none;transform-box:fill-box;transform-origin:center;transition:transform .42s cubic-bezier(.34,1.4,.64,1),opacity .3s}
+.mapsvg .n,.mapsvg .hubg{cursor:pointer;outline:none}
+.mapsvg circle{vector-effect:non-scaling-stroke}
+.mapsvg.live{touch-action:none}
 .mapsvg .edges line{transition:opacity .3s}
 .mapsvg .bud{transition:opacity .2s}
 .mapsvg .n>circle{fill:var(--node);stroke:var(--line);stroke-width:1.5;transition:stroke .15s,stroke-width .15s}
