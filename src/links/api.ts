@@ -8,6 +8,7 @@ import type { Ctx, Env } from './server';
 const RESERVED = new Set(['amybo', 'links', 'admin', 'api', 'edit', 'www', 'go', 'media', 'diary', 'events', 'help', 'about']);
 const KINDS: NodeKind[] = ['group', 'link', 'text', 'diary', 'support'];
 const TINT_RE = /^(|mono|#[0-9a-f]{6})$/i;
+const HEX_OR_NONE = /^(|#[0-9a-f]{6})$/i;
 const cleanZoom = (z: unknown) => Math.min(2.4, Math.max(0.6, Number(z) || 1));
 const EMAIL_RE = /^[^\s@<>"]{1,64}@[^\s@<>"]{1,190}\.[a-z]{2,}$/i;
 
@@ -123,6 +124,9 @@ export async function saveProfile(ctx: Ctx): Promise<Response> {
 	const hubDkTint = str(b.hub_dk_tint, 7);
 	if (hubDkIcon && !ICON_KEYS.includes(hubDkIcon)) return fail('Unknown dark-mode picture for the centre');
 	if (!TINT_RE.test(hubDkTint)) return fail('The centre dark-mode colour must be like #3f9c00');
+	const hubBg = str(b.hub_bg, 7);
+	const hubDkBg = str(b.hub_dk_bg, 7);
+	if (!HEX_OR_NONE.test(hubBg) || !HEX_OR_NONE.test(hubDkBg)) return fail('The centre background must be like #ffffff');
 	const before = await imagesInUse(ctx.env.DB, p.id);
 	await ctx.env.DB.batch([
 		ctx.env.DB.prepare('UPDATE lp_people SET name = ?, bio = ?, photo = ?, basic_mode = ?, diary_default = ?, updated_at = ? WHERE id = ?').bind(
@@ -142,6 +146,9 @@ export async function saveProfile(ctx: Ctx): Promise<Response> {
 			`INSERT INTO lp_page_dark (person_id, linked, icon, tint, zoom) VALUES (?, ?, ?, ?, ?)
 			 ON CONFLICT(person_id) DO UPDATE SET linked = excluded.linked, icon = excluded.icon, tint = excluded.tint, zoom = excluded.zoom`,
 		).bind(p.id, b.hub_dk_linked === false || b.hub_dk_linked === 0 ? 0 : 1, hubDkIcon, hubDkTint.toLowerCase(), cleanZoom(b.hub_dk_zoom)),
+		ctx.env.DB.prepare(
+			`INSERT INTO lp_page_bg (person_id, bg, dk_bg) VALUES (?, ?, ?) ON CONFLICT(person_id) DO UPDATE SET bg = excluded.bg, dk_bg = excluded.dk_bg`,
+		).bind(p.id, hubBg.toLowerCase(), hubDkBg.toLowerCase()),
 	]);
 	forgetImages(ctx, before, await imagesInUse(ctx.env.DB, p.id));
 	return json({ ok: true });
@@ -165,6 +172,8 @@ interface InNode {
 	dk_icon?: string;
 	dk_tint?: string;
 	dk_zoom?: number;
+	bg?: string;
+	dk_bg?: string;
 }
 
 const slugify = (s: string) =>
@@ -212,6 +221,7 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 		if (!TINT_RE.test(String(n.tint ?? ''))) return fail(`The colour for "${label}" must be like #3f9c00`);
 		if (n.dk_icon && !ICON_KEYS.includes(n.dk_icon)) n.dk_icon = '';
 		if (!TINT_RE.test(String(n.dk_tint ?? ''))) return fail(`The dark-mode colour for "${label}" must be like #3f9c00`);
+		if (!HEX_OR_NONE.test(String(n.bg ?? '')) || !HEX_OR_NONE.test(String(n.dk_bg ?? ''))) return fail(`The background for "${label}" must be like #ffffff`);
 		if (!/^(|\d{2}|\d{4}|\d{6})$/.test(String(n.day ?? ''))) return fail(`The date for "${label}" must be YY, YYMM or YYMMDD, like 2608 or 260822`);
 		if (!okImage(str(n.image, 300), p.handle)) return fail(`The image for "${label}" is not one of your uploads`);
 		keys.set(n.key, n);
@@ -296,10 +306,15 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 	const renames = list
 		.filter((n) => n.id != null && n.kind !== 'link' && placeholder.test(existingById.get(n.id)!.slug) && slugify(n.label) !== 'link')
 		.map((n) => db.prepare('UPDATE lp_nodes SET slug = ? WHERE id = ? AND person_id = ?').bind(slugFor(n), n.id!, p.id));
+	const backs = list.map((n) =>
+		db
+			.prepare(`INSERT INTO lp_node_bg (node_id, bg, dk_bg) VALUES (?, ?, ?) ON CONFLICT(node_id) DO UPDATE SET bg = excluded.bg, dk_bg = excluded.dk_bg`)
+			.bind(idOf.get(n.key)!, String(n.bg ?? '').toLowerCase(), String(n.dk_bg ?? '').toLowerCase()),
+	);
 	const deletes = existing.filter((r) => !keep.has(r.id)).map((r) => db.prepare('DELETE FROM lp_nodes WHERE id = ? AND person_id = ?').bind(r.id, p.id));
 	const imagesBefore = await imagesInUse(db, p.id);
 	try {
-		await db.batch([...updates, ...renames, ...styles, ...darks, ...deletes, db.prepare('UPDATE lp_people SET updated_at = ? WHERE id = ?').bind(nowIso(), p.id)]);
+		await db.batch([...updates, ...renames, ...styles, ...darks, ...backs, ...deletes, db.prepare('UPDATE lp_people SET updated_at = ? WHERE id = ?').bind(nowIso(), p.id)]);
 	} catch (e) {
 		if (fresh.length) await db.batch(fresh.map((n) => db.prepare('DELETE FROM lp_nodes WHERE id = ? AND person_id = ?').bind(idOf.get(n.key)!, p.id))).catch(() => {});
 		throw e;

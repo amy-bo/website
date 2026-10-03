@@ -2,7 +2,7 @@
 // Privacy: only the page, the link slug and the UTC time are stored. No IP, user agent, referrer or cookie.
 import type { Env as EventsEnv } from '../../eventsandeye/src/env';
 import { HANDLE_RE, byDate, diaryEntries, loadPage, walk } from './model';
-import { BOOT, renderDiary, renderPage } from './render';
+import { BOOT, THEME, renderDiary, renderPage } from './render';
 
 export interface Env extends EventsEnv {
 	LINKS_BUCKET?: R2Bucket;
@@ -27,11 +27,15 @@ const count = (ctx: Ctx, page: string, slug: string) => {
 };
 
 // The page's one inline script (the map loader) is allowed by its hash; nothing else inline can run.
+// (and the theme script in the head).
 let bootHash = '';
 async function scriptHash(): Promise<string> {
 	if (!bootHash) {
-		const d = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(BOOT)));
-		bootHash = `'sha256-${btoa(String.fromCharCode(...d))}'`;
+		const hash = async (src: string) => {
+			const d = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(src)));
+			return `'sha256-${btoa(String.fromCharCode(...d))}'`;
+		};
+		bootHash = `${await hash(BOOT)} ${await hash(THEME)}`;
 	}
 	return bootHash;
 }

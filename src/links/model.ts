@@ -22,6 +22,9 @@ export interface Person {
 	hub_dk_icon: string;
 	hub_dk_tint: string;
 	hub_dk_zoom: number;
+	/** The centre circle's colour in light and dark ('' = the page's own). */
+	hub_bg: string;
+	hub_dk_bg: string;
 }
 
 export interface LinkNode {
@@ -47,6 +50,9 @@ export interface LinkNode {
 	dk_icon: string;
 	dk_tint: string;
 	dk_zoom: number;
+	/** The circle's colour behind the picture, light and dark ('' = the page's own). */
+	bg: string;
+	dk_bg: string;
 	children: LinkNode[];
 }
 
@@ -100,14 +106,16 @@ export const pagePath = (handle: string) => (handle === 'amybo' ? '/links' : `/~
 /** Every item of a person's page, with its picture style. */
 export const NODE_SELECT = `SELECT n.id, n.parent_id, n.kind, n.slug, n.label, n.url, n.icon, n.image, n.body, n.seed, n.position,
 	COALESCE(m.tint, '') AS tint, COALESCE(m.zoom, 1) AS zoom, COALESCE(m.day, '') AS day, COALESCE(m.highlight, 0) AS highlight,
-	COALESCE(d.linked, 1) AS dk_linked, COALESCE(d.icon, '') AS dk_icon, COALESCE(d.tint, '') AS dk_tint, COALESCE(d.zoom, 1) AS dk_zoom
-	FROM lp_nodes n LEFT JOIN lp_node_meta m ON m.node_id = n.id LEFT JOIN lp_node_dark d ON d.node_id = n.id WHERE n.person_id = ?`;
+	COALESCE(d.linked, 1) AS dk_linked, COALESCE(d.icon, '') AS dk_icon, COALESCE(d.tint, '') AS dk_tint, COALESCE(d.zoom, 1) AS dk_zoom,
+	COALESCE(b.bg, '') AS bg, COALESCE(b.dk_bg, '') AS dk_bg
+	FROM lp_nodes n LEFT JOIN lp_node_meta m ON m.node_id = n.id LEFT JOIN lp_node_dark d ON d.node_id = n.id LEFT JOIN lp_node_bg b ON b.node_id = n.id WHERE n.person_id = ?`;
 
 /** The person's row with their page settings. */
 export const PERSON_SELECT = `SELECT p.id, p.handle, p.email, p.name, p.bio, p.photo, p.kind, p.basic_mode, p.diary_default,
 	COALESCE(m.accent, '') AS accent, COALESCE(m.hub_icon, '') AS hub_icon, COALESCE(m.hub_tint, '') AS hub_tint, COALESCE(m.hub_zoom, 1) AS hub_zoom,
-	COALESCE(d.linked, 1) AS hub_dk_linked, COALESCE(d.icon, '') AS hub_dk_icon, COALESCE(d.tint, '') AS hub_dk_tint, COALESCE(d.zoom, 1) AS hub_dk_zoom
-	FROM lp_people p LEFT JOIN lp_page_meta m ON m.person_id = p.id LEFT JOIN lp_page_dark d ON d.person_id = p.id`;
+	COALESCE(d.linked, 1) AS hub_dk_linked, COALESCE(d.icon, '') AS hub_dk_icon, COALESCE(d.tint, '') AS hub_dk_tint, COALESCE(d.zoom, 1) AS hub_dk_zoom,
+	COALESCE(b.bg, '') AS hub_bg, COALESCE(b.dk_bg, '') AS hub_dk_bg
+	FROM lp_people p LEFT JOIN lp_page_meta m ON m.person_id = p.id LEFT JOIN lp_page_dark d ON d.person_id = p.id LEFT JOIN lp_page_bg b ON b.person_id = p.id`;
 
 /** Diary entries: everything inside a diary item that isn't a group, at any depth. */
 export function diaryEntries(roots: LinkNode[]): LinkNode[] {

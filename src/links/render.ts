@@ -59,10 +59,15 @@ const hexLum = (hex: string) => {
 };
 
 /** Inline style giving a brand mark its colour, adjusted so it reads on light and dark tiles. */
-function brandStyle(key: string): string {
+function brandStyle(key: string, onColour = ''): string {
 	const i = icon(key);
 	if (!i.brand || !i.hex) return '';
 	const lum = hexLum(i.hex);
+	if (onColour) {
+		// On a circle of its own colour: the brand colour, unless it would vanish into that circle.
+		const c = Math.abs(lum - hexLum(onColour.slice(1))) < 0.25 ? (hexLum(onColour.slice(1)) > 0.5 ? '#111' : '#fff') : `#${i.hex}`;
+		return ` style="--brand:${c};--brand-d:${c}"`;
+	}
 	const light = lum > 0.55 ? 'var(--ink)' : `#${i.hex}`;
 	const dark = lum < 0.12 ? 'var(--ink)' : `#${i.hex}`;
 	return ` style="--brand:${light};--brand-d:${dark}"`;
@@ -136,7 +141,7 @@ function withDiary(nodes: LinkNode[]): LinkNode[] {
 		if (!highlights.length || highlights.length === entries.length) return { ...n, children: entries };
 		const all: LinkNode = {
 			id: -2_000_000 - n.id, parent_id: n.id, kind: 'group', slug: `${n.slug}-all`, label: 'All', url: '', icon: 'diary', image: '',
-			body: '', seed: 0, position: 0, tint: '', zoom: 1, day: '', highlight: 0, dk_linked: 1, dk_icon: '', dk_tint: '', dk_zoom: 1,
+			body: '', seed: 0, position: 0, tint: '', zoom: 1, day: '', highlight: 0, dk_linked: 1, dk_icon: '', dk_tint: '', dk_zoom: 1, bg: '', dk_bg: '',
 			children: entries.map((e) => ({ ...e, id: -3_000_000 - e.id, parent_id: -2_000_000 - n.id })),
 		};
 		return { ...n, children: [...highlights, all] };
@@ -235,10 +240,10 @@ function layout(top: LinkNode[]): Map<number, { x: number; y: number; r: number;
 }
 
 /** Colour for a picture: '' keeps its own colours, 'mono' uses the page's ink, '#rrggbb' that colour. */
-function tintStyle(key: string, tint: string): string {
-	if (tint === 'mono') return ' style="--brand:var(--ink);--brand-d:var(--ink);color:var(--ink)"';
+function tintStyle(key: string, tint: string, onColour = ''): string {
+	if (tint === 'mono') return ' style="--brand:var(--accent-ink);--brand-d:var(--accent-ink);color:var(--accent-ink)"';
 	if (/^#[0-9a-f]{6}$/i.test(tint)) return ` style="--brand:${tint};--brand-d:${tint};color:${tint}"`;
-	return brandStyle(key);
+	return brandStyle(key, onColour);
 }
 
 /** The id of the SVG filter that paints a logo in a single colour, or '' for its own colours. */
@@ -250,14 +255,14 @@ function tintFilters(tints: Set<string>): string {
 		.map((t) => {
 			const id = tintFilterId(t);
 			if (!id) return '';
-			const flood = t === 'mono' ? 'style="flood-color:var(--ink)"' : `flood-color="${t}"`;
+			const flood = t === 'mono' ? 'style="flood-color:var(--accent-ink)"' : `flood-color="${t}"`;
 			return `<filter id="${id}" color-interpolation-filters="sRGB"><feFlood ${flood}/><feComposite in2="SourceAlpha" operator="in"/></filter>`;
 		})
 		.join('');
 }
 
 /** A node's picture, centred on (x, y). `uid` keeps clip-path ids unique; `zoom` sizes the picture in its circle. */
-function iconMarkup(key: string, x: number, y: number, r: number, uid: string | number = '', tint = '', zoom = 1, forDark = false, inline = false): string {
+function iconMarkup(key: string, x: number, y: number, r: number, uid: string | number = '', tint = '', zoom = 1, forDark = false, inline = false, onColour = ''): string {
 	const i = icon(key);
 	const z = Math.min(2.4, Math.max(0.6, zoom || 1));
 	if (i.logo) {
@@ -272,12 +277,12 @@ function iconMarkup(key: string, x: number, y: number, r: number, uid: string | 
 		// colour recolours the logo's shape (its transparent background stays clear).
 		const w = r * (l.scale ?? 1.3) * z;
 		const single = tintFilterId(tint);
-		const cls = !single && l.invert && !forDark ? ' class="inv"' : '';
+		const cls = !single && l.invert && !forDark && !onColour ? ' class="inv"' : '';
 		return `${bg}<image href="${esc(l.src)}" x="${round(x - w / 2)}" y="${round(y - w / 2)}" width="${round(w)}" height="${round(w)}" preserveAspectRatio="xMidYMid meet"${cls}${single ? ` filter="url(#${single})"` : ''}/>`;
 	}
 	const s = round(r * 1.05 * z);
-	if (inline) return `<svg viewBox="0 0 24 24" class="${i.brand ? 'ib' : 'il'}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${s}" height="${s}"${tintStyle(key, tint)}>${i.svg}</svg>`;
-	return `<use href="#i-${esc(key)}" class="${i.brand ? 'ib' : 'il'}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${s}" height="${s}"${tintStyle(key, tint)}/>`;
+	if (inline) return `<svg viewBox="0 0 24 24" class="${i.brand ? 'ib' : 'il'}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${s}" height="${s}"${tintStyle(key, tint, onColour)}>${i.svg}</svg>`;
+	return `<use href="#i-${esc(key)}" class="${i.brand ? 'ib' : 'il'}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${s}" height="${s}"${tintStyle(key, tint, onColour)}/>`;
 }
 
 /** A node's picture for both modes: one drawing while light and dark are linked; two (one shown per mode) when not. */
@@ -288,28 +293,40 @@ function picture(n: LinkNode, x: number, y: number, r: number, uid: string, inli
 		const s = round((r * 2 - 3) * z);
 		return `<clipPath id="p${uid}"><circle cx="${x}" cy="${y}" r="${round(r - 1.5)}"/></clipPath><image href="${esc(mediaUrl(n.image))}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${s}" height="${s}" preserveAspectRatio="xMidYMid slice" clip-path="url(#p${uid})"/>`;
 	}
-	const light = iconMarkup(nodeIcon(n), x, y, r, uid, n.tint, n.zoom, false, inline);
+	// A circle colour of its own sits behind the picture, which then keeps its colours in both modes.
+	const disc = (c: string) => (c ? `<circle cx="${x}" cy="${y}" r="${round(r - 0.75)}" style="fill:${esc(c)};stroke:none"/>` : '');
+	const light = disc(n.bg) + iconMarkup(nodeIcon(n), x, y, r, uid, n.tint, n.zoom, false, inline, n.bg);
 	if (n.dk_linked !== 0) return light;
-	const dark = iconMarkup(n.dk_icon || nodeIcon(n), x, y, r, `${uid}d`, n.dk_tint, n.dk_zoom, true, inline);
+	const dark = disc(n.dk_bg) + iconMarkup(n.dk_icon || nodeIcon(n), x, y, r, `${uid}d`, n.dk_tint, n.dk_zoom, true, inline, n.dk_bg);
 	return `<g class="lt">${light}</g><g class="dk">${dark}</g>`;
 }
 
+/** The centre, as a node, when it shows a picture rather than a photo. */
+const hubNode = (p: PageData['person']): LinkNode =>
+	({ kind: 'link', icon: p.hub_icon, image: '', tint: p.hub_tint, zoom: p.hub_zoom, dk_linked: p.hub_dk_linked, dk_icon: p.hub_dk_icon || p.hub_icon, dk_tint: p.hub_dk_tint, dk_zoom: p.hub_dk_zoom, bg: p.hub_bg, dk_bg: p.hub_dk_bg, children: [] }) as unknown as LinkNode;
+
 /** One item's picture drawn exactly as the page draws it (same colours for light and dark, logo inversion, separate
  * dark pictures), in a self-contained SVG for the editor. Its styles are TILE_CSS. */
-export function tileSvg(n: Pick<LinkNode, 'kind' | 'icon' | 'image' | 'tint' | 'zoom' | 'dk_linked' | 'dk_icon' | 'dk_tint' | 'dk_zoom'> & { children?: LinkNode[] }, uid: string, ring = true): string {
+export function tileSvg(n: Pick<LinkNode, 'kind' | 'icon' | 'image' | 'tint' | 'zoom' | 'dk_linked' | 'dk_icon' | 'dk_tint' | 'dk_zoom' | 'bg' | 'dk_bg'> & { children?: LinkNode[] }, uid: string, ring = true): string {
 	const node = { label: '', children: [], ...n } as unknown as LinkNode;
 	const filters = tintFilters(new Set([n.tint, n.dk_linked === 0 ? n.dk_tint : ''].filter((t) => t && icon(nodeIcon(node)).logo)));
 	return `<svg class="l-tile" viewBox="-24 -24 48 48" aria-hidden="true">${filters ? `<defs>${filters}</defs>` : ''}${ring ? '<circle class="tn" r="22.5"/>' : ''}${picture(node, 0, 0, 22, uid, true)}</svg>`;
 }
+const TILE_LIGHT = (pre: string) =>
+	`${pre} .l-tile{--bg:#f6f8f4;--node:#fff;--line:#d8e2cf;--ink:#16210f;--accent-ink:#1d6b00}[data-tint] ${pre} .l-tile{--accent-ink:var(--ti)}` +
+	`${pre} .l-tile svg.ib{fill:var(--brand,currentColor)}${pre} .l-tile .inv{filter:none}${pre} .l-tile .lt{display:inline}${pre} .l-tile .dk{display:none}`;
+const TILE_DARK = (pre: string) =>
+	`${pre} .l-tile{--bg:#0b1208;--node:#142010;--line:#24361d;--ink:#e6f0df;--accent-ink:#b7e27c}[data-tint] ${pre} .l-tile{--accent-ink:var(--tid)}` +
+	`${pre} .l-tile svg.ib{fill:var(--brand-d,currentColor)}${pre} .l-tile .inv{filter:invert(1) hue-rotate(180deg) brightness(1.15)}${pre} .l-tile .lt{display:none}${pre} .l-tile .dk{display:inline}`;
+/** Styles for tileSvg: the page's own colours for the viewer's mode, or for one mode inside .l-light / .l-dark. */
 export const TILE_CSS = `.l-tile{width:100%;height:100%;display:block;overflow:visible}
-.l-tile .tn{fill:var(--node,#fff);stroke:var(--line);stroke-width:1.5}
+.l-tile .tn{fill:var(--node);stroke:var(--line);stroke-width:1.5}
 .l-tile svg{color:var(--accent-ink)}
-.l-tile svg.ib{fill:var(--brand,currentColor)}
 .l-tile svg.il{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.l-tile .dk{display:none}
-[data-tint] .l-tile{--accent-ink:var(--ti)}
-@media (prefers-color-scheme:dark){[data-tint] .l-tile{--accent-ink:var(--tid)}}
-@media (prefers-color-scheme:dark){.l-tile svg.ib{fill:var(--brand-d,currentColor)}.l-tile .inv{filter:invert(1) hue-rotate(180deg) brightness(1.15)}.l-tile .lt{display:none}.l-tile .dk{display:inline}}`;
+${TILE_LIGHT('')}
+@media (prefers-color-scheme:dark){${TILE_DARK('')}}
+${TILE_LIGHT('.l-light')}
+${TILE_DARK('.l-dark')}`;
 
 /** Small dots on the far side of a group from its parent, one per item it holds: groups open, everything else is
  * a link. `angle` points away from the parent (radians); the live map turns the arc as the group moves. With many
@@ -362,7 +379,7 @@ function graphData(roots: LinkNode[], ctx: Ctx) {
 	const hubDark = p.hub_dk_linked === 0 ? iconMarkup(p.hub_dk_icon || p.hub_icon || 'person', 0, 0, 42, 'hubd', p.hub_dk_tint, p.hub_dk_zoom, true) : '';
 	const hubPic = (light: string) => (hubDark ? `<g class="lt">${light}</g><g class="dk">${hubDark}</g>` : light);
 	const hub = p.hub_icon
-		? `<circle class="hub" r="42"/>${hubPic(iconMarkup(p.hub_icon, 0, 0, 42, 'hub', p.hub_tint, p.hub_zoom))}`
+		? `<circle class="hub" r="42"/>${picture(hubNode(p), 0, 0, 42, 'hub')}`
 		: p.kind === 'org'
 			? `<circle class="hub" r="42"/>${hubPic(`<image href="${esc(mediaUrl(p.photo))}" x="${round(-30 * p.hub_zoom)}" y="${round(-21 * p.hub_zoom)}" width="${round(60 * p.hub_zoom)}" height="${round(42 * p.hub_zoom)}" class="inv" preserveAspectRatio="xMidYMid meet"/>`)}`
 			: p.photo
@@ -426,15 +443,63 @@ export interface RenderOptions {
 	preview?: boolean;
 }
 
+/** Splits a selector list at its top-level commas (not those inside :is(...) and the like). */
+function splitSelectors(sel: string): string[] {
+	const out: string[] = [];
+	let depth = 0;
+	let cur = '';
+	for (const ch of sel) {
+		if (ch === '(') depth++;
+		if (ch === ')') depth--;
+		if (ch === ',' && depth === 0) {
+			out.push(cur.trim());
+			cur = '';
+		} else cur += ch;
+	}
+	if (cur.trim()) out.push(cur.trim());
+	return out;
+}
+
+/** Lets visitors choose light, dark or automatic: each dark-mode block applies automatically unless they chose light
+ * (html[data-theme=light]), and also whenever they chose dark (html[data-theme=dark]). */
+function themed(css: string): string {
+	const open = '@media (prefers-color-scheme:dark){';
+	let out = '';
+	let at = 0;
+	const forced: string[] = [];
+	for (let i = css.indexOf(open); i !== -1; i = css.indexOf(open, at)) {
+		out += css.slice(at, i);
+		let depth = 1;
+		let k = i + open.length;
+		for (; depth && k < css.length; k++) depth += css[k] === '{' ? 1 : css[k] === '}' ? -1 : 0;
+		const inner = css.slice(i + open.length, k - 1);
+		const auto: string[] = [];
+		for (const m of inner.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+			const sels = splitSelectors(m[1]);
+			const scope = (pre: string) => sels.map((x) => (x.startsWith(':root') ? pre + x.slice(5) : `${pre} ${x}`)).join(',');
+			auto.push(`${scope(':root:not([data-theme=light])')}{${m[2]}}`);
+			forced.push(`${scope(':root[data-theme=dark]')}{${m[2]}}`);
+		}
+		out += `${open}${auto.join('')}}`;
+		at = k;
+	}
+	out += css.slice(at);
+	return `${out}\n${forced.join('\n')}\n:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}`;
+}
+
+/** Runs first, in the head: applies the visitor's chosen theme before anything is drawn, and makes the footer's
+ * theme button cycle automatic → light → dark (remembered on this device only). */
+export const THEME = `(()=>{const d=document.documentElement,K='lp-theme',L={'':'Automatic',light:'Light',dark:'Dark'};let t='';try{t=localStorage.getItem(K)||''}catch{}if(t!=='light'&&t!=='dark')t='';const set=v=>{t=v;if(v)d.dataset.theme=v;else delete d.dataset.theme;try{v?localStorage.setItem(K,v):localStorage.removeItem(K)}catch{}const b=document.querySelector('.l-theme');if(b){b.setAttribute('aria-label','Theme: '+L[v]);b.title='Theme: '+L[v]}};set(t);addEventListener('DOMContentLoaded',()=>set(t));addEventListener('click',e=>{if(e.target.closest&&e.target.closest('.l-theme'))set(t===''?'light':t==='light'?'dark':'')})})();`;
+
 function head(title: string, description: string, canonical: string, extra = ''): string {
 	return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(description)}"><meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#f6f8f4" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#0b1208" media="(prefers-color-scheme: dark)">
 <meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(description)}"><meta property="og:url" content="${esc(canonical)}"><meta property="og:type" content="profile">
-<link rel="canonical" href="${esc(canonical)}"><link rel="icon" href="/favicon.svg">${extra}<style>${CSS}</style></head>`;
+<link rel="canonical" href="${esc(canonical)}"><link rel="icon" href="/favicon.svg"><script>${THEME}</script>${extra}<style>${CSS}</style></head>`;
 }
 
-const FOOT = `<footer class="foot"><a href="https://amybo.org/">AMYBO</a> · clicks are counted, nothing about you is stored · <a href="https://amybo.org/privacy/">Privacy</a></footer>`;
+const FOOT = `<footer class="foot"><a href="https://amybo.org/">AMYBO</a> · clicks are counted, nothing about you is stored · <a href="https://amybo.org/privacy/">Privacy</a> <button type="button" class="l-theme" aria-label="Theme: Automatic"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="t-auto"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5v15a7.5 7.5 0 0 0 0-15z" class="fill"/></g><g class="t-light"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></g><g class="t-dark"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/></g></svg></button></footer>`;
 
 export function renderPage(data: PageData, opts: RenderOptions = {}): string {
 	const p = data.person;
@@ -533,7 +598,14 @@ ${FOOT}
  * /link-assets/graph.js. Links on the map are plain links and work without it. */
 export const BOOT = `(()=>{const b=document.body,m=document.querySelector('.map');let go;const rm=matchMedia('(prefers-reduced-motion: reduce)').matches;const vt=f=>document.startViewTransition&&!rm?document.startViewTransition(f):f();const small=()=>matchMedia('(max-width: 56rem)').matches;const load=()=>m?(go=go||import('/link-assets/graph.js').then(g=>g.start(m))):Promise.resolve(null);const show=s=>{const t=document.querySelector('.tree [data-s="'+CSS.escape(s)+'"]');if(!t)return;for(let d=t.closest('details');d;d=d.parentElement.closest('details'))d.open=true;if(t.tagName==='SUMMARY')t.parentElement.open=true;t.scrollIntoView({block:'nearest',behavior:rm?'auto':'smooth'});t.classList.remove('flash');void t.offsetWidth;t.classList.add('flash');const n=+t.dataset.n;if(m&&!small())load().then(x=>x&&x.goto(n))};const fromHash=()=>{const s=decodeURIComponent(location.hash.slice(1));if(s)show(s)};addEventListener('hashchange',fromHash);if(location.hash)fromHash();addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'&&!e.target.closest('input,textarea,[contenteditable]')){e.preventDefault();e.shiftKey?history.forward():history.back()}});if(!m)return;const act=(e,g)=>{e.preventDefault();load().then(x=>x.tap(+g.dataset.g))};m.addEventListener('click',e=>{if(small()&&!b.classList.contains('map-on')){e.preventDefault();vt(()=>b.classList.add('map-on'));load();return}const g=e.target.closest('g[data-g]');if(g)act(e,g)});m.addEventListener('pointerdown',e=>{if(small()&&!b.classList.contains('map-on'))return;const n=e.target.closest('[data-g]');if(n)load().then(x=>x.grab(e,+n.dataset.g))});m.addEventListener('keydown',e=>{const g=e.target.closest&&e.target.closest('g[data-g]');if(g&&(e.key==='Enter'||e.key===' '))act(e,g)});const off=()=>{if(b.classList.contains('map-on'))vt(()=>b.classList.remove('map-on'))};m.querySelector('.back').addEventListener('click',e=>{e.stopPropagation();off()});addEventListener('keydown',e=>{if(e.key==='Escape')off()})})();`;
 
-const CSS = `
+const CSS = themed(`
+.l-theme{vertical-align:middle;margin-left:.35rem;width:1.6rem;height:1.6rem;padding:.2rem;border:0;border-radius:50%;background:none;color:var(--muted);cursor:pointer}
+.l-theme:hover{color:var(--ink);background:color-mix(in srgb,var(--ink) 8%,transparent)}
+.l-theme svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.l-theme .fill{fill:currentColor;stroke:none}
+.l-theme .t-light,.l-theme .t-dark{display:none}
+[data-theme=light] .l-theme .t-auto,[data-theme=dark] .l-theme .t-auto{display:none}
+[data-theme=light] .l-theme .t-light,[data-theme=dark] .l-theme .t-dark{display:inline}
 :root{--bg:#f6f8f4;--ink:#16210f;--muted:#66745f;--line:#d8e2cf;--accent:#3f9c00;--accent-ink:#1d6b00;--node:#fff;--ease:cubic-bezier(.2,.8,.2,1)}
 @media (prefers-color-scheme:dark){:root{--bg:#0b1208;--ink:#e6f0df;--muted:#97a88e;--line:#24361d;--accent:#87bd25;--accent-ink:#b7e27c;--node:#142010}.inv{filter:invert(1) hue-rotate(180deg) brightness(1.15)}}
 [data-tint]{--accent:var(--t);--accent-ink:var(--ti)}
@@ -624,4 +696,4 @@ svg.il,use.il{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:roun
 .entry h2{font-size:1.15rem;margin:.15rem 0 .5rem;letter-spacing:-.01em}
 .star{color:var(--accent)}
 .empty{color:var(--muted)}
-`;
+`);

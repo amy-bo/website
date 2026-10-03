@@ -3,7 +3,7 @@
 -- Separate tables (rather than new columns) so this file stays safe to run on every deploy.
 CREATE TABLE IF NOT EXISTS lp_node_meta (
 	node_id INTEGER PRIMARY KEY REFERENCES lp_nodes(id) ON DELETE CASCADE,
-	tint TEXT NOT NULL DEFAULT '',   -- '' original colours, 'mono' the page's text colour, or '#rrggbb'
+	tint TEXT NOT NULL DEFAULT '',   -- '' original colours, 'mono' the page tint, or '#rrggbb'
 	zoom REAL NOT NULL DEFAULT 1,    -- picture size within its circle, 0.6 to 2.4
 	day TEXT NOT NULL DEFAULT '',    -- optional short date: YY, YYMM or YYMMDD (diary entries)
 	highlight INTEGER NOT NULL DEFAULT 0
@@ -30,6 +30,17 @@ CREATE TABLE IF NOT EXISTS lp_page_dark (
 	icon TEXT NOT NULL DEFAULT '',
 	tint TEXT NOT NULL DEFAULT '',
 	zoom REAL NOT NULL DEFAULT 1
+);
+-- A picture's circle colour, for light and dark ('' = the page's own).
+CREATE TABLE IF NOT EXISTS lp_node_bg (
+	node_id INTEGER PRIMARY KEY REFERENCES lp_nodes(id) ON DELETE CASCADE,
+	bg TEXT NOT NULL DEFAULT '',
+	dk_bg TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS lp_page_bg (
+	person_id INTEGER PRIMARY KEY REFERENCES lp_people(id) ON DELETE CASCADE,
+	bg TEXT NOT NULL DEFAULT '',
+	dk_bg TEXT NOT NULL DEFAULT ''
 );
 
 -- Martin's "Email" group held one link; it becomes that link, named Email, where the group was. Runs once.

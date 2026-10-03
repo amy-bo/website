@@ -113,9 +113,9 @@
 	<dialog id="picker" aria-labelledby="picker-title">
 		<div class="pickhead"><h2 id="picker-title">Picture</h2><button type="button" id="pick-close" class="icon-btn" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
 		<div class="modes">
-			<button type="button" class="mode on" data-mode="light" title="How it looks on the light page. Click to edit it."><span id="pv-light" class="pv"></span><span>Light</span></button>
+			<button type="button" class="mode on" data-mode="light" title="Edit the light version"><span id="pv-light" class="pv"></span><span>Light</span></button>
 			<button type="button" id="chain" class="chain" aria-pressed="true" aria-label="Link dark mode to light mode"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="whole" d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/><path class="halves" d="M9.5 6.5L11 5a4 4 0 0 1 6 0 4 4 0 0 1 0 6l-1.5 1.5M14.5 17.5L13 19a4 4 0 0 1-6 0 4 4 0 0 1 0-6l1.5-1.5M4 4l3 3M20 20l-3-3"/></svg></button>
-			<button type="button" class="mode" data-mode="dark" title="How it looks on the dark page. Click to edit it; a change gives dark its own picture."><span id="pv-dark" class="pv"></span><span>Dark</span></button>
+			<button type="button" class="mode" data-mode="dark" title="Edit the dark version"><span id="pv-dark" class="pv"></span><span>Dark</span></button>
 		</div>
 		<div id="suggested" class="suggested"></div>
 		<label id="pick-upload" class="uploadbtn"><input id="pick-file" type="file" accept="image/*" /> Upload your own</label>
@@ -123,9 +123,10 @@
 			<legend>Colour</legend>
 			<label><input type="radio" name="tint" value="orig" /> Original</label>
 			<span id="tint-single-wrap"><label><input type="radio" name="tint" value="single" /> Single colour:</label>
-				<label title="Dark on the light page, light on the dark page"><input id="tint-text" type="checkbox" /> Text colour</label>
+				<label title="Your page's tint, lighter on the dark page"><input id="tint-text" type="checkbox" /> Page tint</label>
 				<span class="or">or</span> <input id="tint-colour" type="color" aria-label="Pick a colour" /> <input id="tint-hex" class="hex" maxlength="7" aria-label="Colour as hex" placeholder="#3f9c00" /></span>
 		</fieldset>
+		<div class="bgrow"><span>Background</span> <label><input id="bg-page" type="checkbox" /> Page</label> <span class="or">or</span> <input id="bg-colour" type="color" aria-label="Background colour" /> <input id="bg-hex" class="hex" maxlength="7" aria-label="Background colour as hex" placeholder="#ffffff" /></div>
 		<label class="pickzoom">Size <input id="pick-zoom" type="range" min="0.6" max="2.4" step="0.05" /></label>
 		<input id="icon-search" type="search" placeholder="Search icons" aria-label="Search icons" />
 		<div id="icon-grid" class="grid"></div>
@@ -148,11 +149,11 @@
 			<dt>⌘ Z / ⇧ ⌘ Z</dt><dd>Undo / redo (outside a field: the whole page)</dd>
 		</dl>
 		<h3>Dates and stars</h3>
-		<p>Give an item a date (26, 2608 or 260822) with the calendar. In a group with dates, the newest comes first. Starred items come first, with everything else under All.</p>
+		<p>Click the calendar to date an item; delete digits to keep only the month (2608) or year (26). Dated items show newest first. Star items to put them first, with everything else under All.</p>
 		<h3>Aliases</h3>
-		<p>Copy an item's address from its ⋯ menu and paste it as another link's address: that link takes visitors to the original, on your page.</p>
+		<p>Copy an item's address from its ⋯ menu and paste it as a new link's address. Visitors who click it are taken to the original on your page.</p>
 		<h3>Pictures</h3>
-		<p>Light and dark show exactly as they will on your page. Click one to edit it. The chain between them links dark to light; change dark and it gets its own (click the chain to link them again; dark's choices are kept). With a photo, choose the part that shows when you add it.</p>
+		<p>Click Light or Dark to edit that version. Changing Dark unlinks it from Light; click the chain to link them again. Set a background colour to give a logo its own circle. When you add a photo, drag and zoom to choose what shows.</p>
 	</dialog>
 
 	<div id="toasts" class="toasts"></div>
@@ -266,7 +267,8 @@
 	.rowin .day{flex:none;width:5.2rem;font-family:ui-monospace,monospace;font-size:.85rem;padding:.25rem .4rem;background:var(--bg)}
 	.rowin .star{flex:none;border:0;background:none;font-size:1.15rem;color:var(--muted);width:1.9rem;height:1.9rem;border-radius:8px;cursor:pointer}
 	.rowin .star.on{color:var(--accent)}
-	.rowin .star:not(.on),.rowin .cal{opacity:.35}
+	.rowin .star:not(.on),.rowin .cal:not(.on){opacity:.35}
+	.rowin .cal.on{color:var(--accent-ink)}
 	.rowin:hover .star,.rowin:hover .cal,.rowin:focus-within .star,.rowin:focus-within .cal{opacity:1}
 	.rowin .cal{flex:none;border:0;background:none;width:1.9rem;height:1.9rem;border-radius:8px;display:grid;place-items:center;color:var(--muted);cursor:pointer}
 	.rowin .cal svg{width:1.05rem;height:1.05rem;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}
@@ -315,7 +317,13 @@
 	.mode{display:grid;justify-items:center;gap:.25rem;background:none;border:2px solid transparent;border-radius:16px;padding:.35rem .5rem;font-size:.78rem;font-weight:600;color:var(--muted);cursor:pointer}
 	.mode.on{border-color:var(--accent);color:var(--ink)}
 	.pv{display:block;width:4.5rem;height:4.5rem}
-	.pv svg{width:100%;height:100%;display:block}
+	.pvwrap{display:block;width:100%;height:100%;padding:.55rem;border-radius:12px;box-sizing:border-box}
+	.pvwrap.l-light{background:#f6f8f4}
+	.pvwrap.l-dark{background:#0b1208}
+	.bgrow{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;font-size:.9rem;margin:.2rem 0 .7rem}
+	.bgrow label{display:inline-flex;align-items:center;gap:.3rem;font-weight:400}
+	.bgrow label input{width:auto;margin:0}
+	.bgrow>span:first-child{font-weight:600;font-size:.82rem;color:var(--muted);margin-right:.3rem}
 	.chain{width:2.4rem;height:2.4rem;border-radius:50%;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;cursor:pointer;color:var(--accent-ink)}
 	.chain svg{width:1.2rem;height:1.2rem;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 	.chain .halves{display:none}

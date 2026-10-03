@@ -20,7 +20,8 @@ export function start(map) {
 	// ---- the tree ----
 	const hub = { id: 0, kind: 'hub', parent: null, children: [], x: 0, y: 0, r: 44, el: hubEl };
 	const byId = new Map([[0, hub]]);
-	for (const n of data.nodes) byId.set(n.id, { ...n, parent: n.parent ?? 0, children: [] });
+	// home: where the static drawing put each centre item (as an angle), so going back to the centre restores it.
+	for (const n of data.nodes) byId.set(n.id, { ...n, parent: n.parent ?? 0, children: [], home: Math.atan2(n.y ?? 0, n.x ?? 1) });
 	for (const n of byId.values()) if (n !== hub) byId.get(n.parent).children.push(n);
 	for (const n of byId.values()) Object.assign(n, { vx: 0, vy: 0, s: n === hub ? 1 : 0, ts: 0, op: 0, top: 0, on: false });
 	hub.s = hub.ts = 1;
@@ -256,9 +257,27 @@ export function start(map) {
 				n.vy += (dy / d) * push;
 			}
 		}
+		// Each of the focus's items is drawn towards its own place round the focus, so they spread out quickly instead
+		// of bunching: at the centre, where the static drawing had them; elsewhere, evenly across a fan facing away
+		// from the parent, in list order.
+		{
+			const vis = focus.children.filter((c) => role.has(c));
+			const k = vis.length;
+			const step = Math.min(0.95, (2 * Math.PI - 1.6) / Math.max(k, 1));
+			const awayA = Math.atan2(away[1], away[0]);
+			const acrossSign = Math.sign(-away[1] * across[0] + away[0] * across[1]) || 1;
+			vis.forEach((c, i) => {
+				const t = focus === hub ? c.home : awayA + acrossSign * (i - (k - 1) / 2) * step;
+				const tx = focus.x + Math.cos(t) * REST.child;
+				const ty = focus.y + Math.sin(t) * REST.child;
+				c.vx += (tx - c.x) * 0.045;
+				c.vy += (ty - c.y) * 0.045;
+			});
+		}
 		// The focus's items keep their list order around it, so their lines never cross or swap: measured as angles
 		// across the fan (from the "away" direction), each must sit at least a little past the one before.
-		{
+		// (At the centre the items keep the static drawing's places instead, which alternate right and left.)
+		if (focus !== hub) {
 			const [ax, ay] = away;
 			const [tx, ty] = across;
 			const vis = focus.children.filter((c) => role.has(c));

@@ -273,6 +273,7 @@ try {
 			{ key: 'txt', parent: null, kind: 'text', label: 'About my lab', body: 'We grow **things**.', tint: '#ff0000' },
 			{ key: 'lg', parent: null, kind: 'link', label: 'AMYBO', url: 'https://amybo.org/', icon: 'amybo', tint: '#00aa00' },
 			{ key: 'al', parent: null, kind: 'link', label: 'Back to AMYBO', url: 'https://amy.bo/~vee#amybo', icon: 'link' },
+			{ key: 'wb', parent: null, kind: 'link', label: 'On white', url: 'https://example.org/3', icon: 'amybo', bg: '#ffffff', dk_linked: 0, dk_icon: 'amybo', dk_bg: '#ffffff' },
 			{ key: 'dk', parent: null, kind: 'link', label: 'Two-tone', url: 'https://example.org/2', icon: 'github', dk_linked: 0, dk_icon: 'gitlab', dk_tint: '#ffaa00', dk_zoom: 1.5 },
 		];
 		check('bad colours are refused', (await req('PUT', '/api/links/nodes', { nodes: [...base, { key: 'bad', parent: null, kind: 'link', label: 'x', url: 'https://x.org', tint: 'red' }] }, C)).status === 400);
@@ -283,9 +284,11 @@ try {
 		check('a group with one link is that link, under the group\'s name', />Help me<\/a>/.test(pg.text) && !/<summary[^>]*>[^<]*<span class="tw"[^>]*>&gt;<\/span>Help me</.test(pg.text));
 		check('one twisty open per level (named details)', /<details name="l-\d+">/.test(pg.text) || /<details name="l-root"/.test(pg.text));
 		check('text items show their text in the list', pg.text.includes('About my lab') && pg.text.includes('We grow <strong>things</strong>.'));
-		check('monochrome and own-colour pictures', pg.text.includes('--brand:var(--ink)') && pg.text.includes('--brand:#ff0000'));
+		check('page-tint and own-colour pictures', pg.text.includes('--brand:var(--accent-ink)') && pg.text.includes('--brand:#ff0000'));
 		check('a link to an item on the same page is an alias', /class="alias"/.test(pg.text) && /href="#[a-z0-9-]+" class="alias"/.test(pg.text));
 		check('list items carry their address', /data-s="/.test(pg.text));
+		check('a circle colour sits behind the picture, and stops the logo inverting', /style="fill:#ffffff;stroke:none"\/><image href="[^"]*amybo[^"]*"[^>]*preserveAspectRatio="xMidYMid meet"\/>/.test(pg.text));
+		check('the theme switch is in the footer, and its script is allowed', /class="l-theme"/.test(pg.text) && /:root\[data-theme=dark\] /.test(pg.text) && (pg.headers.get('content-security-policy') || '').split('sha256-').length >= 3);
 		check('an unlinked dark picture is drawn for dark mode only', /<g class="lt">[^]*?#i-github[^]*?<\/g><g class="dk">[^]*?#i-gitlab[^]*?--brand:#ffaa00/.test(pg.text));
 		check('a single-colour logo gets its colour filter', pg.text.includes('<filter id="lt-00aa00"') && pg.text.includes('filter="url(#lt-00aa00)"'));
 		check('the page tint is applied', pg.text.includes('data-tint style="--t:#aa3377'));
