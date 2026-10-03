@@ -1,6 +1,6 @@
 // Link pages (amy.bo/~name): data model shared by the page renderer, the editor and the API.
 
-export type NodeKind = 'group' | 'link' | 'diary' | 'support';
+export type NodeKind = 'group' | 'link' | 'text' | 'diary' | 'support';
 
 export interface Person {
 	id: number;
@@ -11,6 +11,8 @@ export interface Person {
 	kind: 'person' | 'org';
 	basic_mode: number;
 	diary_default: 'all' | 'highlights';
+	/** Page tint: '' for AMYBO green, or '#rrggbb'. */
+	accent: string;
 }
 
 export interface LinkNode {
@@ -25,6 +27,9 @@ export interface LinkNode {
 	body: string;
 	seed: number;
 	position: number;
+	/** Picture colour: '' original, 'mono', or '#rrggbb'; and size within the circle (1 = normal). */
+	tint: string;
+	zoom: number;
 	children: LinkNode[];
 }
 
@@ -75,14 +80,22 @@ export const mediaUrl = (v: string) => (v.startsWith('r2:') ? `/links/media/${v.
 /** The path of a person's page on the site ("/links" for AMYBO's own). */
 export const pagePath = (handle: string) => (handle === 'amybo' ? '/links' : `/~${handle}`);
 
+/** Every item of a person's page, with its picture style. */
+export const NODE_SELECT = `SELECT n.id, n.parent_id, n.kind, n.slug, n.label, n.url, n.icon, n.image, n.body, n.seed, n.position,
+	COALESCE(s.tint, '') AS tint, COALESCE(s.zoom, 1) AS zoom
+	FROM lp_nodes n LEFT JOIN lp_node_style s ON s.node_id = n.id WHERE n.person_id = ?`;
+
 export async function loadPage(db: D1Database, handle: string): Promise<PageData | null> {
 	const person = await db
-		.prepare(`SELECT id, handle, name, bio, photo, kind, basic_mode, diary_default FROM lp_people WHERE handle = ? AND status = 'active'`)
+		.prepare(
+			`SELECT p.id, p.handle, p.name, p.bio, p.photo, p.kind, p.basic_mode, p.diary_default, COALESCE(s.accent, '') AS accent
+			 FROM lp_people p LEFT JOIN lp_page_style s ON s.person_id = p.id WHERE p.handle = ? AND p.status = 'active'`,
+		)
 		.bind(handle)
 		.first<Person>();
 	if (!person) return null;
 	const [nodes, diary] = await db.batch([
-		db.prepare('SELECT id, parent_id, kind, slug, label, url, icon, image, body, seed, position FROM lp_nodes WHERE person_id = ?').bind(person.id),
+		db.prepare(NODE_SELECT).bind(person.id),
 		db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(highlight), 0) AS h FROM lp_diary WHERE person_id = ?').bind(person.id),
 	]);
 	const counts = (diary.results[0] ?? { n: 0, h: 0 }) as { n: number; h: number };

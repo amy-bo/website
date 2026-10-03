@@ -79,6 +79,7 @@
 						<button id="add-link" class="primary">+ Add a link</button>
 						<button id="add-group" class="ghost">+ Group</button>
 						<button id="add-diary" class="ghost">+ Diary</button>
+						<button id="add-text" class="ghost">+ Text</button>
 						<button id="add-support" class="ghost">+ How I support</button>
 					</div>
 				</section>
@@ -96,6 +97,7 @@
 
 				<section class="card" aria-labelledby="h-settings">
 					<h2 id="h-settings">Settings</h2>
+					<div class="tintrow"><span>Page tint</span> <input id="s-tint" type="color" aria-label="Page tint" /> <input id="s-tint-hex" class="hex" maxlength="7" aria-label="Page tint as hex" /> <button id="s-tint-reset" class="link" type="button">Back to AMYBO green</button></div>
 					<label class="switch"><input id="s-map" type="checkbox" /><span class="track" aria-hidden="true"></span><span>Show the map of your links beside the list</span></label>
 					<p class="fine">Signed in as <span id="who"></span>. <button id="signout" class="link">Sign out</button></p>
 				</section>
@@ -120,6 +122,13 @@
 		<div class="pickhead"><h2 id="picker-title">Picture</h2><button type="button" id="pick-close" class="icon-btn" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
 		<div id="suggested" class="suggested"></div>
 		<label id="pick-upload" class="uploadbtn"><input id="pick-file" type="file" accept="image/*" /> Upload your own</label>
+		<fieldset class="pickstyle">
+			<legend>Colour</legend>
+			<label><input type="radio" name="tint" value="orig" /> Original</label>
+			<label><input type="radio" name="tint" value="mono" /> Monochrome</label>
+			<span id="tint-custom-wrap"><label><input type="radio" name="tint" value="custom" /> Own colour</label> <input id="tint-colour" type="color" aria-label="Pick a colour" /> <input id="tint-hex" class="hex" maxlength="7" aria-label="Colour as hex" placeholder="#3f9c00" /></span>
+		</fieldset>
+		<label class="pickzoom">Size <input id="pick-zoom" type="range" min="0.6" max="1.6" step="0.05" /></label>
 		<input id="icon-search" type="search" placeholder="Search icons" aria-label="Search icons" />
 		<div id="icon-grid" class="grid"></div>
 	</dialog>
@@ -213,7 +222,7 @@
 	.kids{margin:.45rem 0 0 1.4rem;padding-left:.7rem;border-left:1.5px solid var(--line)}
 	.row .rowin{display:flex;align-items:center;gap:.55rem;padding:.45rem .5rem .45rem .3rem;border:1px solid var(--line);border-radius:16px;background:var(--card);transition:box-shadow .15s,border-color .15s,opacity .15s}
 	.row .rowin:focus-within{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
-	.row.lp-group>.rowin{background:var(--tile);border-color:transparent}
+	.row.l-group>.rowin{background:var(--tile);border-color:transparent}
 	.row.dragging>.rowin{opacity:.35}
 	.drop-before{box-shadow:0 -3px 0 var(--accent)}
 	.drop-after{box-shadow:0 3px 0 var(--accent)}
@@ -237,12 +246,12 @@
 	.fields input,.fields textarea{background:transparent;border-color:transparent;padding:.15rem .4rem;border-radius:8px}
 	.fields input:hover,.fields textarea:hover{border-color:var(--line)}
 	.fields .lbl{font-weight:600}
-	.row.lp-group>.rowin .lbl{font-size:.8rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+	.row.l-group>.rowin .lbl{font-size:.8rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 	.fields .url{font-size:.82rem;color:var(--muted)}
 	.fields .body{margin-top:.3rem;background:var(--bg);border-color:var(--line);font-size:.9rem}
 	.sub{font-size:.8rem;color:var(--muted);padding:0 .4rem}
 	.chip{flex:none;font-size:.72rem;font-weight:600;color:var(--muted);background:var(--tile);border-radius:99px;padding:.1rem .5rem;white-space:nowrap}
-	.row.lp-group>.rowin .chip{background:var(--card)}
+	.row.l-group>.rowin .chip{background:var(--card)}
 	.more{flex:none;width:30px;height:30px;border:0;background:none;border-radius:8px;display:grid;place-items:center;color:var(--muted)}
 	.more svg{width:18px;height:18px;fill:currentColor}
 	.more:hover{background:var(--tile);color:var(--ink)}
@@ -266,6 +275,15 @@
 	.seg{border:0;padding:0;margin:.6rem 0 0;display:flex;gap:1rem;flex-wrap:wrap;align-items:center;font-size:.9rem}
 	.seg legend{float:left;font-weight:600;font-size:.8rem;color:var(--muted);margin-right:.4rem}
 	.seg input,.switch input,.hl-toggle input{width:auto}
+	.pickstyle{border:0;padding:0;margin:0 0 .6rem;display:flex;flex-wrap:wrap;gap:.4rem .9rem;align-items:center;font-size:.9rem}
+	.pickstyle legend,.pickzoom{font-weight:600;font-size:.8rem;color:var(--muted)}
+	.pickstyle input[type=radio]{width:auto}
+	input[type=color]{width:2.2rem;height:1.8rem;padding:0;border-radius:6px;vertical-align:middle}
+	.hex{width:6.2rem;font-family:ui-monospace,monospace;font-size:.85rem;padding:.3rem .5rem}
+	.pickzoom{display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem}
+	.pickzoom input{flex:1}
+	.tintrow{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.9rem;font-size:.95rem}
+	img.mono{filter:grayscale(1)}
 	/* switch */
 	.switch{display:flex;align-items:center;gap:.7rem;cursor:pointer}
 	.switch input{position:absolute;opacity:0}

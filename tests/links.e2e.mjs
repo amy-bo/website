@@ -134,7 +134,7 @@ try {
 		check('one portrait only (the map\'s centre)', !r.text.includes('class="avatar"') && (r.text.match(/martin-currie\.jpg/g) || []).length === 1);
 		check('a group with one link is just that link (Email)', /<a data-n="\d+" href="\/~martin\/go\/email">Email<\/a>/.test(r.text), (/.{0,80}go\/email.{0,40}/.exec(r.text) || [''])[0]);
 		check('hovering one lights up the other (CSS only)', r.text.includes(':has([data-n=') && r.text.includes(':has([data-g='));
-		const pics = JSON.parse(/<script type="application\/json" id="lp-data">([^<]*)<\/script>/.exec(r.text)[1].replace(/\\u003c/g, '<')).nodes.map((n) => n.icon);
+		const pics = JSON.parse(/<script type="application\/json" id="l-data">([^<]*)<\/script>/.exec(r.text)[1].replace(/\\u003c/g, '<')).nodes.map((n) => n.icon);
 		check('every picture on the map is different', new Set(pics).size === pics.length, pics.join(' '));
 		check('the email link asks for a "Contact Martin" heading', (await req('GET', '/~martin/go/email')).headers.get('location').includes('heading=Contact%20Martin'));
 		check('the map uses the real logos', r.text.includes('/link-media/logo-andeye.png') || r.text.includes('/link-media/amybo.svg'));
@@ -263,6 +263,27 @@ try {
 		const mv = await req('PUT', '/api/links/nodes', { nodes: moved }, C);
 		const m5 = (await req('GET', '/api/links/me', undefined, { cookie: `lp_s=${cookie}` })).data;
 		check('moving a link out of a group while deleting the group keeps the link', mv.status === 200 && m5.nodes.some((n) => n.id === mail.id && n.parent_id === null) && !m5.nodes.some((n) => n.id === deeper.id), mv.text);
+
+		// Text items, a group holding one link, colours and sizes, and the page tint.
+		const m6 = (await req('GET', '/api/links/me', undefined, { cookie: `lp_s=${cookie}` })).data;
+		const base = m6.nodes.map((n) => ({ id: n.id, key: `k${n.id}`, parent: n.parent_id ? `k${n.parent_id}` : null, kind: n.kind, label: n.label, url: n.url, icon: n.icon, image: n.image, body: n.body }));
+		const extra = [
+			{ key: 'help', parent: null, kind: 'group', label: 'Help me' },
+			{ key: 'pat', parent: 'help', kind: 'link', label: 'Patreon', url: 'https://patreon.com/x', icon: 'patreon', tint: 'mono', zoom: 1.3 },
+			{ key: 'txt', parent: null, kind: 'text', label: 'About my lab', body: 'We grow **things**.', tint: '#ff0000' },
+		];
+		check('bad colours are refused', (await req('PUT', '/api/links/nodes', { nodes: [...base, { key: 'bad', parent: null, kind: 'link', label: 'x', url: 'https://x.org', tint: 'red' }] }, C)).status === 400);
+		const sv = await req('PUT', '/api/links/nodes', { nodes: [...base, ...extra] }, C);
+		check('text items, colours and sizes save', sv.status === 200, sv.text);
+		await req('PUT', '/api/links/profile', { name: 'Vee', accent: '#aa3377' }, C);
+		const pg = await req('GET', '/~vee');
+		check('a group with one link keeps its twisty', /<summary data-n="\d+"><span class="tw" aria-hidden="true">&gt;<\/span>Help me<\/summary>/.test(pg.text));
+		check('text items show their text in the list', pg.text.includes('About my lab') && pg.text.includes('We grow <strong>things</strong>.'));
+		check('monochrome and own-colour pictures', pg.text.includes('--brand:var(--ink)') && pg.text.includes('--brand:#ff0000'));
+		check('the page tint is applied', pg.text.includes('data-tint style="--t:#aa3377'));
+		check('the tint must be a colour', (await req('PUT', '/api/links/profile', { name: 'Vee', accent: 'pink' }, C)).status === 400);
+		const m7 = (await req('GET', '/api/links/me', undefined, { cookie: `lp_s=${cookie}` })).data;
+		check('sizes come back to the editor', m7.nodes.some((n) => n.label === 'Patreon' && n.zoom === 1.3 && n.tint === 'mono') && m7.person.accent === '#aa3377');
 
 		const e1 = await req('POST', '/api/links/diary', { day: '2026-09-01', title: 'Older', body: 'See https://amybo.org/about/' }, C);
 		const e2 = await req('POST', '/api/links/diary', { day: '2026-10-01', title: 'Newer', body: 'Built [the rig](https://amybo.org/).', highlight: true }, C);

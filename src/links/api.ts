@@ -2,11 +2,13 @@
 import { orgName } from '../../eventsandeye/src/env';
 import { checkOrigin, endSession, fail, json, nowIso, peek, personFromSession, redeem, sendLink, startSession, type SessionPerson } from './auth';
 import { guessIcon, ICON_KEYS } from './icons';
-import { HANDLE_RE, type NodeKind } from './model';
+import { HANDLE_RE, NODE_SELECT, type NodeKind } from './model';
 import type { Ctx, Env } from './server';
 
 const RESERVED = new Set(['amybo', 'links', 'admin', 'api', 'edit', 'www', 'go', 'media', 'diary', 'events', 'help', 'about']);
-const KINDS: NodeKind[] = ['group', 'link', 'diary', 'support'];
+const KINDS: NodeKind[] = ['group', 'link', 'text', 'diary', 'support'];
+const TINT_RE = /^(|mono|#[0-9a-f]{6})$/i;
+const cleanZoom = (z: unknown) => Math.min(1.6, Math.max(0.6, Number(z) || 1));
 const EMAIL_RE = /^[^\s@<>"]{1,64}@[^\s@<>"]{1,190}\.[a-z]{2,}$/i;
 
 const body = async <T>(req: Request): Promise<T | null> => {
@@ -89,8 +91,11 @@ export async function me(ctx: Ctx): Promise<Response> {
 	if (!p) return fail('Not signed in', 401);
 	const db = ctx.env.DB;
 	const [person, nodes, diary, counts] = await db.batch([
-		db.prepare('SELECT handle, email, name, bio, photo, kind, basic_mode, diary_default FROM lp_people WHERE id = ?').bind(p.id),
-		db.prepare('SELECT id, parent_id, kind, slug, label, url, icon, image, body, seed, position FROM lp_nodes WHERE person_id = ? ORDER BY position, id').bind(p.id),
+		db.prepare(
+			`SELECT p.handle, p.email, p.name, p.bio, p.photo, p.kind, p.basic_mode, p.diary_default, COALESCE(s.accent, '') AS accent
+			 FROM lp_people p LEFT JOIN lp_page_style s ON s.person_id = p.id WHERE p.id = ?`,
+		).bind(p.id),
+		db.prepare(`${NODE_SELECT} ORDER BY n.position, n.id`).bind(p.id),
 		db.prepare('SELECT id, day, title, body, highlight FROM lp_diary WHERE person_id = ? ORDER BY day DESC, id DESC').bind(p.id),
 		db.prepare(
 			`SELECT slug, COUNT(*) AS total, SUM(at >= strftime('%Y-%m-%dT%H:%M:%SZ','now','-30 days')) AS d30 FROM link_events WHERE page = ? GROUP BY slug`,
@@ -112,10 +117,21 @@ export async function saveProfile(ctx: Ctx): Promise<Response> {
 	const photo = str(b.photo, 300);
 	if (!okImage(photo, p.handle)) return fail('That photo is not one of your uploads');
 	const diaryDefault = b.diary_default === 'highlights' ? 'highlights' : 'all';
+	const accent = str(b.accent, 7);
+	if (!/^(|#[0-9a-f]{6})$/i.test(accent)) return fail('The tint must be a colour like #3f9c00');
 	const before = await imagesInUse(ctx.env.DB, p.id);
-	await ctx.env.DB.prepare('UPDATE lp_people SET name = ?, bio = ?, photo = ?, basic_mode = ?, diary_default = ?, updated_at = ? WHERE id = ?')
-		.bind(name, str(b.bio, 300), photo, b.basic_mode ? 1 : 0, diaryDefault, nowIso(), p.id)
-		.run();
+	await ctx.env.DB.batch([
+		ctx.env.DB.prepare('UPDATE lp_people SET name = ?, bio = ?, photo = ?, basic_mode = ?, diary_default = ?, updated_at = ? WHERE id = ?').bind(
+			name,
+			str(b.bio, 300),
+			photo,
+			b.basic_mode ? 1 : 0,
+			diaryDefault,
+			nowIso(),
+			p.id,
+		),
+		ctx.env.DB.prepare('INSERT INTO lp_page_style (person_id, accent) VALUES (?, ?) ON CONFLICT(person_id) DO UPDATE SET accent = excluded.accent').bind(p.id, accent.toLowerCase()),
+	]);
 	forgetImages(ctx, before, await imagesInUse(ctx.env.DB, p.id));
 	return json({ ok: true });
 }
@@ -130,6 +146,8 @@ interface InNode {
 	icon?: string;
 	image?: string;
 	body?: string;
+	tint?: string;
+	zoom?: number;
 }
 
 const slugify = (s: string) =>
@@ -174,6 +192,7 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 		if (n.kind === 'support' && ++supports > 1) return fail('A page can have one support note');
 		if (n.id != null && !existingById.has(n.id)) return fail('The page data is out of date; please reload the editor');
 		if (n.icon && !ICON_KEYS.includes(n.icon)) n.icon = '';
+		if (!TINT_RE.test(String(n.tint ?? ''))) return fail(`The colour for "${label}" must be like #3f9c00`);
 		if (!okImage(str(n.image, 300), p.handle)) return fail(`The image for "${label}" is not one of your uploads`);
 		keys.set(n.key, n);
 	}
@@ -229,16 +248,21 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 				n.kind === 'link' ? str(n.url, 2000) : '',
 				n.icon ?? '',
 				str(n.image, 300),
-				n.kind === 'support' ? str(n.body, 5000) : '',
+				n.kind === 'support' || n.kind === 'text' ? str(n.body, 5000) : '',
 				pos,
 				idOf.get(n.key)!,
 				p.id,
 			);
 	});
+	const styles = list.map((n) =>
+		db
+			.prepare('INSERT INTO lp_node_style (node_id, tint, zoom) VALUES (?, ?, ?) ON CONFLICT(node_id) DO UPDATE SET tint = excluded.tint, zoom = excluded.zoom')
+			.bind(idOf.get(n.key)!, String(n.tint ?? '').toLowerCase(), cleanZoom(n.zoom)),
+	);
 	const deletes = existing.filter((r) => !keep.has(r.id)).map((r) => db.prepare('DELETE FROM lp_nodes WHERE id = ? AND person_id = ?').bind(r.id, p.id));
 	const imagesBefore = await imagesInUse(db, p.id);
 	try {
-		await db.batch([...updates, ...deletes, db.prepare('UPDATE lp_people SET updated_at = ? WHERE id = ?').bind(nowIso(), p.id)]);
+		await db.batch([...updates, ...styles, ...deletes, db.prepare('UPDATE lp_people SET updated_at = ? WHERE id = ?').bind(nowIso(), p.id)]);
 	} catch (e) {
 		if (fresh.length) await db.batch(fresh.map((n) => db.prepare('DELETE FROM lp_nodes WHERE id = ? AND person_id = ?').bind(idOf.get(n.key)!, p.id))).catch(() => {});
 		throw e;

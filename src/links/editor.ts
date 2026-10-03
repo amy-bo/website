@@ -17,6 +17,9 @@ interface ENode {
 	image: string;
 	body: string;
 	seed: number;
+	/** Picture colour ('' original, 'mono', '#rrggbb') and size in its circle (0.6 to 1.6). */
+	tint: string;
+	zoom: number;
 	children: ENode[];
 	collapsed?: boolean;
 	/** The last address the server accepted; used while the one being typed isn't valid yet. */
@@ -32,6 +35,7 @@ interface Person {
 	kind: 'person' | 'org';
 	basic_mode: number;
 	diary_default: 'all' | 'highlights';
+	accent: string;
 }
 
 interface MeResponse {
@@ -144,7 +148,7 @@ const flatten = () => {
 				if (!n.savedUrl) return;
 				url = n.savedUrl;
 			}
-			out.push({ id: n.id, key: n.key, parent, kind: n.kind, label: n.label.trim() || 'Untitled', url, icon: n.icon, image: n.image, body: n.body } as never);
+			out.push({ id: n.id, key: n.key, parent, kind: n.kind, label: n.label.trim() || 'Untitled', url, icon: n.icon, image: n.image, body: n.body, tint: n.tint, zoom: n.zoom } as never);
 			add(n.children, n.key);
 		});
 	add(S.tree, null);
@@ -195,6 +199,8 @@ function preview() {
 				body: n.body,
 				seed: 0,
 				position: 0,
+				tint: n.tint,
+				zoom: n.zoom,
 				children: n.children.map((c) => toLink(c, myId)),
 			};
 		};
@@ -211,15 +217,19 @@ function preview() {
 
 // ---------- rendering the editor ----------
 
-const tileHtml = (n: { icon: string; image: string; kind?: NodeKind }) => {
+const tileHtml = (n: { icon: string; image: string; kind?: NodeKind; tint?: string; zoom?: number }) => {
 	if (n.image) return `<img src="${esc(mediaUrl(n.image))}" alt="">`;
-	const key = n.icon || (n.kind === 'diary' ? 'diary' : n.kind === 'support' ? 'heart' : n.kind === 'group' ? 'folder' : 'link');
+	const key = n.icon || (n.kind === 'diary' ? 'diary' : n.kind === 'support' ? 'heart' : n.kind === 'text' ? 'text' : n.kind === 'group' ? 'folder' : 'link');
 	const i = icon(key);
-	if (i.logo) return `<img src="${esc(i.logo.src)}" alt="" class="${i.logo.cover ? 'cover' : 'fit'}${i.logo.invert ? ' inv' : ''}">`;
-	return `<svg viewBox="0 0 24 24" class="${i.brand ? 'ib' : 'il'}" aria-hidden="true"${i.brand && i.hex ? ` style="--brand:#${i.hex}"` : ''}>${i.svg}</svg>`;
+	const z = n.zoom && n.zoom !== 1 ? ` transform:scale(${n.zoom});` : '';
+	const mono = n.tint === 'mono';
+	if (i.logo) return `<img src="${esc(i.logo.src)}" alt="" class="${i.logo.cover ? 'cover' : 'fit'}${i.logo.invert ? ' inv' : ''}${mono ? ' mono' : ''}"${z ? ` style="${z}"` : ''}>`;
+	const colour = mono ? 'var(--ink)' : /^#[0-9a-f]{6}$/i.test(n.tint ?? '') ? n.tint : i.brand && i.hex ? `#${i.hex}` : '';
+	const st = `${colour ? `--brand:${colour};${mono || n.tint ? `color:${colour};` : ''}` : ''}${z}`;
+	return `<svg viewBox="0 0 24 24" class="${i.brand ? 'ib' : 'il'}" aria-hidden="true"${st ? ` style="${st}"` : ''}>${i.svg}</svg>`;
 };
 
-const KIND_NAME: Record<NodeKind, string> = { group: 'group', link: 'link', diary: 'diary', support: 'support note' };
+const KIND_NAME: Record<NodeKind, string> = { group: 'group', link: 'link', text: 'text', diary: 'diary', support: 'support note' };
 
 function rowHtml(n: ENode, depth: number): string {
 	const st = n.slug ? S.stats.get(n.slug) : undefined;
@@ -229,7 +239,9 @@ function rowHtml(n: ENode, depth: number): string {
 	if (n.kind === 'link') fields += `<input class="url" data-f="url" value="${esc(n.url)}" aria-label="Web address" placeholder="https://" inputmode="url" spellcheck="false">`;
 	if (n.kind === 'support')
 		fields += `<textarea class="body" data-f="body" rows="3" aria-label="How you support AMYBO" placeholder="In your own words. Nobody needs to know about money: say only what you'd like to.">${esc(n.body)}</textarea>`;
-	if (n.kind === 'diary') fields += `<span class="sub">${S.diary.length} ${S.diary.length === 1 ? 'entry' : 'entries'} · write them below</span>`;
+	if (n.kind === 'text') fields += `<textarea class="body" data-f="body" rows="3" aria-label="Text" placeholder="Anything you'd like to say. Links work as they are, or [like this](https://…).">${esc(n.body)}</textarea>`;
+	if (n.kind === 'diary')
+		fields += `<span class="sub">${S.diary.length ? `${S.diary.length} ${S.diary.length === 1 ? 'entry' : 'entries'}` : 'No entries yet, so visitors don\'t see it'} · add entries in the Diary section below</span>`;
 	const twisty =
 		n.kind === 'group'
 			? `<button type="button" class="tw${n.collapsed ? '' : ' open'}" data-act="fold" aria-expanded="${!n.collapsed}" aria-label="${n.collapsed ? 'Show' : 'Hide'} what's in ${esc(n.label)}"></button>`
@@ -239,7 +251,7 @@ function rowHtml(n: ENode, depth: number): string {
 		n.kind === 'group'
 			? `<ul class="kids"${n.collapsed ? ' hidden' : ''}>${n.children.map((c) => rowHtml(c, depth + 1)).join('')}<li class="addin"><button type="button" class="ghost" data-act="add-in">+ Add a link here</button></li></ul>`
 			: '';
-	return `<li class="row lp-${n.kind}" data-key="${n.key}"><div class="rowin">
+	return `<li class="row l-${n.kind}" data-key="${n.key}"><div class="rowin">
 <span class="grip" draggable="true" aria-hidden="true" title="Drag to move"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></span>
 ${twisty}${tile}<div class="fields">${fields}</div>${count}${clicks}
 <button type="button" class="more" data-act="menu" aria-label="More for ${esc(n.label)}" aria-haspopup="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
@@ -268,6 +280,8 @@ function renderProfile() {
 	$<HTMLInputElement>('#s-map').checked = !p.basic_mode;
 	for (const r of document.querySelectorAll<HTMLInputElement>('input[name="ddef"]')) r.checked = r.value === p.diary_default;
 	$('#who').textContent = p.email;
+	$<HTMLInputElement>('#s-tint').value = $<HTMLInputElement>('#s-tint-hex').value = p.accent || '#3f9c00';
+	$('#s-tint-reset').hidden = !p.accent;
 	$('#upload-note').hidden = S.uploads;
 }
 
@@ -378,10 +392,14 @@ function act(a: string, n: ENode) {
 let dragKey: string | null = null;
 function setupDrag() {
 	const tree = $('#tree');
+	// Rows can be dragged from anywhere except their text fields and buttons (so text can still be selected).
+	tree.addEventListener('pointerdown', (e) => {
+		const rowin = (e.target as HTMLElement).closest<HTMLElement>('.rowin');
+		if (rowin) rowin.draggable = !(e.target as HTMLElement).closest('input,textarea,button');
+	});
 	tree.addEventListener('dragstart', (e) => {
-		const grip = (e.target as HTMLElement).closest?.('.grip');
-		const row = grip?.closest<HTMLElement>('.row');
-		if (!row) return;
+		const row = (e.target as HTMLElement).closest?.('.row') as HTMLElement | null;
+		if (!row || (e.target as HTMLElement).closest?.('input,textarea')) return;
 		dragKey = row.dataset.key!;
 		e.dataTransfer!.effectAllowed = 'move';
 		e.dataTransfer!.setData('text/plain', dragKey);
@@ -397,7 +415,7 @@ function setupDrag() {
 		if (find(dragKey)!.node && row.closest(`.row[data-key="${dragKey}"]`)) return null; // not into itself
 		const r = rowin.getBoundingClientRect();
 		const y = (e.clientY - r.top) / r.height;
-		const group = row.classList.contains('lp-group');
+		const group = row.classList.contains('l-group');
 		const pos = group && y > 0.3 && y < 0.7 ? 'in' : y < 0.5 ? 'before' : 'after';
 		return { row, rowin, pos };
 	};
@@ -490,7 +508,7 @@ function pickPicture(n: ENode, suggestions: Proposal | null = null): Promise<voi
 			grid.innerHTML = S.icons
 				.filter((k) => !q || k.includes(q) || icon(k).title.toLowerCase().includes(q))
 				.slice(0, 160)
-				.map((k) => `<button type="button" class="ichoice${!n.image && n.icon === k ? ' on' : ''}" data-icon="${esc(k)}" title="${esc(icon(k).title)}">${tileHtml({ icon: k, image: '' })}</button>`)
+				.map((k) => `<button type="button" class="ichoice${!n.image && n.icon === k ? ' on' : ''}" data-icon="${esc(k)}" title="${esc(icon(k).title)}">${tileHtml({ icon: k, image: '', tint: n.tint })}</button>`)
 				.join('');
 		};
 		search.value = '';
@@ -501,6 +519,37 @@ function pickPicture(n: ENode, suggestions: Proposal | null = null): Promise<voi
 		if (S.uploads && suggestions?.image) sugg.push(`<button type="button" class="sugg" data-remote="${esc(suggestions.image)}"><img src="/api/links/remote-image?url=${encodeURIComponent(suggestions.image)}" alt=""><span>The site's picture</span></button>`);
 		sug.innerHTML = sugg.join('');
 		$('#pick-upload', dlg).hidden = !S.uploads;
+		// Colour and size for this item's picture.
+		const custom = /^#[0-9a-f]{6}$/i.test(n.tint);
+		for (const r of dlg.querySelectorAll<HTMLInputElement>('input[name="tint"]')) r.checked = r.value === (custom ? 'custom' : n.tint || 'orig');
+		const colour = $<HTMLInputElement>('#tint-colour', dlg);
+		const hex = $<HTMLInputElement>('#tint-hex', dlg);
+		colour.value = hex.value = custom ? n.tint : '#3f9c00';
+		const zoom = $<HTMLInputElement>('#pick-zoom', dlg);
+		zoom.value = String(n.zoom || 1);
+		const isLogo = !n.image && !!icon(n.icon).logo;
+		$('#tint-custom-wrap', dlg).hidden = isLogo || !!n.image;
+		const restyle = () => {
+			const choice = dlg.querySelector<HTMLInputElement>('input[name="tint"]:checked')?.value ?? 'orig';
+			n.tint = choice === 'orig' ? '' : choice === 'mono' ? 'mono' : /^#[0-9a-f]{6}$/i.test(hex.value) ? hex.value.toLowerCase() : n.tint;
+			n.zoom = Number(zoom.value) || 1;
+			drawGrid();
+			changed(true);
+		};
+		dlg.querySelectorAll<HTMLInputElement>('input[name="tint"]').forEach((r) => (r.onchange = restyle));
+		colour.oninput = () => {
+			hex.value = colour.value;
+			(dlg.querySelector('input[name="tint"][value="custom"]') as HTMLInputElement).checked = true;
+			restyle();
+		};
+		hex.oninput = () => {
+			if (/^#[0-9a-f]{6}$/i.test(hex.value)) {
+				colour.value = hex.value;
+				(dlg.querySelector('input[name="tint"][value="custom"]') as HTMLInputElement).checked = true;
+				restyle();
+			}
+		};
+		zoom.oninput = restyle;
 		const done = () => {
 			dlg.close();
 			changed(true);
@@ -555,7 +604,7 @@ function addLink(into: ENode | null) {
 	const tile = $('#a-tile', dlg);
 	const hint = $('#a-hint', dlg);
 	let prop: Proposal | null = null;
-	const n: ENode = { key: newKey(), kind: 'link', label: '', url: '', icon: 'link', image: '', body: '', seed: 0, children: [] };
+	const n: ENode = { key: newKey(), kind: 'link', label: '', url: '', icon: 'link', image: '', body: '', seed: 0, tint: '', zoom: 1, children: [] };
 	url.value = '';
 	name.value = '';
 	tile.innerHTML = tileHtml(n);
@@ -616,9 +665,10 @@ function addLink(into: ENode | null) {
 	url.focus();
 }
 
-function addSpecial(kind: 'group' | 'diary' | 'support') {
-	const labels = { group: 'New group', diary: 'AMYBO diary', support: 'How I support AMYBO' };
-	const n: ENode = { key: newKey(), kind, label: labels[kind], url: '', icon: kind === 'diary' ? 'diary' : kind === 'support' ? 'heart' : '', image: '', body: '', seed: 0, children: [] };
+function addSpecial(kind: 'group' | 'text' | 'diary' | 'support') {
+	const labels = { group: 'New group', text: 'New text', diary: 'AMYBO diary', support: 'How I support AMYBO' };
+	const icons = { group: '', text: 'text', diary: 'diary', support: 'heart' };
+	const n: ENode = { key: newKey(), kind, label: labels[kind], url: '', icon: icons[kind], image: '', body: '', seed: 0, tint: '', zoom: 1, children: [] };
 	S.tree.push(n);
 	changed(true);
 	requestAnimationFrame(() => {
@@ -704,7 +754,7 @@ async function load() {
 	S.diary = me.diary;
 	S.stats = new Map(me.stats.map((s) => [s.slug, s]));
 	const tree = buildTree(me.nodes as Omit<LinkNode, 'children'>[]);
-	const conv = (n: LinkNode): ENode => ({ key: newKey(), id: n.id, slug: n.slug, kind: n.kind, label: n.label, url: n.url, savedUrl: n.url, icon: n.icon, image: n.image, body: n.body, seed: n.seed, children: n.children.map(conv) });
+	const conv = (n: LinkNode): ENode => ({ key: newKey(), id: n.id, slug: n.slug, kind: n.kind, label: n.label, url: n.url, savedUrl: n.url, icon: n.icon, image: n.image, body: n.body, seed: n.seed, tint: n.tint || '', zoom: n.zoom || 1, children: n.children.map(conv) });
 	S.tree = tree.map(conv);
 	renderProfile();
 	renderTree();
@@ -831,6 +881,21 @@ function init() {
 	$('#add-group').addEventListener('click', () => addSpecial('group'));
 	$('#add-diary').addEventListener('click', () => addSpecial('diary'));
 	$('#add-support').addEventListener('click', () => addSpecial('support'));
+	$('#add-text').addEventListener('click', () => addSpecial('text'));
+	// The page's tint.
+	const setTint = (v: string) => {
+		S.person!.accent = v;
+		$<HTMLInputElement>('#s-tint').value = $<HTMLInputElement>('#s-tint-hex').value = v || '#3f9c00';
+		$('#s-tint-reset').hidden = !v;
+		preview();
+		later('profile', saveProfile, 300);
+	};
+	$('#s-tint').addEventListener('input', (e) => setTint((e.target as HTMLInputElement).value.toLowerCase()));
+	$('#s-tint-hex').addEventListener('input', (e) => {
+		const v = (e.target as HTMLInputElement).value.trim();
+		if (/^#[0-9a-f]{6}$/i.test(v)) setTint(v.toLowerCase());
+	});
+	$('#s-tint-reset').addEventListener('click', () => setTint(''));
 
 	// diary
 	$('#new-entry').addEventListener('click', () => editEntry(null));
@@ -869,7 +934,7 @@ async function saveProfile() {
 	const send = async () => {
 		const p = S.person;
 		if (!p) return;
-		await api('profile', { method: 'PUT', body: { name: p.name, bio: p.bio, photo: p.photo, basic_mode: !!p.basic_mode, diary_default: p.diary_default } });
+		await api('profile', { method: 'PUT', body: { name: p.name, bio: p.bio, photo: p.photo, basic_mode: !!p.basic_mode, diary_default: p.diary_default, accent: p.accent } });
 	};
 	profileSaving = (profileSaving ?? Promise.resolve()).catch(() => {}).then(send);
 	await profileSaving;

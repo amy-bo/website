@@ -10,7 +10,7 @@ let api = null;
 
 export function start(map) {
 	if (api) return api;
-	const data = JSON.parse(document.getElementById('lp-data').textContent);
+	const data = JSON.parse(document.getElementById('l-data').textContent);
 	const svg = map.querySelector('.mapsvg');
 	const edgeLayer = svg.querySelector('.edges');
 	const nodeLayer = svg.querySelector('.nodes');
@@ -25,6 +25,7 @@ export function start(map) {
 	for (const n of byId.values()) Object.assign(n, { vx: 0, vy: 0, s: n === hub ? 1 : 0, ts: 0, op: 0, top: 0, on: false });
 	hub.s = hub.ts = 1;
 	hub.op = hub.top = 1;
+	hub.on = true; // the centre is on the page from the start: it never "arrives".
 
 	const ancestors = (n) => {
 		const out = [];
@@ -41,9 +42,9 @@ export function start(map) {
 	function nodeEl(n) {
 		if (n.el) return n.el;
 		const e =
-			n.kind === 'group'
-				? el('g', { class: 'n lp-group', 'data-g': n.id, tabindex: 0, role: 'button', 'aria-label': n.label })
-				: el('a', { class: `n lp-${n.kind}`, 'data-g': n.id, href: n.href, 'aria-label': n.label });
+			n.kind === 'group' || n.kind === 'text' || n.kind === 'support'
+				? el('g', { class: `n l-${n.kind}`, 'data-g': n.id, tabindex: 0, role: 'button', 'aria-label': n.label })
+				: el('a', { class: `n l-${n.kind}`, 'data-g': n.id, href: n.href, 'aria-label': n.label });
 		if (n.kind === 'link' && data.preview) {
 			e.setAttribute('target', '_blank');
 			e.setAttribute('rel', 'noopener');
@@ -91,11 +92,14 @@ export function start(map) {
 				let dx = gp && gp.on ? from.x - gp.x : n.x - from.x;
 				let dy = gp && gp.on ? from.y - gp.y : n.y - from.y;
 				const d = Math.hypot(dx, dy) || 1;
-				// Places in the fan are handed out top to bottom in list order, so the map reads like the list.
+				// The focus's items start in their places across the fan, in list order (as the ordering force keeps
+				// them); anything else starts out along the line from its own parent.
 				const sibs = from.children;
-				const fan = sibs.map((_, i) => ((i - (sibs.length - 1) / 2) / Math.max(sibs.length, 1)) * 2.2).map((sp) => Math.atan2(dy / d, dx / d) + sp);
-				fan.sort((p, q) => Math.sin(p) - Math.sin(q));
-				const a = fan[Math.max(0, sibs.indexOf(n))];
+				const k = Math.max(0, sibs.indexOf(n));
+				const sp = ((k - (sibs.length - 1) / 2) / Math.max(sibs.length, 1)) * 2.2;
+				const [ax, ay] = from === focus ? away : [dx / d, dy / d];
+				const [tx, ty] = from === focus ? across : [-ay, ax];
+				const a = Math.atan2(ay * Math.cos(sp) + ty * Math.sin(sp), ax * Math.cos(sp) + tx * Math.sin(sp));
 				n.x = from.x + Math.cos(a) * 14;
 				n.y = from.y + Math.sin(a) * 14;
 				n.vx = Math.cos(a) * 4;
@@ -124,6 +128,7 @@ export function start(map) {
 	// ---- physics ----
 	let alpha = 0;
 	let away = [0, -1];
+	let across = [1, 0];
 	const REST = { child: 118, parent: 160, anc: 125, sib: 92 };
 	function tick() {
 		const live = [...byId.values()].filter((n) => n.on);
@@ -187,18 +192,27 @@ export function start(map) {
 				n.vy += (dy / d) * push;
 			}
 		}
-		// Keep each family in list order from top to bottom: a gentle nudge whenever two neighbours swap.
-		const families = [focus.children];
-		if (parentOfFocus) families.push(parentOfFocus.children);
-		for (const fam of families) {
-			const vis = fam.filter((c) => role.has(c));
+		// The focus's items keep their list order around it, so their lines never cross or swap: measured as angles
+		// across the fan (from the "away" direction), each must sit at least a little past the one before.
+		{
+			const [ax, ay] = away;
+			const [tx, ty] = across;
+			const vis = focus.children.filter((c) => role.has(c));
+			const ang = vis.map((c) => Math.atan2((c.x - focus.x) * tx + (c.y - focus.y) * ty, (c.x - focus.x) * ax + (c.y - focus.y) * ay));
+			const gap = Math.min(0.42, 5 / Math.max(vis.length, 1));
 			for (let i = 0; i + 1 < vis.length; i++) {
-				const a = vis[i];
-				const b = vis[i + 1];
-				const over = a.y - (b.y - 16);
-				if (over > 0) {
-					if (a !== focus) a.vy -= over * 0.15;
-					if (b !== focus) b.vy += over * 0.15;
+				const short = ang[i] + gap - ang[i + 1];
+				if (short <= 0) continue;
+				for (const [c, a, sign] of [
+					[vis[i], ang[i], -1],
+					[vis[i + 1], ang[i + 1], 1],
+				]) {
+					// Push along the circle (perpendicular to the line to the focus), towards its proper side.
+					const d = Math.hypot(c.x - focus.x, c.y - focus.y) || 1;
+					const ex = -Math.sin(a) * ax + Math.cos(a) * tx;
+					const ey = -Math.sin(a) * ay + Math.cos(a) * ty;
+					c.vx += ex * sign * short * d * 0.08;
+					c.vy += ey * sign * short * d * 0.08;
 				}
 			}
 		}
@@ -377,31 +391,62 @@ export function start(map) {
 		const my = away[1] * (1 - edge) + (cv / cl) * edge;
 		const ml = Math.hypot(mx, my) || 1;
 		away = [mx / ml, my / ml];
+		// "Across" the fan: the perpendicular that points down the page (or right, for a sideways fan), so list
+		// order runs top to bottom.
+		across = [-away[1], away[0]];
+		if (across[1] < -0.2 || (Math.abs(across[1]) <= 0.2 && across[0] < 0)) across = [-across[0], -across[1]];
 		arrange();
 		if (fromMap) syncList();
 		kick();
 	}
 
-	/** A tap on a group or the centre: it becomes the focus; tapping the focus again goes back up a level. */
+	// ---- a note's text, in a card beside it ----
+	let card = null;
+	function closeCard() {
+		card?.remove();
+		card = null;
+	}
+	function showCard(n) {
+		if (card && card.dataset.id === String(n.id)) return closeCard();
+		closeCard();
+		card = document.createElement('div');
+		card.className = 'card';
+		card.dataset.id = n.id;
+		card.setAttribute('role', 'dialog');
+		card.setAttribute('aria-label', n.label);
+		const h = document.createElement('h2');
+		h.textContent = n.label;
+		card.append(h);
+		card.insertAdjacentHTML('beforeend', n.note || ''); // formatted and escaped on the server
+		map.append(card);
+		// Beside the node, kept inside the map.
+		const mb = map.getBoundingClientRect();
+		const nb = n.el.getBoundingClientRect();
+		const cw = card.offsetWidth;
+		const ch = card.offsetHeight;
+		let left = nb.right - mb.left + 10;
+		if (left + cw > mb.width - 8) left = nb.left - mb.left - cw - 10;
+		left = Math.max(8, Math.min(left, mb.width - cw - 8));
+		const top = Math.max(8, Math.min(nb.top - mb.top + nb.height / 2 - ch / 2, mb.height - ch - 8));
+		card.style.left = `${left}px`;
+		card.style.top = `${top}px`;
+	}
+	document.addEventListener('pointerdown', (e) => {
+		if (card && !card.contains(e.target) && !e.target.closest?.('.l-text,.l-support')) closeCard();
+	});
+	addEventListener('keydown', (e) => e.key === 'Escape' && closeCard());
+
+	/** A tap on a group or the centre: it becomes the focus; tapping the focus again goes back up a level.
+	 * A tap on a note shows its text. */
 	function tap(id) {
 		const n = byId.get(id);
 		if (!n) return;
+		if (n.kind === 'text' || n.kind === 'support') return showCard(n);
+		closeCard();
 		if (n === focus) setFocus(n.parent != null ? byId.get(n.parent) : hub, true);
 		else if (n.kind === 'group' || n === hub) setFocus(n, true);
 	}
 
-	// A support note on the map opens it in the list.
-	nodeLayer.addEventListener('click', (e) => {
-		const a = e.target.closest && e.target.closest('a.n.lp-support');
-		if (!a) return;
-		e.preventDefault();
-		map.querySelector('.back')?.click();
-		const d = document.getElementById('lp-support');
-		if (d) {
-			d.open = true;
-			d.scrollIntoView({ block: 'center' });
-		}
-	});
 	document.addEventListener('visibilitychange', () => {
 		if (document.hidden && raf) {
 			cancelAnimationFrame(raf);

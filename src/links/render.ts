@@ -72,6 +72,7 @@ const nodeIcon = (n: LinkNode): string => {
 	if (n.icon) return n.icon;
 	if (n.kind === 'diary') return 'diary';
 	if (n.kind === 'support') return 'heart';
+	if (n.kind === 'text') return 'text';
 	if (n.kind === 'group') {
 		// A group wears the icon of its first link, so the map reads at a glance.
 		const first = [...walk(n.children)].find((c) => c.kind === 'link');
@@ -94,10 +95,9 @@ interface Ctx {
 }
 
 /** Visitors don't see an empty support note or an empty diary; the editor's preview shows everything. */
-const isHidden = (n: LinkNode, ctx: Ctx) => !ctx.preview && ((n.kind === 'support' && !n.body.trim()) || (n.kind === 'diary' && !ctx.data.diaryCount));
+const isHidden = (n: LinkNode, ctx: Ctx) => !ctx.preview && (((n.kind === 'support' || n.kind === 'text') && !n.body.trim()) || (n.kind === 'diary' && !ctx.data.diaryCount));
 
-/** The tree as visitors see it: hidden items gone, empty groups gone, and a group holding a single link becomes
- * that link under the group's name (an "Email" group with one contact form is just "Email"). */
+/** The tree as visitors see it: hidden items and empty groups left out. */
 function visible(nodes: LinkNode[], ctx: Ctx): LinkNode[] {
 	const out: LinkNode[] = [];
 	for (const n of nodes) {
@@ -107,9 +107,7 @@ function visible(nodes: LinkNode[], ctx: Ctx): LinkNode[] {
 			continue;
 		}
 		const kids = visible(n.children, ctx);
-		if (!kids.length) continue;
-		if (kids.length === 1 && kids[0].kind === 'link') out.push({ ...kids[0], label: n.label, parent_id: n.parent_id });
-		else out.push({ ...n, children: kids });
+		if (kids.length) out.push({ ...n, children: kids });
 	}
 	return out;
 }
@@ -125,8 +123,8 @@ function renderList(nodes: LinkNode[], ctx: Ctx): string {
 		.map((n) => {
 			if (n.kind === 'group')
 				return `<li><details><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${esc(n.label)}</summary><ul>${renderList(n.children, ctx)}</ul></details></li>`;
-			if (n.kind === 'support')
-				return `<li><details id="lp-support"><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${esc(n.label)}</summary><div class="note">${formatText(n.body)}</div></details></li>`;
+			if (n.kind === 'support' || n.kind === 'text')
+				return `<li><details id="l-note-${n.id}"><summary data-n="${n.id}"><span class="tw" aria-hidden="true">&gt;</span>${esc(n.label)}</summary><div class="note">${formatText(n.body)}</div></details></li>`;
 			return `<li><a data-n="${n.id}" href="${esc(hrefOf(n, ctx))}"${n.kind === 'link' ? tgt : ''}>${esc(n.label)}</a></li>`;
 		})
 		.join('');
@@ -142,6 +140,8 @@ interface GNode {
 	href: string;
 	/** The node's picture, as SVG markup centred on (0, 0), for the live map. */
 	pic: string;
+	/** A note's text, formatted, for the card the live map shows when it is tapped. */
+	note?: string;
 	icon: string;
 	x: number;
 	y: number;
@@ -183,23 +183,33 @@ function layout(top: LinkNode[]): Map<number, { x: number; y: number; r: number;
 	return pos;
 }
 
-/** A node's picture, centred on (x, y). `uid` keeps clip-path ids unique on the page. */
-function iconMarkup(key: string, x: number, y: number, r: number, uid: string | number = ''): string {
+/** Colour for a picture: '' keeps its own colours, 'mono' uses the page's ink, '#rrggbb' that colour. */
+function tintStyle(key: string, tint: string): string {
+	if (tint === 'mono') return ' style="--brand:var(--ink);--brand-d:var(--ink);color:var(--ink)"';
+	if (/^#[0-9a-f]{6}$/i.test(tint)) return ` style="--brand:${tint};--brand-d:${tint};color:${tint}"`;
+	return brandStyle(key);
+}
+
+/** A node's picture, centred on (x, y). `uid` keeps clip-path ids unique; `zoom` sizes the picture in its circle. */
+function iconMarkup(key: string, x: number, y: number, r: number, uid: string | number = '', tint = '', zoom = 1): string {
 	const i = icon(key);
+	const z = Math.min(1.6, Math.max(0.6, zoom || 1));
 	if (i.logo) {
 		const l = i.logo;
-		const bg = l.bg ? `<circle class="bg" cx="${x}" cy="${y}" r="${round(r - 1)}" style="fill:${esc(l.bg)};stroke:none"/>` : '';
+		const mono = tint === 'mono' ? ' class="mono"' : '';
+		const bg = l.bg ? `<circle class="bg" cx="${x}" cy="${y}" r="${round(r - 1)}" style="fill:${esc(tint === 'mono' ? 'var(--ink)' : l.bg)};stroke:none"/>` : '';
 		if (l.cover) {
-			const s = r * 2 - 3;
+			const s = (r * 2 - 3) * z;
 			const id = `c${uid || Math.abs(Math.round(x * 7 + y * 13))}`;
-			return `<clipPath id="${id}"><circle cx="${x}" cy="${y}" r="${round(r - 1.5)}"/></clipPath><image href="${esc(l.src)}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${round(s)}" height="${round(s)}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`;
+			return `<clipPath id="${id}"><circle cx="${x}" cy="${y}" r="${round(r - 1.5)}"/></clipPath><image href="${esc(l.src)}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${round(s)}" height="${round(s)}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"${mono}/>`;
 		}
 		// Natural proportions, never squeezed: the box is the logo's width, and "meet" keeps its shape.
-		const w = r * (l.scale ?? 1.3);
-		return `${bg}<image href="${esc(l.src)}" x="${round(x - w / 2)}" y="${round(y - w / 2)}" width="${round(w)}" height="${round(w)}" preserveAspectRatio="xMidYMid meet"${l.invert ? ' class="inv"' : ''}/>`;
+		const w = r * (l.scale ?? 1.3) * z;
+		const cls = [l.invert ? 'inv' : '', tint === 'mono' ? 'mono' : ''].filter(Boolean).join(' ');
+		return `${bg}<image href="${esc(l.src)}" x="${round(x - w / 2)}" y="${round(y - w / 2)}" width="${round(w)}" height="${round(w)}" preserveAspectRatio="xMidYMid meet"${cls ? ` class="${cls}"` : ''}/>`;
 	}
-	const s = round(r * 1.05);
-	return `<use href="#i-${esc(key)}" class="${i.brand ? 'ib' : 'il'}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${s}" height="${s}"${brandStyle(key)}/>`;
+	const s = round(r * 1.05 * z);
+	return `<use href="#i-${esc(key)}" class="${i.brand ? 'ib' : 'il'}" x="${round(x - s / 2)}" y="${round(y - s / 2)}" width="${s}" height="${s}"${tintStyle(key, tint)}/>`;
 }
 
 /** Small dots on the far side of a group from its parent, one per item it holds: groups open, everything else is
@@ -224,7 +234,7 @@ function graphData(roots: LinkNode[], ctx: Ctx) {
 	const visit = (list: LinkNode[], parent: number | null) =>
 		list.forEach((n) => {
 			const p = pos.get(n.id)!;
-			nodes.push({ id: n.id, parent, kind: n.kind, label: n.label, href: n.kind === 'support' ? '#lp-support' : hrefOf(n, ctx), pic: iconMarkup(nodeIcon(n), 0, 0, p.r, `l${n.id}`) + halo(n, 0, 0, p.r), icon: nodeIcon(n), x: p.x, y: p.y, r: p.r });
+			nodes.push({ id: n.id, parent, kind: n.kind, label: n.label, href: hrefOf(n, ctx), pic: iconMarkup(nodeIcon(n), 0, 0, p.r, `l${n.id}`, n.tint, n.zoom) + halo(n, 0, 0, p.r), note: n.kind === 'text' || n.kind === 'support' ? formatText(n.body) : undefined, icon: nodeIcon(n), x: p.x, y: p.y, r: p.r });
 			visit(n.children, n.id);
 		});
 	visit(roots, null);
@@ -238,12 +248,13 @@ function graphData(roots: LinkNode[], ctx: Ctx) {
 	for (const n of roots) {
 		const p = pos.get(n.id)!;
 		edges.push(`<line data-e="${n.id}" x1="0" y1="0" x2="${p.x}" y2="${p.y}"/>`);
-		const body = `<title>${esc(n.label)}</title><circle cx="${p.x}" cy="${p.y}" r="${p.r}"/>${iconMarkup(nodeIcon(n), p.x, p.y, p.r, `s${n.id}`)}${halo(n, p.x, p.y, p.r, Math.atan2(p.y, p.x))}`;
-		const href = n.kind === 'support' ? '#lp-support' : hrefOf(n, ctx);
+		const body = `<title>${esc(n.label)}</title><circle cx="${p.x}" cy="${p.y}" r="${p.r}"/>${iconMarkup(nodeIcon(n), p.x, p.y, p.r, `s${n.id}`, n.tint, n.zoom)}${halo(n, p.x, p.y, p.r, Math.atan2(p.y, p.x))}`;
+		const href = hrefOf(n, ctx);
+		// Groups open, notes show their text: both are buttons. Links and the diary are plain links.
 		items.push(
-			n.kind === 'group'
-				? `<g class="n lp-group" data-g="${n.id}" tabindex="0" role="button" aria-expanded="false" aria-label="${esc(n.label)}">${body}</g>`
-				: `<a class="n lp-${n.kind}" data-g="${n.id}" href="${esc(href)}" aria-label="${esc(n.label)}"${n.kind === 'link' ? tgt : ''}>${body}</a>`,
+			n.kind === 'group' || n.kind === 'text' || n.kind === 'support'
+				? `<g class="n l-${n.kind}" data-g="${n.id}" tabindex="0" role="button"${n.kind === 'group' ? ' aria-expanded="false"' : ''} aria-label="${esc(n.label)}">${body}</g>`
+				: `<a class="n l-${n.kind}" data-g="${n.id}" href="${esc(href)}" aria-label="${esc(n.label)}"${n.kind === 'link' ? tgt : ''}>${body}</a>`,
 		);
 	}
 	const p = ctx.data.person;
@@ -272,6 +283,19 @@ function linkStyles(roots: LinkNode[]): string {
 		});
 	visit(roots, []);
 	return rules.join('');
+}
+
+/** A colour mixed towards black or white, for tints that read on light and dark pages. */
+function mix(hex: string, to: number, t: number): string {
+	const n = parseInt(hex.slice(1), 16);
+	const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (to - v) * t));
+	return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** The page's own tint, if it has one: inline variables the stylesheet picks up for light and dark. */
+function tintVars(accent: string): string {
+	if (!/^#[0-9a-f]{6}$/i.test(accent)) return '';
+	return ` data-tint style="--t:${accent};--ti:${mix(accent, 0, 0.35)};--td:${mix(accent, 255, 0.2)};--tid:${mix(accent, 255, 0.45)}"`;
 }
 
 const initials = (name: string) =>
@@ -330,12 +354,12 @@ export function renderPage(data: PageData, opts: RenderOptions = {}): string {
 <svg class="mapsvg" viewBox="${g.view.join(' ')}">${g.svg}</svg>
 <button type="button" class="back" aria-label="Back to the list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/></svg></button>
 </aside>
-<script type="application/json" id="lp-data">${JSON.stringify({ nodes: g.nodes, preview: ctx.preview }).replace(/</g, '\\u003c')}</script>
+<script type="application/json" id="l-data">${JSON.stringify({ nodes: g.nodes, preview: ctx.preview }).replace(/</g, '\\u003c')}</script>
 <script>${BOOT}</script>`
 		: '';
 
 	return `${head(p.name, description, canonical, relMe)}
-<body class="lp${g ? ' has-map' : ''}">${keys.size ? `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>${sprite(keys)}</defs></svg>` : ''}
+<body class="lp${g ? ' has-map' : ''}"${tintVars(p.accent)}>${keys.size ? `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>${sprite(keys)}</defs></svg>` : ''}
 <div class="shell">
 <main class="list">
 <header class="top">${portrait}<h1>${esc(p.name)}</h1>${p.bio ? `<p class="bio">${esc(p.bio)}</p>` : ''}</header>
@@ -369,7 +393,7 @@ export function renderDiary(data: PageData, entries: DiaryEntry[], view: 'all' |
 				.join('')
 		: `<p class="empty">${view === 'highlights' ? 'No highlights yet.' : 'No entries yet.'}</p>`;
 	return `${head(title, `${p.name}'s ${diaryNode?.label || 'diary'}`, canonical)}
-<body class="lp diary"><div class="shell"><main class="list">
+<body class="lp diary"${tintVars(p.accent)}><div class="shell"><main class="list">
 <header class="top"><p class="crumb"><a href="${base}">${esc(p.name)}</a></p><h1>${esc(diaryNode?.label || 'Diary')}</h1>
 <p class="seg">${seg('highlights', 'Highlights')} · ${seg('all', 'All entries')}</p></header>
 ${list}
@@ -386,6 +410,15 @@ export const BOOT = `(()=>{const b=document.body,m=document.querySelector('.map'
 const CSS = `
 :root{--bg:#f6f8f4;--ink:#16210f;--muted:#66745f;--line:#d8e2cf;--accent:#3f9c00;--accent-ink:#1d6b00;--node:#fff;--ease:cubic-bezier(.2,.8,.2,1)}
 @media (prefers-color-scheme:dark){:root{--bg:#0b1208;--ink:#e6f0df;--muted:#97a88e;--line:#24361d;--accent:#87bd25;--accent-ink:#b7e27c;--node:#142010}.inv{filter:invert(1) hue-rotate(180deg) brightness(1.15)}}
+[data-tint]{--accent:var(--t);--accent-ink:var(--ti)}
+@media (prefers-color-scheme:dark){[data-tint]{--accent:var(--td);--accent-ink:var(--tid)}}
+.mapsvg image.mono{filter:grayscale(1) contrast(1.1)}
+@media (prefers-color-scheme:dark){.mapsvg image.mono.inv{filter:invert(1) grayscale(1)}}
+.card{position:absolute;z-index:6;max-width:min(22rem,calc(100% - 2rem));padding:.9rem 1.1rem;background:var(--node);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgb(0 0 0/14%);font-size:.95rem;line-height:1.5;animation:cardin .18s cubic-bezier(.2,.8,.2,1)}
+.card h2{font-size:1rem;margin:0 0 .4rem}
+.card p{margin:0 0 .5em}
+.card a{color:var(--accent-ink)}
+@keyframes cardin{from{opacity:0;transform:translateY(4px)}}
 *{box-sizing:border-box}
 html{background:var(--bg);-webkit-text-size-adjust:100%}
 body{margin:0;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;font:18px/1.5 -apple-system,system-ui,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
@@ -428,7 +461,7 @@ details[open]>summary .tw{transform:rotate(90deg)}
 .mapsvg.live{touch-action:none}
 .mapsvg .edges line{transition:opacity .3s}
 .mapsvg .n>circle{fill:var(--node);stroke:var(--line);stroke-width:1.5;transition:stroke .15s,stroke-width .15s}
-.mapsvg .n.lp-group>circle{stroke:color-mix(in srgb,var(--accent) 40%,var(--line))}
+.mapsvg .n.l-group>circle{stroke:color-mix(in srgb,var(--accent) 40%,var(--line))}
 .mapsvg .n:hover>circle,.mapsvg .n:focus-visible>circle,.mapsvg .n.open>circle{stroke:var(--accent);stroke-width:3}
 .mapsvg use{color:var(--accent-ink)}
 svg.ib,use.ib{fill:var(--brand,currentColor)}
@@ -440,10 +473,10 @@ svg.il,use.il{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:roun
 .has-map .map{position:relative;top:0;order:-1;max-height:none;width:min(100%,24rem);margin:-14% auto -12%;cursor:zoom-in}
 .map-on .map{position:fixed;inset:0;max-height:none;width:auto;margin:0;aspect-ratio:auto;z-index:5;background:var(--bg);cursor:default;padding:4.5rem 1rem 1rem}
 .map-on .list,.map-on .foot{visibility:hidden}
-.map-on .back{display:grid;place-items:center;position:fixed;top:max(1rem,env(safe-area-inset-top));left:1rem;width:2.75rem;height:2.75rem;border-radius:50%;border:1px solid var(--line);background:var(--node);color:var(--ink);cursor:pointer;view-transition-name:lp-list}
+.map-on .back{display:grid;place-items:center;position:fixed;top:max(1rem,env(safe-area-inset-top));left:1rem;width:2.75rem;height:2.75rem;border-radius:50%;border:1px solid var(--line);background:var(--node);color:var(--ink);cursor:pointer;view-transition-name:l-list}
 .back svg{width:1.2rem;height:1.2rem;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 .map-on .list{view-transition-name:none}
-.list{view-transition-name:lp-list}
+.list{view-transition-name:l-list}
 }
 ::view-transition-group(*){animation-duration:.4s;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
