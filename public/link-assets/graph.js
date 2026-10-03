@@ -271,7 +271,17 @@ export function start(map) {
 		svg.setAttribute('viewBox', cam.map((v) => v.toFixed(1)).join(' '));
 	}
 	fitAspect();
-	if (window.ResizeObserver) new ResizeObserver(() => fitAspect()).observe(svg);
+	// The starting scale, in viewBox width per box width, kept as the box changes size (e.g. full screen on a phone).
+	const scale0 = cam[2] / (box().width || 1);
+	let baseW = cam[2];
+	const rebase = () => {
+		const b = box();
+		if (b.width) baseW = scale0 * b.width;
+	};
+	if (window.ResizeObserver) new ResizeObserver(() => {
+		fitAspect();
+		rebase();
+	}).observe(svg);
 	function camTarget() {
 		const b = box();
 		const aspect = b.width / Math.max(b.height, 1) || 1;
@@ -279,12 +289,13 @@ export function start(map) {
 		// Never closer than 12% to an edge, so there is always some room around it to open into.
 		anchor = anchor.map((u) => Math.min(Math.max(u, 0.12), 0.88));
 		const [u, v] = anchor;
-		let w = 320 * Math.max(1, aspect);
+		// The scale stays as it started, so the map never shrinks as you go deeper. It widens only if the focus's
+		// own items wouldn't fit; the parent and the other groups may run off the edge (tap back to reach them).
+		let w = baseW;
 		for (const n of byId.values()) {
-			// Frame the focus, its items, its parent and siblings; older ancestors may fade off the edge.
-			if (!role.has(n) || role.get(n) === 'anc') continue;
-			const r = radius(n) + 24;
-			// Each shown node must fit: left, right, top and bottom of the view, with the focus held at (u, v).
+			const rl = role.get(n);
+			if (rl !== 'focus' && rl !== 'child') continue;
+			const r = radius(n) + 20;
 			if (n.x - r < focus.x) w = Math.max(w, (focus.x - (n.x - r)) / u);
 			if (n.x + r > focus.x) w = Math.max(w, (n.x + r - focus.x) / (1 - u));
 			if (n.y - r < focus.y) w = Math.max(w, ((focus.y - (n.y - r)) / v) * aspect);
