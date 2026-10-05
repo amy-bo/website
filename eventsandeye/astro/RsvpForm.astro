@@ -191,8 +191,11 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 	.rsvp { display: grid; gap: 1rem; max-width: 40rem; margin-block: 1.5rem; }
 	.field { display: grid; gap: 0.35rem; border: 0; padding: 0; margin: 0; }
 	.field label:not(.choice), legend { font-weight: 600; }
-	.choice { display: flex; gap: 0.5rem; align-items: flex-start; font-weight: normal; }
-	.choice input { margin-top: 0.3rem; }
+	/* :global because tour and opt-in choices are added by the script after the page loads, and Astro's scoped
+	   styles only reach elements written in this file. */
+	.rsvp :global(.choice) { display: flex; gap: 0.5rem; align-items: flex-start; font-weight: normal; }
+	.rsvp :global(.choice input) { margin-top: 0.3rem; }
+	#rsvp-tours, #rsvp-optins { display: grid; gap: 0.35rem; }
 	input[type='text'], input[type='email'], textarea {
 		padding: 0.5rem; border: 1px solid var(--sl-color-gray-3); border-radius: 0.3rem; background: var(--sl-color-bg); color: var(--sl-color-text); font: inherit;
 	}
