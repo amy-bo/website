@@ -2,6 +2,10 @@
 
 Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
+## 2026-10-05
+
+- [x] **Martin's page as he edited it locally** — `db/links/0008_martin_page_v2.sql` carries the edits Martin made in the local preview (group pictures, colours, purple tint, the diary entry, the Volunteer note) to the live database once, keeping the Linktree click counts; Volunteer takes the heart so every picture stays different; the uploaded Aqueum picture stays local until the bucket exists.
+
 ## 2026-10-03
 
 - [x] **Link pages: theme switch, circle colours, date picker, even spread** — a footer button cycles automatic → light → dark, remembered on the device (the page's dark styles are generated for both the automatic and the chosen case; the head script that applies it before drawing is allowed by its CSP hash); each picture can have its own circle colour for light and dark (lp_node_bg, lp_page_bg), which also stops logos inverting, so AMYBO can be dark on white in dark mode; the single colour option is now the page tint; the editor's light/dark previews use the page's own drawing code; the calendar opens the system date picker and the short date stays editable; each item is drawn towards its own place round the focus (the static places at the centre, an even fan elsewhere), which ends the bunching on returning to the centre; help text says what to do. test:links 114 checks.
