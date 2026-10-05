@@ -19,7 +19,7 @@ const rendered = await Promise.all(talks.map(async (t) => ({ t, Content: (await 
 				<li class="talk">
 					{t.data.headshot && <Image src={t.data.headshot} alt={t.data.headshotAlt ?? `Photo of ${t.data.speaker}`} width={120} height={120} class="headshot" />}
 					<div>
-						<h3>{t.data.start && <span class="time">{t.data.start} </span>}{t.data.title}</h3>
+						<h3>{t.data.start && <span class="time">{t.data.start}</span>}{t.data.title}</h3>
 						<p class="speaker">{t.data.speakerUrl ? <a href={t.data.speakerUrl}>{t.data.speaker}</a> : t.data.speaker}{t.data.affiliation && <>, {t.data.affiliation}</>}</p>
 						<Content />
 					</div>
@@ -34,5 +34,5 @@ const rendered = await Promise.all(talks.map(async (t) => ({ t, Content: (await 
 	.talk { display: flex; gap: 1rem; align-items: flex-start; margin-block: 1.5rem; }
 	.headshot { border-radius: 50%; flex: none; object-fit: cover; }
 	.speaker { font-style: italic; margin-top: 0; }
-	.time { color: var(--sl-color-gray-3); font-weight: normal; }
+	.time { color: var(--sl-color-gray-3); font-weight: normal; margin-right: 0.4em; }
 </style>

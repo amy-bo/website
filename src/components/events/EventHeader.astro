@@ -1,0 +1,44 @@
+---
+// A short looping header film for an event page: muted, no controls, and still for anyone who prefers reduced
+// motion or is saving data (they see the poster frame). About 250 KB; nothing loads until the page does.
+interface Props {
+	/** Folder under public/ holding event-header.webm, event-header.mp4 and event-header-poster.jpg. */
+	base: string;
+	/** Width over height of the film. */
+	ratio?: string;
+}
+const { base, ratio = '3 / 1' } = Astro.props;
+---
+
+<figure class="event-header" style={`aspect-ratio:${ratio}`} aria-hidden="true">
+	<video autoplay muted loop playsinline preload="metadata" poster={`${base}/event-header-poster.jpg`} disablepictureinpicture>
+		<source src={`${base}/event-header.webm`} type="video/webm" />
+		<source src={`${base}/event-header.mp4`} type="video/mp4" />
+	</video>
+</figure>
+
+<script>
+	const still = matchMedia('(prefers-reduced-motion: reduce)').matches || (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+	if (still) {
+		for (const v of document.querySelectorAll<HTMLVideoElement>('.event-header video')) {
+			v.removeAttribute('autoplay');
+			v.preload = 'none';
+			v.pause();
+		}
+	}
+</script>
+
+<style>
+	.event-header {
+		margin: 0 0 1.5rem;
+		border-radius: 0.75rem;
+		overflow: hidden;
+		background: #dfe9cf;
+	}
+	.event-header video {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+</style>
