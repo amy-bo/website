@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-10-05
 
+- [x] **Admin sign-in with Cloudflare's per-application MFA** — the AMYBO admin Access application now requires an authenticator app itself, but its tokens report only `onetimepin`, so the admin check refused a genuine two-factor sign-in ("no methods"). `ACCESS_MFA = "application"` in wrangler.toml makes the code rely on the application's MFA setting; the claim check stays available (and tested) with any other value. README step 6 describes the set-up, including the App Launcher needed to enrol an authenticator. Change to the in-repo Events&I copy; offer it upstream.
 - [x] **AMYBO's Linktree click counts** — `db/links/0009_amybo_linktree_counts.sql` carries the lifetime clicks per link from linktr.ee/amybo.org (37 across ten links) onto amy.bo/links as each link's starting count, once.
 - [x] **Martin's page as he edited it locally** — `db/links/0008_martin_page_v2.sql` carries the edits Martin made in the local preview (group pictures, colours, purple tint, the diary entry, the Volunteer note) to the live database once, keeping the Linktree click counts; Volunteer takes the heart so every picture stays different; the uploaded Aqueum picture stays local until the bucket exists.
 

@@ -89,7 +89,11 @@ async function checkJwt(env: Env, request: Request): Promise<AccessResult> {
 	// The two-factor requirement can be switched off only for local development, never on a deployed host.
 	const mfaOff = env.ACCESS_REQUIRE_MFA === 'false' && isDev(env) && isLocalRequest(request);
 	if (env.ACCESS_REQUIRE_MFA === 'false' && !mfaOff) console.error('ACCESS_REQUIRE_MFA=false is ignored outside local development');
-	if (!mfaOff) {
+	// Cloudflare's per-application ("independent") MFA is enforced by Access before any token is issued, but the
+	// token's amr still says only how the person first signed in (e.g. "onetimepin"). With ACCESS_MFA=application
+	// the deployment declares that the Access application requires MFA, and the claim is not checked.
+	const mfaByApp = env.ACCESS_MFA === 'application';
+	if (!mfaOff && !mfaByApp) {
 		const allowed = (env.ACCESS_MFA_METHODS || DEFAULT_MFA_METHODS.join(',')).split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
 		const amr = (Array.isArray(payload.amr) ? payload.amr : []).map((x) => String(x).toLowerCase());
 		if (!amr.some((m) => allowed.includes(m))) {

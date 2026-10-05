@@ -45,6 +45,8 @@ writeFileSync('.dev.vars', [
 	'ACCESS_AUD=e2e-aud',
 	'ACCESS_TEAM_DOMAIN=e2e.cloudflareaccess.com',
 	'ADMIN_EMAILS=admin@example.org',
+	// Check the token's own methods here (the live site relies on the Access application's MFA instead).
+	'ACCESS_MFA=claim',
 	`ACCESS_JWKS_JSON=${JSON.stringify({ keys: [jwk] })}`,
 	'',
 ].join('\n'));

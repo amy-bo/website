@@ -31,6 +31,9 @@ export interface Env {
 	ACCESS_REQUIRE_MFA?: string;
 	/** Comma-separated `amr` values accepted as a second factor; see access.ts. */
 	ACCESS_MFA_METHODS?: string;
+	/** "application": the Access application itself requires MFA (Cloudflare's independent MFA), which its tokens
+	 * don't report in `amr`; the code then relies on that setting instead of the claim. See access.ts. */
+	ACCESS_MFA?: string;
 	/** Comma-separated admin email addresses; when set, no other Access identity is admitted. */
 	ADMIN_EMAILS?: string;
 	/** Maximum age of an admin sign-in in hours (default 12). */
