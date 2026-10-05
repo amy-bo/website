@@ -39,5 +39,10 @@ test('the editor lives on the main site', async () => {
 test('www and everything else', async () => {
 	assert.equal((await get('/~martin', 'www.amy.bo')).headers.get('location'), 'https://amy.bo/~martin');
 	assert.equal((await get('/about')).headers.get('location'), 'https://amybo.org/about');
-	assert.equal((await get('/event')).headers.get('location'), 'https://amybo.org/event');
+	assert.equal((await get('/whatever')).headers.get('location'), 'https://amybo.org/whatever');
+});
+test('amy.bo/event is the next event, temporarily', async () => {
+	const r = await get('/event');
+	assert.equal(r.status, 302);
+	assert.equal(r.headers.get('location'), 'https://amybo.org/events/2026-11-13-london/');
 });

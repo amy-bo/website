@@ -24,6 +24,8 @@ const REDIRECTS = {
 // Short links that may change (302).
 const TEMPORARY = {
 	'/media': 'https://github.com/amy-bo/electroPioreactor/tree/main/Media',
+	// The next AMYBO Event; repoint it when the next one is announced.
+	'/event': 'https://amybo.org/events/2026-11-13-london/',
 };
 
 /** Paths served from the Pages project, keeping the amy.bo address. */
