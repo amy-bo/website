@@ -149,12 +149,12 @@ function calendarHtml(cal: CalendarBlock | undefined, tz: string): string {
 		return `<li><strong>${escapeHtml(e.summary)}</strong>, ${escapeHtml(ukDateTime(e.start, tz))}<br>
 <span style="font-size:14px">Add to: <a href="${escapeHtml(l.google)}">Google</a> · <a href="${escapeHtml(l.outlook)}">Outlook.com</a> · <a href="${escapeHtml(l.office365)}">Office 365</a> · <a href="${escapeHtml(l.yahoo)}">Yahoo</a> · <a href="${escapeHtml(cal.icsUrl(e.key))}">Apple and others (.ics)</a></span></li>`;
 	}).join('');
-	return `<h2 style="font-size:18px">Your calendar</h2><p style="font-size:14px">Calendar invitations are attached; most email apps add them to your calendar automatically. Or use these links. Your calendar app decides which alerts you get, so add any reminders you need.</p><ul>${items}</ul>`;
+	return `<h2 style="font-size:18px">Your calendar</h2><p style="font-size:14px">If the event wasn't added to your calendar automatically, try opening the attachment or using one of these links:</p><ul>${items}</ul>`;
 }
 
 function calendarText(cal: CalendarBlock | undefined, tz: string): string {
 	if (!cal || !cal.entries.length) return '';
-	return '\n\nYOUR CALENDAR (invitations attached; your calendar app decides which alerts you get, so add any reminders you need)\n' + cal.entries.map((e) => {
+	return '\n\nYOUR CALENDAR (if the event wasn\'t added automatically, open the attachment or use one of these links)\n' + cal.entries.map((e) => {
 		const l = addLinks(e);
 		return `- ${e.summary}, ${ukDateTime(e.start, tz)}\n  Google: ${l.google}\n  Outlook.com: ${l.outlook}\n  Office 365: ${l.office365}\n  Yahoo: ${l.yahoo}\n  Apple and others (.ics): ${cal.icsUrl(e.key)}`;
 	}).join('\n');

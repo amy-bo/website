@@ -109,3 +109,32 @@ If you booked the 10:30 tour, please arrive by 10:20. Closed shoes are needed in
 :::
 
 Calendar entries are attached to this email. To change or cancel your registration, use your personal link below.', 'New name (AMYBO Event); lunch 13:30, talks resume 14:30; dinner about £45 a head', strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'setup');
+
+-- Joining instructions version 4 (6 October): shorter; no arrive-early line for the 10:30 tour, no sign-up deadline in the dinner line. Insert-only.
+INSERT OR IGNORE INTO instructions (event_id, version, subject, body_md, change_note, created_at, created_by) VALUES
+  ('2026-11-13-london', 4, 'Joining instructions: AMYBO Event, 13 November 2026',
+':::in-person
+**Where:** Room 516, Bezos Centre for Sustainable Protein, Imperial College White City campus, 84 Wood Lane, London W12 0BZ.
+
+**Getting there:** Wood Lane station (Hammersmith & City and Circle lines) is a few minutes'' walk away, and White City station (Central line) is also close.
+
+**Schedule (UK time):**
+
+- 10:30 First optional lab tour
+- 11:15 Second optional lab tour, and networking
+- 12:00 Welcome and talks
+- 13:30 Lunch
+- 14:30 Talks and discussion
+- 16:30 Close
+- 17:00 Dinner, for those who signed up
+
+Closed shoes are needed in the labs.
+
+**Food:** attendance is free, and snacks and soft drinks are provided. Unless a sponsor comes forward, please buy or bring your own meals. The Works (Sir Michael Uren Hub, on campus) serves hot food at lunchtime. For dinner, we will try to book a private space at The Broadcaster (89 Wood Lane) at about £45 a head, paid on the night. We pay a £250 deposit, so please tell us as soon as you can if you can''t make it.
+:::
+
+:::remote
+**Joining remotely:** the talks are on Google Meet from 12:00 to 13:30 and from 14:30 to 16:30 (UK time), and they are recorded. The links will be in your calendar entries.
+:::
+
+To change or cancel your registration, use your personal link below.', 'Shorter: no arrive-early line, no dinner deadline, no repeated links or attachments note', strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'setup');
