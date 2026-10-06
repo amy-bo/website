@@ -705,7 +705,9 @@ export async function updateSessions(env: Env, eventId: string, input: Record<st
 		if (old.host_email !== s.host_email) stmts.push(env.DB.prepare('DELETE FROM host_snapshots WHERE session_id=?').bind(s.id));
 	}
 	if (stmts.length) await env.DB.batch(stmts);
-	const updates = await resyncCalendars(env, ev.id);
+	// "Save without emailing": calendars aren't updated now. Each person's entries catch up with the next email that
+	// carries their calendar (joining instructions, a message that includes them, or a change of their own).
+	const updates = input.quiet === true ? 0 : await resyncCalendars(env, ev.id);
 	await syncHosts(env, brand(env), ev, await getSessions(env, ev.id));
 	return { ok: true as const, calendar_updates: updates };
 }

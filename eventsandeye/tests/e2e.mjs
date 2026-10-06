@@ -369,6 +369,9 @@ try {
 	r = await req('POST', '/api/admin/sessions', { event: EVENT, sessions: [{ id: PM.id, ends_at: '2026-11-13T17:00:00Z' }] }, ADMIN);
 	check('both updated; Alice now ends 17:00 with SEQUENCE:3', r.data.calendar_updates === 2 && icsProp((await last(alice)).att[0].content, 'DTEND')[0]?.endsWith('T170000') && /SEQUENCE:3/.test((await last(alice)).att[0].content));
 	check('saving unchanged sessions sends nothing', (await req('POST', '/api/admin/sessions', { event: EVENT, sessions: [{ id: PM.id, ends_at: '2026-11-13T17:00:00Z' }] }, ADMIN)).data.calendar_updates === 0);
+	n = (await outbox()).length;
+	r = await req('POST', '/api/admin/sessions', { event: EVENT, sessions: [{ id: DINNER, location: 'provisionally at The Broadcaster, 89 Wood Lane, London W12 7FX (~£45 a head)' }], quiet: true }, ADMIN);
+	check('save without emailing: saved, nobody emailed', r.data.ok && r.data.calendar_updates === 0 && (await outbox()).length === n, JSON.stringify(r.data));
 
 	console.log('\nAdmin: promote, instructions versions, messages');
 	r = await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN);
@@ -400,6 +403,7 @@ try {
 	m = await last(alice);
 	check('each recipient gets a personal copy with their manage link and the beta footer', /Hello Alice A/.test(m.text_body) && /<strong>G01<\/strong>/.test(m.html_body) && m.text_body.includes('/events/manage/?t=') && /Events&I \(beta\)/.test(m.text_body));
 	check('with "include the latest joining instructions", the message opens a full copy of them under its own subject', m.subject === 'Room confirmed' && /Room \*\*G01\*\*|Room G01/.test(m.text_body) && /Bring ID/.test(m.text_body) && /What's changed/.test(m.text_body), m.subject + ' | ' + m.text_body.slice(0, 300));
+	check('…and carries calendar changes saved quietly earlier (the new dinner location)', m.att.some((x) => /METHOD:REQUEST/.test(x.content) && /provisionally at The Broadcaster/.test(x.content.replace(/\r\n /g, ''))), m.att.map((x) => (/LOCATION:[^\r\n]*/.exec(x.content) || [''])[0]).join(' | '));
 	check('recipients now recorded as having the new version', (await req('POST', '/api/admin/messages', { event: EVENT, dry_run: true, audience: { below_version: V } }, ADMIN)).data.count === 0);
 	check('filter by tour: 11:15 → 1 person', (await req('POST', '/api/admin/messages', { event: EVENT, dry_run: true, audience: { tour_id: TOUR2 } }, ADMIN)).data.count === 1);
 	check('HTML in messages is escaped', !/<script>/.test((await req('POST', '/api/admin/preview', { body_md: '<script>alert(1)</script>' }, ADMIN)).data.html));
