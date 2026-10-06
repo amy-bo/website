@@ -467,6 +467,20 @@ export async function promote(env: Env, id: string, what: 'event' | 'tour') {
 	return { ok: true as const };
 }
 
+/** Promotes people from the in-person waiting list, in waiting-list order, until the in-person maximum is reached
+ * (for when a bigger room is found). Each gets the latest joining instructions, as with a single promotion. */
+export async function promoteAll(env: Env, eventId: string) {
+	const ev = await getEvent(env, eventId);
+	const cap = await capacity(env, ev, await getSessions(env, ev.id));
+	const room = Math.max(0, cap.inPerson.max - cap.inPerson.held);
+	const waiting = await env.DB.prepare(
+		`SELECT id FROM registrations WHERE event_id = ? AND status = 'confirmed' AND attendance = 'in_person' AND place = 'waitlist'
+		 ORDER BY waitlist_since, confirmed_at LIMIT ?`,
+	).bind(ev.id, room).all<{ id: string }>();
+	for (const r of waiting.results) await promote(env, r.id, 'event');
+	return { ok: true as const, promoted: waiting.results.length, still_waiting: cap.inPerson.waiting - waiting.results.length };
+}
+
 /** "I did not register": deletes a registration that has not been confirmed, from the link in the confirmation email,
  * so the person gets no further email and any place it held is freed at once. Confirmed ones are left alone. */
 export async function decline(env: Env, id: string) {

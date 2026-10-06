@@ -64,7 +64,7 @@ const HTML = /* html */ `<!doctype html>
 				<div><label for="s-travel">Assumed travel time for the "time to leave" reminder (minutes)</label><input id="s-travel" type="number" min="0" required /></div>
 			</div>
 			<button type="submit">Save settings</button>
-			<p class="small">Raising a maximum does not move anyone off a waiting list: use "Promote" below, which sends that person the latest joining instructions.</p>
+			<p class="small">Raising a maximum does not move anyone off the waiting list by itself: use "Promote" on a person below, or <button type="button" id="promote-all" hidden>Promote all who fit</button> to give places to the waiting list in order, up to the maximum. Each person promoted is emailed the latest joining instructions.</p>
 		</form>
 	</section>
 
@@ -187,6 +187,8 @@ async function load() {
 		...s.sessions.filter((x) => x.optin).map((x) => stat(x.label + ': signed up (confirmed, with a place)', s.registrations.filter((r) => r.status === 'confirmed' && r.attendance === 'in_person' && r.place === 'place' && (r.optins || '').split(',').includes(x.id)).length)),
 		stat('registration closes', uk(s.event.deadline)),
 	].join('');
+	$('promote-all').hidden = !(c.inPerson.waiting > 0 && c.inPerson.held < c.inPerson.max);
+	$('promote-all').dataset.fit = String(Math.min(c.inPerson.waiting, c.inPerson.max - c.inPerson.held));
 	$('s-max').value = s.event.in_person_max; $('s-deadline').value = isoToUkLocal(s.event.deadline); $('s-travel').value = s.event.travel_minutes;
 
 	$('sessions-box').innerHTML = sessions.map((x) => {
@@ -257,6 +259,9 @@ document.body.addEventListener('click', async (e) => {
 		if (b.id === 'sess-dry') {
 			const d = await api('/api/admin/sessions', 'POST', { event: eventId, sessions: sessionEdits(), dry_run: true });
 			toast(d.calendar_updates + ' person(s) would get updated calendar invitations.');
+		} else if (b.id === 'promote-all') {
+			if (!confirm('Promote ' + b.dataset.fit + ' person(s) from the waiting list? Each will be emailed the latest joining instructions.')) return;
+			const d = await api('/api/admin/promote-all', 'POST', { event: eventId }); toast('Promoted and emailed ' + d.promoted + (d.still_waiting ? '; ' + d.still_waiting + ' still waiting.' : '.')); load();
 		} else if (b.dataset.promote) {
 			if (!confirm('Promote this person? They will be emailed the latest joining instructions.')) return;
 			await api('/api/admin/promote', 'POST', { id: b.dataset.id, what: b.dataset.promote }); toast('Promoted and emailed.'); load();

@@ -350,7 +350,13 @@ try {
 	const bobId = r.data.registrations.find((x) => x.email === bob).id;
 	r = await req('POST', '/api/admin/promote', { id: bobId, what: 'tour' }, ADMIN);
 	check('promote Bob to the 10:30 tour (still waiting for a place → no email yet)', r.data.ok && (await mailsTo(bob)).length === 3);
-	r = await req('POST', '/api/admin/promote', { id: bobId, what: 'event' }, ADMIN);
+	r = await req('POST', '/api/admin/promote-all', { event: EVENT }, ADMIN);
+	check('promote all does nothing while the maximum is reached', r.data.ok && r.data.promoted === 0 && r.data.still_waiting === 1, JSON.stringify(r.data));
+	await req('POST', '/api/admin/settings', { event: EVENT, in_person_max: 2 }, ADMIN);
+	r = await req('POST', '/api/admin/promote-all', { event: EVENT }, ADMIN);
+	check('raising the maximum then promote all gives the waiting list places, in order', r.data.ok && r.data.promoted === 1 && r.data.still_waiting === 0, JSON.stringify(r.data));
+	await req('POST', '/api/admin/settings', { event: EVENT, in_person_max: 1 }, ADMIN);
+	check('promote all needs Access', (await req('POST', '/api/admin/promote-all', { event: EVENT })).status === 401);
 	m = await last(bob);
 	check('promote Bob to a place → joining instructions with an invitation starting 10:30', r.data.ok && /You have an in-person place/.test(m.text_body) && /booked on the 10:30 lab tour/.test(m.text_body) && m.att.length === 1 && icsProp(m.att[0].content, 'DTSTART').at(-1)?.endsWith('T103000'));
 	check('10:30 host list now shows Bob booked (changed, in bold)', /\*\*Bob – booked(, but waiting for an in-person place)?\*\*/.test((await last('host1@example.org')).text_body));

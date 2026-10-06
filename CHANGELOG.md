@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-10-06
 
+- [x] **Promote all who fit** — a button on the admin page (shown when people are waiting and the maximum has room) promotes the in-person waiting list in order up to the maximum, each person getting the latest joining instructions as with a single promotion (POST /api/admin/promote-all), for when a bigger room is found.
 - [x] **Waiting-list confirmation email** — when in-person places are full, the confirmation email asks people to confirm "and join the waiting list: we will email you if a place comes up, for example if we can book a bigger room", says the registration (not a place) will be deleted if they don't, and lists "You are joining the waiting list for an in-person place."
 - [x] **Deleting a registration you didn't make sends one last email** ("Registration deleted", naming nobody), and a remote registrant's confirmation email says "If you don't complete your registration, it will be deleted…".
 - [x] **Switching between in person and remote says so** — changing attendance now sends the joining instructions for the new way of attending, opening "You have changed to joining remotely. Your in-person place has been deleted, along with any lab tour or dinner sign-up." (or "…attending in person."), with the calendar changes attached, instead of a bare calendar update; online calendar entries drop a trailing place that is part of the venue ("AMYBO Event: Welcome and talks (online)").
