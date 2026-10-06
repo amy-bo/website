@@ -31,7 +31,7 @@ const { contactHref } = Astro.props;
 				if (!d.ok) throw new Error(d.error);
 				del.hidden = true;
 				document.getElementById('confirm-intro')!.hidden = true;
-				out.innerHTML = '<p><strong>Deleted.</strong> You won\'t hear from us about it again.</p>';
+				out.innerHTML = '<p><strong>Deleted.</strong> We have sent you a final email to confirm your registration has been deleted.</p>';
 			} catch (e) {
 				out.textContent = (e as Error).message || 'Something went wrong. Please contact us using the link below.';
 				del.disabled = false;

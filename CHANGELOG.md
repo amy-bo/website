@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-10-06
 
+- [x] **Admin messages can carry the joining instructions** — "Counts as joining instructions version" becomes a checkbox, "Include the latest joining instructions": the message is sent first, under its own subject, followed by the full latest instructions with any calendar changes (people still waiting for a place get the message alone), and everyone sent it counts as having that version. The "I did not register" page now says a final email confirms the deletion, and that email signs off "Best regards, AMYBO".
 - [x] **Promote all who fit** — a button on the admin page (shown when people are waiting and the maximum has room) promotes the in-person waiting list in order up to the maximum, each person getting the latest joining instructions as with a single promotion (POST /api/admin/promote-all), for when a bigger room is found.
 - [x] **Waiting-list confirmation email** — when in-person places are full, the confirmation email asks people to confirm "and join the waiting list: we will email you if a place comes up, for example if we can book a bigger room", says the registration (not a place) will be deleted if they don't, and lists "You are joining the waiting list for an in-person place."
 - [x] **Deleting a registration you didn't make sends one last email** ("Registration deleted", naming nobody), and a remote registrant's confirmation email says "If you don't complete your registration, it will be deleted…".

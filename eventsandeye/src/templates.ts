@@ -280,8 +280,10 @@ export function declinedEmail(b: Brand, ev: EventRow, email: string): OutgoingEm
 	const subject = `Registration deleted: ${ev.title}`;
 	const html = layout(b, subject, `
 <p>Hello,</p>
-<p>The registration made with this address for the <strong>${escapeHtml(ev.title)}</strong> has been deleted, as you asked. You won't hear from us about it again.</p>`);
-	const text = `Hello,\n\nThe registration made with this address for the ${ev.title} has been deleted, as you asked. You won't hear from us about it again.${textFooter(b)}`;
+<p>The registration made with this address for the <strong>${escapeHtml(ev.title)}</strong> has been deleted, as you asked. You won't hear from us about it again.</p>
+<p>Best regards</p>
+<p>${escapeHtml(b.org)}</p>`);
+	const text = `Hello,\n\nThe registration made with this address for the ${ev.title} has been deleted, as you asked. You won't hear from us about it again.\n\nBest regards\n\n${b.org}${textFooter(b)}`;
 	return { to: email, subject, html, text };
 }
 

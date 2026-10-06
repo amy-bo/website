@@ -85,7 +85,7 @@ const HTML = /* html */ `<!doctype html>
 
 	<section aria-labelledby="h-instr">
 		<h2 id="h-instr">Joining instructions</h2>
-		<p class="small">The latest version is emailed automatically, with calendar invitations, to each person when they confirm (or are promoted from the in-person waiting list), and to anyone who registers again. Saving a new version does <strong>not</strong> email anyone already registered: to update them, compose a message below to "people on an older version" and tick "counts as this version".</p>
+		<p class="small">The latest version is emailed automatically, with calendar invitations, to each person when they confirm (or are promoted from the in-person waiting list), and to anyone who registers again. Saving a new version does <strong>not</strong> email anyone already registered: to update them, write a short message below to "people on an older version" and tick "Include the latest joining instructions".</p>
 		<div id="instr-versions"></div>
 		<form id="instr-form">
 			<label for="i-subject">Subject</label><input id="i-subject" type="text" required maxlength="200" />
@@ -106,7 +106,7 @@ const HTML = /* html */ `<!doctype html>
 				<div><label for="m-att">Attendance</label><select id="m-att"><option value="all">Everyone</option><option value="in_person">In person</option><option value="remote">Remote</option></select></div>
 				<div><label for="m-tour">Tour</label><select id="m-tour"><option value="">Any</option><option value="none">No tour</option></select></div>
 				<div><label for="m-below">Only people whose joining instructions are older than version</label><input id="m-below" type="number" min="1" placeholder="(everyone)" /></div>
-				<div><label for="m-marks">Counts as joining instructions version</label><input id="m-marks" type="number" min="1" placeholder="(no)" /></div>
+				<div><label><input type="checkbox" id="m-instr" style="width:auto" /> Include the latest joining instructions</label><p class="small">Your message comes first, then the full joining instructions with any calendar changes. Everyone sent it counts as having the latest version.</p></div>
 			</div>
 			<label><input type="checkbox" id="m-wait" style="width:auto" /> Include people on the in-person waiting list</label>
 			<label for="m-when">Send at (UK time; leave empty to send now)</label><input id="m-when" type="datetime-local" />
@@ -230,7 +230,7 @@ async function load() {
 	const latest = iv.versions[0];
 	$('instr-versions').innerHTML = iv.versions.map((v) => '<details><summary>Version ' + esc(v.version) + ' – ' + esc(uk(v.created_at)) + ' – ' + esc(v.subject) + (v.change_note ? ' – <em>' + esc(v.change_note) + '</em>' : '') + '</summary><pre style="white-space:pre-wrap">' + esc(v.body_md) + '</pre></details>').join('');
 	if (latest && !$('i-subject').value) { $('i-subject').value = latest.subject; $('i-body').value = latest.body_md; }
-	$('m-marks').placeholder = '(no) latest is ' + latestVersion;
+	$('m-instr').parentElement.lastChild.textContent = ' Include the latest joining instructions (version ' + latestVersion + ')';
 
 	const ms = await api('/api/admin/messages?event=' + encodeURIComponent(eventId));
 	$('msgs').querySelector('tbody').innerHTML = ms.messages.map((m) => '<tr><td>' + esc(uk(m.sent_at || m.scheduled_at || m.created_at)) + '</td><td>' + esc(m.subject) + '</td><td>' + esc(m.status) + (m.error ? ': ' + esc(m.error) : '') + '</td><td>' + esc(m.recipients_count ?? '') + '</td><td><code>' + esc(m.audience) + '</code></td><td>' + (m.status === 'scheduled' ? '<button class="danger" data-cancel="' + esc(m.id) + '">Cancel</button>' : '') + '</td></tr>').join('') || '<tr><td colspan="6">Nothing sent yet.</td></tr>';
@@ -294,7 +294,7 @@ $('msg-form').addEventListener('submit', async (e) => {
 	try {
 		const count = (await api('/api/admin/messages', 'POST', { event: eventId, dry_run: true, audience: audience() })).count;
 		if (!confirm((when ? 'Schedule for ' + uk(when) : 'Send now') + ' to ' + count + ' recipient(s)?')) return;
-		await api('/api/admin/messages', 'POST', { event: eventId, subject: $('m-subject').value, body_md: $('m-body').value, audience: audience(), scheduled_at: when, marks_instructions_version: $('m-marks').value ? Number($('m-marks').value) : undefined });
+		await api('/api/admin/messages', 'POST', { event: eventId, subject: $('m-subject').value, body_md: $('m-body').value, audience: audience(), scheduled_at: when, marks_instructions_version: $('m-instr').checked ? latestVersion : undefined });
 		toast(when ? 'Scheduled.' : 'Sent.'); e.target.reset(); load();
 	} catch (err) { toast(err.message); }
 });

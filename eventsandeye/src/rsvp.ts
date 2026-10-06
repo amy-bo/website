@@ -8,6 +8,7 @@ import {
 	alreadyRegisteredIntro, type Brand, calendarUpdateEmail, cancellationEmail, confirmEmail, declinedEmail, type EventRow, instructionsEmail, messageEmail,
 	notification, optedIn, type RegistrationRow, type SessionRow, waitlistReminderEmail,
 } from './templates';
+import { mdToHtml, mdToText } from './markdown';
 import { makeToken } from './tokens';
 import { cleanText, EMAIL_RE, nowIso, randomToken } from './util';
 
@@ -236,14 +237,16 @@ async function demoteIfLatest(env: Env, id: string, field: 'place' | 'tour_place
  * changed entries (or all of them when resendAllCalendar), and entries that no longer apply are cancelled.
  */
 async function sendInstructions(env: Env, ev: EventRow, reg: RegistrationRow, sessions: SessionRow[],
-	opts: { intro?: { html: string; text: string }; resendAllCalendar?: boolean; kind?: string } = {}) {
+	opts: { intro?: { html: string; text: string }; resendAllCalendar?: boolean; kind?: string; subject?: string } = {}) {
 	const instr = await latestInstructions(env, ev.id);
 	if (!instr) return;
 	const murl = await manageUrl(env, reg.id);
 	const p = await plan(parseState(reg.calendar_state), entriesFor(env, ev, sessions, reg));
 	const send = opts.resendAllCalendar ? [...p.requests, ...p.unchanged] : p.requests;
 	const files = attachments(env, ev, reg, send, p.cancels);
-	const pid = await sendEmail(env, instructionsEmail(brand(env), ev, reg, sessions, instr, murl, { entries: p.entries, icsUrl: await icsUrlFor(env, reg.id) }, files, opts.intro));
+	const mail = instructionsEmail(brand(env), ev, reg, sessions, instr, murl, { entries: p.entries, icsUrl: await icsUrlFor(env, reg.id) }, files, opts.intro);
+	if (opts.subject) mail.subject = opts.subject;
+	const pid = await sendEmail(env, mail);
 	await env.DB.prepare('UPDATE registrations SET instructions_version = ?, calendar_state = ? WHERE id = ?').bind(instr.version, JSON.stringify(p.state), reg.id).run();
 	await recordDelivery(env, reg.id, opts.kind ?? 'instructions', pid, { version: instr.version });
 }
@@ -566,9 +569,18 @@ export async function deliverMessage(env: Env, id: string) {
 	if (!claim) return;
 	try {
 		const recipients = await audienceRecipients(env, claim.event_id, JSON.parse(claim.audience));
+		// "Include the latest joining instructions": the message opens a full copy of the instructions (with any calendar
+		// changes) for everyone who has a place; people still waiting for one get the message alone.
+		const latest = await latestInstructions(env, claim.event_id);
+		const withInstructions = !!latest && claim.marks_instructions_version === latest.version;
+		const ev = withInstructions ? await getEvent(env, claim.event_id) : null;
+		const sessions = ev ? await getSessions(env, ev.id) : [];
+		const plain = recipients.filter((r) => !withInstructions || (r.attendance === 'in_person' && r.place !== 'place'));
 		const emails: OutgoingEmail[] = [];
-		for (const r of recipients) emails.push(messageEmail(brand(env), r, claim, await manageUrl(env, r.id)));
-		const ids = await sendBatch(env, emails);
+		for (const r of plain) emails.push(messageEmail(brand(env), r, claim, await manageUrl(env, r.id)));
+		const plainIds = await sendBatch(env, emails);
+		const ids = recipients.map((r) => (plain.includes(r) ? plainIds[plain.indexOf(r)] : null));
+		if (ev) for (const r of recipients) if (!plain.includes(r)) await sendInstructions(env, ev, r, sessions, { intro: { html: mdToHtml(claim.body_md), text: mdToText(claim.body_md) }, subject: claim.subject, kind: 'message_instructions' });
 		const stmts = recipients.map((r, i) =>
 			env.DB.prepare('INSERT INTO deliveries (registration_id, kind, message_id, instructions_version, sent_at, provider_id) VALUES (?,?,?,?,?,?)')
 				.bind(r.id, 'message', id, claim.marks_instructions_version, nowIso(), ids[i] ?? null));
