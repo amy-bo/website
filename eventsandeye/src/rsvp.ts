@@ -402,7 +402,12 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 		// Anyone who now qualifies for joining instructions but never had them (a remote person moving in person with a
 		// place, or someone leaving the in-person waiting list to join remotely) gets them in full.
 		const qualifies = updated.attendance === 'remote' || updated.place === 'place';
-		if (qualifies && (reg.instructions_version === 0 || (reg.attendance === 'remote' && updated.attendance === 'in_person'))) await sendInstructions(env, ev, updated, sessions);
+		// A change between in person and remote is a different day: say so plainly, then give the instructions for the new way of attending.
+		const switched = reg.attendance !== updated.attendance;
+		const intro = !switched ? undefined : updated.attendance === 'remote'
+			? { html: '<p><strong>You have changed to joining remotely.</strong> Your in-person place has been released, along with any lab tour or dinner sign-up.</p>', text: 'You have changed to joining remotely. Your in-person place has been released, along with any lab tour or dinner sign-up.' }
+			: { html: '<p><strong>You have changed to attending in person.</strong></p>', text: 'You have changed to attending in person.' };
+		if (qualifies && (reg.instructions_version === 0 || switched)) await sendInstructions(env, ev, updated, sessions, { intro });
 		else await syncCalendar(env, ev, updated, sessions);
 		await syncHosts(env, brand(env), ev, sessions);
 	}
