@@ -54,24 +54,24 @@ export function entriesFor(env: Env, ev: EventRow, sessions: SessionRow[], reg: 
 		}));
 	}
 
-	// Just the opt-in sessions (e.g. only the dinner): one entry for each, at its own place.
-	if (modeOf(reg) === 'extras') {
-		const ids = (reg.optins ?? '').split(',');
-		return ordered.filter((s) => s.optin && ids.includes(s.id)).map((s) => ({
-			key: `s-${s.id}`,
-			uid: uid(`s-${s.id}`),
-			summary: `${ev.title}: ${s.label}`,
-			location: s.location || ev.location,
-			start: s.starts_at,
-			end: s.ends_at,
-			description: [`${s.label}${s.location ? `, ${s.location}` : ''}`, '', manage].join('\n'),
-			alarms: ['-P1D', '-PT1H'],
-		}));
-	}
+	// The opt-in sessions this person signed up for (e.g. dinner) each get an entry of their own, at their own place,
+	// whether they come for the day too or only for these.
+	const optinIds = (reg.optins ?? '').split(',');
+	const optinEntries: CalEntry[] = ordered.filter((s) => s.optin && optinIds.includes(s.id)).map((s) => ({
+		key: `s-${s.id}`,
+		uid: uid(`s-${s.id}`),
+		summary: `${ev.title}: ${s.label}`,
+		location: s.location || ev.location,
+		start: s.starts_at,
+		end: s.ends_at,
+		description: [`${s.label}${s.location ? `, ${s.location}` : ''}`, '', manage].join('\n'),
+		alarms: ['-P1D', '-PT1H'],
+	}));
+	if (modeOf(reg) === 'extras') return optinEntries;
 
 	const core = ordered.filter((s) => isCore(s) && s.mode !== 'online');
 	const tour = reg.tour_id && reg.tour_place === 'place' ? ordered.find((s) => s.id === reg.tour_id) : undefined;
-	if (!core.length && !tour) return [];
+	if (!core.length && !tour) return optinEntries;
 	const starts = [...core.map((s) => s.starts_at), ...(tour ? [tour.starts_at] : [])].sort();
 	const ends = [...core.map((s) => s.ends_at), ...(tour ? [tour.ends_at] : [])].sort();
 	const schedule = ordered
@@ -95,7 +95,7 @@ export function entriesFor(env: Env, ev: EventRow, sessions: SessionRow[], reg: 
 			manage,
 		].join('\n'),
 		alarms: ['-P7D', '-P1D', `-PT${travel + 15}M`, '-PT15M'],
-	}];
+	}, ...optinEntries];
 }
 
 // Times are normalised so that re-saving the same time in another ISO spelling ('…:00Z' vs '…:00.000Z') is not a change.

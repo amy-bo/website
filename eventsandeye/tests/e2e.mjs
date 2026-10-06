@@ -269,8 +269,8 @@ try {
 	check('Alice receives joining instructions', /Joining instructions/.test(m.subject) && /You have an in-person place/.test(m.text_body));
 	check('instructions open with thanks, then her status, including dinner', /Thank you for registering for the [^\n]+, on \w+day \d+ \w+ 2026\.\n\nYou have an in-person place\.\nYou are booked on the 10:30 lab tour\.\nYou would like to join us for dinner\./.test(m.text_body), JSON.stringify(m.text_body.slice(0, 400)));
 	check('in-person instructions carry the in-person section only', /Room 516/.test(m.text_body) && !/Joining remotely/.test(m.text_body) && !/:::/.test(m.text_body));
-	check('…with exactly one calendar invitation', m.att.length === 1 && m.att[0].filename === 'invite.ics' && /method=REQUEST/.test(m.att[0].content_type), JSON.stringify(m.att.map((a) => a.filename)));
-	let ics = m.att[0].content;
+	check('…with a calendar invitation for the day, and one for the dinner she signed up for', m.att.length === 2 && m.att.every((a) => /method=REQUEST/.test(a.content_type)) && m.att.some((a) => /SUMMARY:[^\r\n]*Dinner/.test(a.content) && /LOCATION:[^\r\n]*Broadcaster/.test(a.content)), JSON.stringify(m.att.map((a) => a.filename)));
+	let ics = m.att.find((a) => !/SUMMARY:[^\r\n]*Dinner/.test(a.content)).content;
 	check('invitation: METHOD:REQUEST, SEQUENCE:0, Europe/London VTIMEZONE', /METHOD:REQUEST/.test(ics) && /SEQUENCE:0/.test(ics) && /TZID:Europe\/London/.test(ics));
 	check('calendar entries never carry the manage link', !/\/events\/manage\//.test(unfold(ics)) && !/events\/manage/.test(decodeURIComponent(m.html_body.match(/calendar\.google\.com[^"]*/)?.[0] ?? '')));
 	{ const icsT = decodeURIComponent((/\/api\/rsvp\/calendar\?t=([^&"]+)/.exec(m.html_body) || [])[1] ?? '');
@@ -299,7 +299,7 @@ try {
 	check('duplicate returns the same generic success', r.status === 200 && r.data.ok);
 	m = await last(alice);
 	check('reminder confirms name, event, email and when registered, then the joining instructions', (await mailsTo(alice)).length === 3 && /already registered/.test(m.text_body) && /Name: Alice\. Email: alice@example\.org\. Registered: /.test(m.text_body) && /Schedule \(UK time\)/.test(m.text_body));
-	check('reminder re-attaches the current calendar invitation (same sequence)', m.att.length === 1 && /SEQUENCE:0/.test(m.att[0].content));
+	check('reminder re-attaches the current calendar invitations (same sequence)', m.att.length === 2 && m.att.every((a) => /SEQUENCE:0/.test(a.content)));
 	await register({ name: 'Bob', email: bob });
 	m = await last(bob);
 	check('waitlisted duplicate gets a reminder of their status, no instructions or calendar', (await mailsTo(bob)).length === 3 && /already registered/.test(m.text_body) && /waiting list/.test(m.text_body) && !/Schedule \(UK time\)/.test(m.text_body) && m.att.length === 0);
@@ -321,7 +321,7 @@ try {
 
 	console.log('\nSelf-service changes and calendar updates');
 	r = await req('GET', `/api/rsvp/manage?t=${encodeURIComponent(aliceManage)}`);
-	check('manage view with calendar download', r.data.ok && r.data.registration.name === 'Alice' && r.data.registration.share_contact === true && r.data.calendar.length === 1 && r.data.calendar[0].key === 'day');
+	check('manage view with calendar download', r.data.ok && r.data.registration.name === 'Alice' && r.data.registration.share_contact === true && r.data.calendar.length === 2 && r.data.calendar[0].key === 'day' && /Dinner/.test(r.data.calendar[1].summary));
 	check('confirm token cannot manage', (await req('GET', `/api/rsvp/manage?t=${encodeURIComponent(aliceConfirm)}`)).status === 404);
 	const dl = await fetch(r.data.calendar[0].url);
 	const dlText = await dl.text();
