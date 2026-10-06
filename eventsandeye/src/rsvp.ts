@@ -405,7 +405,7 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 		// A change between in person and remote is a different day: say so plainly, then give the instructions for the new way of attending.
 		const switched = reg.attendance !== updated.attendance;
 		const intro = !switched ? undefined : updated.attendance === 'remote'
-			? { html: '<p><strong>You have changed to joining remotely.</strong> Your in-person place has been released, along with any lab tour or dinner sign-up.</p>', text: 'You have changed to joining remotely. Your in-person place has been released, along with any lab tour or dinner sign-up.' }
+			? { html: '<p><strong>You have changed to joining remotely.</strong> Your in-person place has been deleted, along with any lab tour or dinner sign-up.</p>', text: 'You have changed to joining remotely. Your in-person place has been deleted, along with any lab tour or dinner sign-up.' }
 			: { html: '<p><strong>You have changed to attending in person.</strong></p>', text: 'You have changed to attending in person.' };
 		if (qualifies && (reg.instructions_version === 0 || switched)) await sendInstructions(env, ev, updated, sessions, { intro });
 		else await syncCalendar(env, ev, updated, sessions);

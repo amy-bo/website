@@ -449,7 +449,7 @@ try {
 	r = await req('POST', '/api/rsvp/manage', { t: bobManage, name: 'Bob', attendance: 'remote', tour_id: 'none' });
 	check('switching to remote drops a tour whose booking has closed', r.data.ok && r.data.registration.attendance === 'remote' && r.data.registration.tour_id === null, JSON.stringify(r.data));
 	m = await last(bob);
-	check('switching to remote says so, releases the in-person place, and sends the remote instructions', /You have changed to joining remotely/.test(m.text_body) && /in-person place has been released/.test(m.text_body) && /Joining instructions/.test(m.subject), m.subject);
+	check('switching to remote says so, releases the in-person place, and sends the remote instructions', /You have changed to joining remotely/.test(m.text_body) && /in-person place has been deleted/.test(m.text_body) && /Joining instructions/.test(m.subject), m.subject);
 	check('online calendar entries drop the place from the event name', m.att.some((a) => /METHOD:REQUEST/.test(a.content) && /SUMMARY:[^\r\n]*\(online\)/.test(a.content) && !/SUMMARY:[^\r\n]*, London/.test(a.content)) && m.att.some((a) => /METHOD:CANCEL/.test(a.content)), m.att.map((a) => (/SUMMARY:[^\r\n]*/.exec(a.content) || [''])[0]).join(' | '));
 	r = await req('DELETE', '/api/rsvp/manage', { t: aliceManage });
 	check('Alice cancels; 11:15 host sees her struck through', r.data.ok && /~~Alice A – booked~~/.test((await last('host2@example.org')).text_body));
