@@ -7,4 +7,3 @@ affiliation: Imperial College London, Bezos Centre for Sustainable Protein
 order: 2
 published: true
 ---
-Air-to-food research at Imperial, which also uses Pioreactors.

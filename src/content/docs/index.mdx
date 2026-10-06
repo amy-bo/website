@@ -6,12 +6,15 @@ hugoPath: /
 provenance: Hero, tagline and the first three cards by Amy (her one-line description rewritten for search results) (forest photo by Ozark Drones on Unsplash). The event banner, the electroPioreactor card and the 'What we are doing now' section are new. Below that, 'We need your help' and 'Let's democratise food' are the Hugo homepage's words; its 2023 lines about fortnightly videos and editable pages were rewritten.
 template: splash
 hero:
-  tagline: We exist to drive forward the protein revolution with the open source community.
   actions:
+    - text: London Event, 13 Nov
+      link: /events/2026-11-13-london/
+      icon: right-arrow
+      variant: primary
     - text: Our Mission
       link: /mission/
       icon: right-arrow
-      variant: primary
+      variant: secondary
 footer: true
 ---
 
@@ -19,10 +22,6 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 import { LinkButton, Aside } from "@astrojs/starlight/components";
 import YouTube from '../../components/YouTube.astro';
 import ForumLatest from '../../components/ForumLatest.astro';
-
-<Aside type="tip" title="AMYBO Event, London – Friday 13 November 2026">
-Lab tours, talks and the pub at the Bezos Centre for Sustainable Protein, Imperial College White City. Free, in person or remote. [Find out more and register](/events/2026-11-13-london/).
-</Aside>
 
 <CardGrid stagger>
     <Card title="EXPERIMENTING IN THE OPEN" icon="rocket">

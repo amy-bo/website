@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-10-06
 
+- [x] **Event page order and trims; homepage event button; About takes Why AMYBO's sections** — event page: Talks, Lab tours, Draft schedule; Room 516 in the Where card; one line for the tours; no Join remotely section, talk description or "more talks" line; snacks first under Food. Homepage: a "London Event, 13 Nov" button in the hero, above the fold on phones and desktops, replacing the banner below it; the "protein revolution" tagline is gone; the hero's outline button is now readable on the photo. About: How we work and Where we are moved from Why AMYBO; the first video sits under History.
 - [x] **Registration form: say less** — the form no longer says whether in-person places are available (a "full" notice would stop people registering, and the waiting list is how demand beyond the room shows up) or that remote places are unlimited: only the closing time; dropped help lines that repeat the page, shortened the consent and host-sharing text (retention stays in the privacy notice), one feedback link instead of two; the White City credit no longer names the crop.
 
 ## 2026-10-05

@@ -52,3 +52,11 @@
 .sl-markdown-content .photo-row { display: grid; gap: 1rem; grid-template-columns: 1fr; }
 @media (min-width: 40rem) { .sl-markdown-content .photo-row { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); } }
 .sl-markdown-content .photo-row figure.photo { margin: 0; }
+
+/* The hero's second button (outline) over the forest photo: white outline and text on a light veil. */
+.hero .sl-link-button.secondary {
+  color: #fff;
+  border-color: #fff;
+  background: rgba(0, 0, 0, 0.3);
+}
+.hero .sl-link-button.secondary:hover { background: rgba(0, 0, 0, 0.45); }
