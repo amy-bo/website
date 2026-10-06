@@ -5,7 +5,7 @@ import { sendBatch, sendEmail, type OutgoingEmail } from './email';
 import { syncHosts } from './hosts';
 import { buildIcs } from './ics';
 import {
-	alreadyRegisteredIntro, type Brand, calendarUpdateEmail, cancellationEmail, confirmEmail, type EventRow, instructionsEmail, messageEmail,
+	alreadyRegisteredIntro, type Brand, calendarUpdateEmail, cancellationEmail, confirmEmail, declinedEmail, type EventRow, instructionsEmail, messageEmail,
 	notification, optedIn, type RegistrationRow, type SessionRow, waitlistReminderEmail,
 } from './templates';
 import { makeToken } from './tokens';
@@ -476,6 +476,7 @@ export async function decline(env: Env, id: string) {
 	await env.DB.prepare("DELETE FROM registrations WHERE id = ? AND status = 'pending'").bind(id).run();
 	const ev = await getEvent(env, reg.event_id);
 	await syncHosts(env, brand(env), ev, await getSessions(env, ev.id));
+	await sendEmail(env, declinedEmail(brand(env), ev, reg.email));
 	return { ok: true as const, gone: false };
 }
 

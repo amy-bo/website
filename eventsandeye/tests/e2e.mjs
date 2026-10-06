@@ -217,6 +217,8 @@ try {
 	check('a GET of the delete link does nothing', (await req('GET', `/api/rsvp/decline?t=${malloryConfirm}`)).status === 405 || (await req('GET', `/api/rsvp/decline?t=${malloryConfirm}`)).status === 404);
 	r = await req('POST', '/api/rsvp/decline', { t: malloryConfirm });
 	check('the delete button removes an unconfirmed registration', r.status === 200 && r.data.ok && r.data.gone === false, JSON.stringify(r.data));
+	const gone = await last(mallory);
+	check('and sends one last email saying it is deleted, naming nobody', /Registration deleted/.test(gone.subject) && !/Someone else/.test(gone.text_body), gone.subject);
 	r = await req('POST', '/api/rsvp/confirm', { t: malloryConfirm });
 	check('and it can no longer be confirmed', r.status === 404);
 	check('a bad token is refused', (await req('POST', '/api/rsvp/decline', { t: 'nope' })).status === 404);

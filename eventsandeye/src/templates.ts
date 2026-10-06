@@ -170,7 +170,7 @@ export function confirmEmail(b: Brand, ev: EventRow, reg: RegistrationRow, sessi
 		...statusLines(reg, sessions).map((l) => l.replace('You have an in-person place.', 'An in-person place is held for you.').replace('You are booked on', 'A place is held for you on')),
 		reg.share_contact ? 'You chose to share your email address with the hosts of the sessions you attend.' : 'Session hosts will see only your name and whether you have a place.',
 	];
-	const held = reg.attendance === 'in_person' ? 'your place will be released' : 'your registration will be deleted';
+	const held = reg.attendance === 'in_person' ? 'your place will be released' : 'it will be deleted';
 	const notMeUrl = `${confirmUrl}${confirmUrl.includes('?') ? '&' : '?'}not-me=1`;
 	const holdUntil = ukDateTime(reg.hold_expires_at ?? ev.deadline, ev.timezone);
 	const html = layout(b, subject, `
@@ -269,6 +269,17 @@ export function cancellationEmail(b: Brand, ev: EventRow, reg: Pick<Registration
 <p>If this was a mistake, you are welcome to <a href="${escapeHtml(eventUrl)}">register again</a> while registration is open.</p>`);
 	const text = `Hello ${reg.name},\n\nYour registration for the ${ev.title} has been cancelled and your details have been deleted.${attachments.length ? ' The attached cancellations remove the entries from your calendar.' : ''}\n\nIf this was a mistake, you are welcome to register again while registration is open: ${eventUrl}${textFooter(b)}`;
 	return { to: reg.email, subject, html, text, attachments };
+}
+
+/** After "I did not register": one last email, so the address owner knows it worked. Names nobody (the name was typed
+ * by whoever registered the address) and invites nothing. */
+export function declinedEmail(b: Brand, ev: EventRow, email: string): OutgoingEmail {
+	const subject = `Registration deleted: ${ev.title}`;
+	const html = layout(b, subject, `
+<p>Hello,</p>
+<p>The registration made with this address for the <strong>${escapeHtml(ev.title)}</strong> has been deleted, as you asked. You won't hear from us about it again.</p>`);
+	const text = `Hello,\n\nThe registration made with this address for the ${ev.title} has been deleted, as you asked. You won't hear from us about it again.${textFooter(b)}`;
+	return { to: email, subject, html, text };
 }
 
 export interface HostLine {
