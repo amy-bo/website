@@ -46,7 +46,6 @@ export default defineConfig({
 				{
 					label: 'Start here',
 					items: [
-						{ label: 'Why AMYBO', slug: 'mission' },
 						{ label: 'About', slug: 'about' },
 						{ label: 'Contact', slug: 'contact' },
 					],

@@ -2,12 +2,8 @@
     {
         "id": 1,
         "text": "Why We Exist",
-        "link": "/mission/",
+        "link": "/about/",
         "sub": [
-            {
-                "text": "Why AMYBO",
-                "link": "/mission/"
-            },
             {
                 "text": "About",
                 "link": "/about/"

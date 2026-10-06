@@ -65,3 +65,5 @@
 /index.xml  /  301
 /docs/index.xml  /projects/  301
 /event    /events/next    302
+/mission/ /about/ 301
+/mission /about/ 301
