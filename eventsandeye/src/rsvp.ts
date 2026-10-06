@@ -418,7 +418,7 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 }
 
 /** Deletes the registration, confirms to the person (cancelling their calendar entries) and tells the organiser. */
-export async function cancel(env: Env, id: string) {
+export async function cancel(env: Env, id: string, opts: { byOrganiser?: boolean } = {}) {
 	const reg = await getRegistration(env, id);
 	if (!reg) throw new UserError('This registration no longer exists.', 404);
 	const ev = await getEvent(env, reg.event_id);
@@ -428,10 +428,10 @@ export async function cancel(env: Env, id: string) {
 	await syncHosts(env, brand(env), ev, sessions);
 	const state = parseState(reg.calendar_state);
 	const files = attachments(env, ev, reg, [], Object.values(state).map((s) => ({ ...s, seq: s.seq + 1 })));
-	await sendEmail(env, cancellationEmail(brand(env), ev, reg, `${siteUrl(env)}${ev.page_path}`, files));
+	await sendEmail(env, cancellationEmail(brand(env), ev, reg, `${siteUrl(env)}${ev.page_path}`, files, opts.byOrganiser));
 	const detail = reg.attendance === 'remote' ? 'remote' : reg.place === 'waitlist' ? 'in person, waiting list' : 'in person';
 	await sendEmail(env, notification(brand(env), `Cancellation: ${ev.title}`, [
-		`${reg.name}${reg.affiliation ? ` (${reg.affiliation})` : ''} cancelled (${reg.status}, ${detail}${reg.tour_id ? `, ${sessions.find((t) => t.id === reg.tour_id)?.label ?? 'tour'} ${reg.tour_place ?? ''}` : ''}).`,
+		`${reg.name}${reg.affiliation ? ` (${reg.affiliation})` : ''} ${opts.byOrganiser ? 'was removed by an organiser' : 'cancelled'} (${reg.status}, ${detail}${reg.tour_id ? `, ${sessions.find((t) => t.id === reg.tour_id)?.label ?? 'tour'} ${reg.tour_place ?? ''}` : ''}).`,
 		...(await totalsLines(env, ev, sessions)),
 	]));
 	return { ok: true as const };
@@ -499,6 +499,9 @@ export async function decline(env: Env, id: string) {
 
 export async function adminDelete(env: Env, id: string) {
 	const reg = await getRegistration(env, id);
+	// Someone who confirmed may be relying on their place (travel, a day off): they are always told, exactly as if
+	// they had cancelled, with their calendar entries cancelled too. Unconfirmed ones (spam, typos) are removed quietly.
+	if (reg?.status === 'confirmed') return cancel(env, id, { byOrganiser: true });
 	await env.DB.prepare('DELETE FROM registrations WHERE id = ?').bind(id).run();
 	if (reg) {
 		const ev = await getEvent(env, reg.event_id);

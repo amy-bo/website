@@ -440,6 +440,19 @@ try {
 	r = await req('POST', '/api/rsvp/manage', { t: bobManage, name: 'Bob', attendance: 'in_person', share_contact: false });
 	check('with his tour closed, Bob can still save other changes (closed tour kept)', r.data.ok && r.data.registration.tour_id === TOUR1 && r.data.registration.share_contact === false, JSON.stringify(r.data));
 	check('closed tour: same refusal for a registered and an unregistered address', (await register({ email: bob, tour_id: TOUR1 })).status === 409 && (await register({ email: `${randomUUID()}@example.org`, tour_id: TOUR1 })).status === 409);
+	console.log('\nAdmin removal');
+	const gina = 'gina@example.org', hal = 'hal@example.org';
+	await registerAndConfirm({ name: 'Gina', email: gina, attendance: 'remote' });
+	let sumR = await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN);
+	r = await req('DELETE', '/api/admin/registration', { id: sumR.data.registrations.find((x) => x.email === gina).id }, ADMIN);
+	m = await last(gina);
+	check('removing a confirmed registration tells them, and cancels their calendar entries', r.data.ok && /Registration cancelled/.test(m.subject) && /cancelled by the organisers/.test(m.text_body) && m.att.length > 0 && m.att.every((x) => /METHOD:CANCEL/.test(x.content)), m.subject + ' | ' + m.text_body.slice(0, 200));
+	await register({ name: 'Hal', email: hal, attendance: 'remote' });
+	sumR = await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN);
+	n = (await mailsTo(hal)).length;
+	r = await req('DELETE', '/api/admin/registration', { id: sumR.data.registrations.find((x) => x.email === hal).id }, ADMIN);
+	check('removing an unconfirmed one (spam, typos) sends nothing', r.data.ok && (await mailsTo(hal)).length === n);
+
 	r = await req('POST', '/api/admin/settings', { event: EVENT, deadline: new Date(Date.now() - 60_000).toISOString() }, ADMIN);
 	check('registration deadline moved into the past', r.data.ok);
 	check('new registration refused after the deadline', (await register({ email: 'late@example.org' })).status === 409);

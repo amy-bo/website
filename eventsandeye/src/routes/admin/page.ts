@@ -219,7 +219,7 @@ async function load() {
 		const actions = [
 			r.status === 'confirmed' && r.place === 'waitlist' ? '<button data-promote="event" data-id="' + esc(r.id) + '">Promote to place</button>' : '',
 			r.status === 'confirmed' && r.tour_place === 'waitlist' ? '<button data-promote="tour" data-id="' + esc(r.id) + '">Promote to tour</button>' : '',
-			'<button class="danger" data-delete="' + esc(r.id) + '" data-name="' + esc(r.name) + '">Remove</button>',
+			'<button class="danger" data-delete="' + esc(r.id) + '" data-name="' + esc(r.name) + '" data-confirmed="' + (r.status === 'confirmed' ? '1' : '0') + '">Remove</button>',
 		].join(' ');
 		return '<tr><td>' + esc(r.name) + '</td><td>' + esc(r.email) + '</td><td>' + pend + where + '</td><td>' + tourCell + '</td><td>' + esc(r.affiliation) + '</td><td>' + esc(r.needs) + '</td><td>' + esc(r.extra_answer) + '</td><td>' + (r.share_contact ? 'yes' : 'no') + '</td><td>' + esc(r.instructions_version) + '</td><td>' + actions + '</td></tr>';
 	}).join('') || '<tr><td colspan="10">No registrations yet.</td></tr>';
@@ -266,7 +266,7 @@ document.body.addEventListener('click', async (e) => {
 			if (!confirm('Promote this person? They will be emailed the latest joining instructions.')) return;
 			await api('/api/admin/promote', 'POST', { id: b.dataset.id, what: b.dataset.promote }); toast('Promoted and emailed.'); load();
 		} else if (b.dataset.delete) {
-			if (!confirm('Remove ' + b.dataset.name + '? No email is sent to them. Use this for spam or duplicates.')) return;
+			if (!confirm(b.dataset.confirmed === '1' ? 'Remove ' + b.dataset.name + '? They have confirmed, so they will be emailed that their registration has been cancelled, and their calendar entries removed.' : 'Remove ' + b.dataset.name + '? They never confirmed, so no email is sent (use this for spam, typos or duplicates).')) return;
 			await api('/api/admin/registration', 'DELETE', { id: b.dataset.delete }); toast('Removed.'); load();
 		} else if (b.dataset.cancel) {
 			await api('/api/admin/messages/cancel', 'POST', { id: b.dataset.cancel }); toast('Scheduled message cancelled.'); load();

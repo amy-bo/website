@@ -264,13 +264,15 @@ export function messageEmail(b: Brand, reg: RegistrationRow, msg: { subject: str
 	return { to: reg.email, subject: msg.subject, html, text };
 }
 
-export function cancellationEmail(b: Brand, ev: EventRow, reg: Pick<RegistrationRow, 'name' | 'email'>, eventUrl: string, attachments: Attachment[]): OutgoingEmail {
+export function cancellationEmail(b: Brand, ev: EventRow, reg: Pick<RegistrationRow, 'name' | 'email'>, eventUrl: string, attachments: Attachment[], byOrganiser = false): OutgoingEmail {
 	const subject = `Registration cancelled: ${ev.title}`;
+	const who = byOrganiser ? 'has been cancelled by the organisers' : 'has been cancelled';
+	const ask = byOrganiser ? 'If you think this is a mistake, please reply to this email.' : 'If this was a mistake, you are welcome to';
 	const html = layout(b, subject, `
 <p>Hello ${escapeHtml(reg.name)},</p>
-<p>Your registration for the <strong>${escapeHtml(ev.title)}</strong> has been cancelled and your details have been deleted.${attachments.length ? ' The attached cancellations remove the entries from your calendar.' : ''}</p>
-<p>If this was a mistake, you are welcome to <a href="${escapeHtml(eventUrl)}">register again</a> while registration is open.</p>`);
-	const text = `Hello ${reg.name},\n\nYour registration for the ${ev.title} has been cancelled and your details have been deleted.${attachments.length ? ' The attached cancellations remove the entries from your calendar.' : ''}\n\nIf this was a mistake, you are welcome to register again while registration is open: ${eventUrl}${textFooter(b)}`;
+<p>Your registration for the <strong>${escapeHtml(ev.title)}</strong> ${who} and your details have been deleted.${attachments.length ? ' The attached cancellations remove the entries from your calendar.' : ''}</p>
+<p>${byOrganiser ? escapeHtml(ask) : `If this was a mistake, you are welcome to <a href="${escapeHtml(eventUrl)}">register again</a> while registration is open.`}</p>`);
+	const text = `Hello ${reg.name},\n\nYour registration for the ${ev.title} ${who} and your details have been deleted.${attachments.length ? ' The attached cancellations remove the entries from your calendar.' : ''}\n\n${byOrganiser ? ask : `If this was a mistake, you are welcome to register again while registration is open: ${eventUrl}`}${textFooter(b)}`;
 	return { to: reg.email, subject, html, text, attachments };
 }
 
