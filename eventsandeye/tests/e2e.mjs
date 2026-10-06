@@ -261,6 +261,7 @@ try {
 	r = await req('POST', '/api/rsvp/confirm', { t: bobConfirm });
 	bobManage = await manageOf(bob);
 	check('Bob confirms → in-person waiting list and tour waiting list', r.data.registration.place === 'waitlist' && r.data.registration.tour_place === 'waitlist', JSON.stringify(r.data));
+	{ const bc = (await mailsTo(bob))[0]; check('on the waiting list, the confirm email says confirming joins the waiting list and no place is held', /join the waiting list: we will email you if a place comes up/.test(bc.text_body) && /it will be deleted on/.test(bc.text_body) && !/place will be released/.test(bc.text_body) && /You are joining the waiting list for an in-person place\./.test(bc.text_body), bc.text_body.slice(0, 600)); }
 	{ const bm = await mailsTo(bob); check('Bob gets his manage link but no joining instructions or calendar while waiting', bm.length === 2 && /Thank you for confirming/.test(bm[1].text_body) && /waiting list/.test(bm[1].text_body) && !/Joining instructions/.test(bm[1].subject) && bm[1].att.length === 0 && !!tokenFrom(bm[1].text_body, 'manage'), bm.map((x) => x.subject).join(' | ')); }
 	let hello = await mailsTo(NOTIFY);
 	check('organiser told about the new waiting-list registration with totals', hello.some((x) => /waiting-list registration/.test(x.subject) && /In person: 1 confirmed of 1 places, 1 on the waiting list/.test(x.text_body)), hello.map((x) => x.subject).join(' | '));
