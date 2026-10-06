@@ -1,7 +1,7 @@
 ---
 event: 2026-11-13-london
 title: "Sustainable Protein for All?"
-speaker: Martin Currie
+speaker: Dr Martin Currie
 speakerUrl: https://amy.bo/~martin
 affiliation: AMYBO
 order: 1
