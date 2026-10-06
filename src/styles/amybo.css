@@ -60,3 +60,7 @@
   background: rgba(0, 0, 0, 0.3);
 }
 .hero .sl-link-button.secondary:hover { background: rgba(0, 0, 0, 0.45); }
+
+/* The homepage's event button: purple, so it stands apart from the site's green. */
+.hero .sl-link-button.event-button { background: #6e11e6; border-color: #6e11e6; color: #fff; }
+.hero .sl-link-button.event-button:hover { background: #5a0dbd; border-color: #5a0dbd; }

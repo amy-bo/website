@@ -203,11 +203,24 @@ try {
 	check('Alice registers', r.status === 200 && r.data.ok, JSON.stringify(r.data));
 	let mails = await mailsTo(alice);
 	check('Alice gets one confirm-your-email message', mails.length === 1 && /Complete your registration/.test(mails[0].subject));
-	check('confirm email states until when the place is held', /If you don't, your place will be released on \w+day, \d+ \w+ 2026 at \d\d:\d\d\./.test(mails[0].text_body), mails[0].text_body.slice(0, 400));
+	check('confirm email states until when the place is held', /If you don't complete your registration, your place will be released on \w+day, \d+ \w+ 2026 at \d\d:\d\d\./.test(mails[0].text_body), mails[0].text_body.slice(0, 400));
 	check('confirm email says registration is not complete, and carries the Events&I beta footer', /NOT COMPLETE YET/.test(mails[0].text_body) && /Complete registration/.test(mails[0].html_body) && /Events&amp;I<\/a> \(beta\)/.test(mails[0].html_body) && /Events&I \(beta\)/.test(mails[0].text_body));
 	const aliceConfirm = tokenFrom(mails[0].text_body, 'confirm');
 	check('confirm link present; no manage link before the address is confirmed', !!aliceConfirm && !tokenFrom(mails[0].text_body, 'manage'));
 	check('confirm email lists the choices being confirmed, without repeating the typed name', /You are confirming:/.test(mails[0].text_body) && /10:30 lab tour/.test(mails[0].text_body) && /share your email address with the hosts/.test(mails[0].text_body) && !/Alice/.test(mails[0].text_body));
+	check('confirm email offers a link to delete a registration the recipient did not make', /not-me=1/.test(mails[0].text_body) && /click here to delete the registration/.test(mails[0].html_body));
+
+	console.log('\nSomeone registered my address: delete it');
+	const mallory = 'not-me@example.org';
+	await register({ name: 'Someone else', email: mallory });
+	const malloryConfirm = tokenFrom((await mailsTo(mallory))[0].text_body, 'confirm');
+	check('a GET of the delete link does nothing', (await req('GET', `/api/rsvp/decline?t=${malloryConfirm}`)).status === 405 || (await req('GET', `/api/rsvp/decline?t=${malloryConfirm}`)).status === 404);
+	r = await req('POST', '/api/rsvp/decline', { t: malloryConfirm });
+	check('the delete button removes an unconfirmed registration', r.status === 200 && r.data.ok && r.data.gone === false, JSON.stringify(r.data));
+	r = await req('POST', '/api/rsvp/confirm', { t: malloryConfirm });
+	check('and it can no longer be confirmed', r.status === 404);
+	check('a bad token is refused', (await req('POST', '/api/rsvp/decline', { t: 'nope' })).status === 404);
+
 	let aliceManage = null;
 	r = await register({ name: 'Bob', email: bob, tour_id: TOUR1 });
 	const bobMail = (await mailsTo(bob))[0];

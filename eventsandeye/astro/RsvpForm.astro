@@ -9,13 +9,15 @@ interface Props {
 	privacyHref?: string;
 	/** Where Events&I's source and feedback live. */
 	sourceUrl?: string;
+	/** The page shown after a successful registration. */
+	next?: string;
 }
-const { event, controller, contactHref, privacyHref = '/privacy/', sourceUrl = 'https://github.com/andeyePro/eventsandeye' } = Astro.props;
+const { event, controller, contactHref, privacyHref = '/privacy/', sourceUrl = 'https://github.com/andeyePro/eventsandeye', next = '/events/check-email/' } = Astro.props;
 const siteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || (import.meta.env.DEV || import.meta.env.PUBLIC_TURNSTILE_ALLOW_TEST_KEY === 'true' ? '1x00000000000000000000AA' : undefined);
 // A production build without a real site key would ship Cloudflare's always-pass test key and every registration would fail.
 if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production builds (or PUBLIC_TURNSTILE_ALLOW_TEST_KEY=true for local test builds).');
 ---
-<form class="rsvp not-content" id="rsvp-form" data-event={event} data-contact={contactHref} novalidate>
+<form class="rsvp not-content" id="rsvp-form" data-event={event} data-contact={contactHref} data-next={next} novalidate>
 	<p class="status-line" id="rsvp-availability" aria-live="polite">Checking availability…</p>
 
 	<div class="field">
@@ -163,19 +165,9 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 			const res = await fetch('/api/rsvp/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 			const data = await res.json();
 			if (!data.ok) throw new Error(data.error || 'Registration failed.');
-			form.reset();
-			syncTour();
-			result.innerHTML = '';
-			const box = document.createElement('div');
-			box.className = 'notice';
-			const h = document.createElement('p');
-			h.innerHTML = '<strong>Nearly there: check your email.</strong>';
-			const p = document.createElement('p');
-			p.textContent = `We have sent an email to ${String(fd.get('email'))}. It can take up to 5 minutes to arrive; if it hasn't come by then, check your junk or spam folder. If this is a new registration, it is not complete until you click the "Complete registration" button in that email, and unconfirmed registrations are deleted automatically. If you had already registered, the email reminds you of your registration and joining instructions. If nothing arrives, contact us using the link below.`;
-			box.append(h, p);
-			result.append(box);
-			box.setAttribute('tabindex', '-1');
-			box.focus();
+			// A page of its own, so the "check your email" step can't be missed below the form.
+			try { sessionStorage.setItem('rsvp-email', String(fd.get('email'))); } catch {}
+			location.href = form.dataset.next || '/events/check-email/';
 		} catch (err) {
 			result.textContent = (err as Error).message;
 			(window as unknown as { turnstile?: { reset: () => void } }).turnstile?.reset();

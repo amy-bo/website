@@ -171,17 +171,18 @@ export function confirmEmail(b: Brand, ev: EventRow, reg: RegistrationRow, sessi
 		reg.share_contact ? 'You chose to share your email address with the hosts of the sessions you attend.' : 'Session hosts will see only your name and whether you have a place.',
 	];
 	const held = reg.attendance === 'in_person' ? 'your place will be released' : 'your registration will be deleted';
+	const notMeUrl = `${confirmUrl}${confirmUrl.includes('?') ? '&' : '?'}not-me=1`;
 	const holdUntil = ukDateTime(reg.hold_expires_at ?? ev.deadline, ev.timezone);
 	const html = layout(b, subject, `
 <h1 style="font-size:22px;margin-top:0">Please complete your registration</h1>
 <p>Hello,</p>
 <p>Someone, hopefully you, registered this address for the <strong>${escapeHtml(ev.title)}</strong> on ${escapeHtml(ukDateTime(ev.starts_at, ev.timezone))}.</p>
-<p><strong>Your registration is not complete yet.</strong> Please click the button below now to confirm your email address. If you don't, ${held} on ${escapeHtml(holdUntil)}.</p>
+<p><strong>Your registration is not complete yet.</strong> Please click the button below now to confirm your email address. If you don't complete your registration, ${held} on ${escapeHtml(holdUntil)}.</p>
 <p>You are confirming:</p><ul>${choices.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}</ul>
 ${button(confirmUrl, 'Complete registration')}
 <p style="font-size:14px">If the button does not work, copy this link into your browser:<br><a href="${escapeHtml(confirmUrl)}">${escapeHtml(confirmUrl)}</a></p>
 <p style="font-size:14px">To change anything, register again with the same address: the newest registration replaces this one. Once you have confirmed, every email has a link to view, change or cancel your registration.</p>
-<p style="font-size:14px">If you did not register, ignore this email and the registration will be deleted.</p>`);
+<p style="font-size:14px">If you did not register, please <a href="${escapeHtml(notMeUrl)}">click here to delete the registration</a>.</p>`);
 	const text = `Hello,
 
 Someone, hopefully you, registered this address for the ${ev.title} on ${ukDateTime(ev.starts_at, ev.timezone)}.
@@ -189,14 +190,15 @@ Someone, hopefully you, registered this address for the ${ev.title} on ${ukDateT
 YOUR REGISTRATION IS NOT COMPLETE YET. Please open this link now and click "Complete registration" to confirm your email address:
 ${confirmUrl}
 
-If you don't, ${held} on ${holdUntil}.
+If you don't complete your registration, ${held} on ${holdUntil}.
 
 You are confirming:
 ${choices.map((l) => `- ${l}`).join('\n')}
 
 To change anything, register again with the same address: the newest registration replaces this one. Once you have confirmed, every email has a link to view, change or cancel your registration.
 
-If you did not register, ignore this email and the registration will be deleted.${textFooter(b)}`;
+If you did not register, please open this link to delete the registration:
+${notMeUrl}${textFooter(b)}`;
 	return { to: reg.email, subject, html, text };
 }
 

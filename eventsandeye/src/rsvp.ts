@@ -462,6 +462,18 @@ export async function promote(env: Env, id: string, what: 'event' | 'tour') {
 	return { ok: true as const };
 }
 
+/** "I did not register": deletes a registration that has not been confirmed, from the link in the confirmation email,
+ * so the person gets no further email and any place it held is freed at once. Confirmed ones are left alone. */
+export async function decline(env: Env, id: string) {
+	const reg = await getRegistration(env, id);
+	if (!reg) return { ok: true as const, gone: true };
+	if (reg.status !== 'pending') throw new UserError('This registration has already been confirmed. To cancel it, use the link in your joining instructions.', 409);
+	await env.DB.prepare("DELETE FROM registrations WHERE id = ? AND status = 'pending'").bind(id).run();
+	const ev = await getEvent(env, reg.event_id);
+	await syncHosts(env, brand(env), ev, await getSessions(env, ev.id));
+	return { ok: true as const, gone: false };
+}
+
 export async function adminDelete(env: Env, id: string) {
 	const reg = await getRegistration(env, id);
 	await env.DB.prepare('DELETE FROM registrations WHERE id = ?').bind(id).run();

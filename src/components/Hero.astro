@@ -70,6 +70,10 @@ let rawHtml: string | undefined;
 			padding-bottom: 1rem;
 			position: relative;
 			overflow: hidden;
+			/* The photo is set inline on .hero itself: cover it once, never tile it. */
+			background-size: cover;
+			background-position: center;
+			background-repeat: no-repeat;
 		}
 
 		.hero-bg {
