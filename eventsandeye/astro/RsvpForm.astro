@@ -24,8 +24,7 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 	</div>
 	<div class="field">
 		<label for="rsvp-email">Email <span aria-hidden="true">*</span></label>
-		<input id="rsvp-email" name="email" type="email" autocomplete="email" required maxlength="254" aria-describedby="rsvp-email-help" />
-		<p class="help" id="rsvp-email-help">We will email you a link to confirm this address. Your registration is not complete until you click it.</p>
+		<input id="rsvp-email" name="email" type="email" autocomplete="email" required maxlength="254" />
 	</div>
 
 	<fieldset class="field">
@@ -36,14 +35,12 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 
 	<fieldset class="field" id="rsvp-tour-fieldset">
 		<legend>Optional lab tour (in person only)</legend>
-		<p class="help">Tours have limited places. If a tour is full you can join its waiting list.</p>
 		<label class="choice"><input type="radio" name="tour_id" value="none" checked /> No tour, thanks</label>
 		<div id="rsvp-tours"></div>
 	</fieldset>
 
 	<fieldset class="field" id="rsvp-optins-fieldset" hidden>
 		<legend>Also joining us for (in person only)</legend>
-		<p class="help">Optional. Tick so we know numbers in advance; you can change this later with the link in your emails.</p>
 		<div id="rsvp-optins"></div>
 	</fieldset>
 
@@ -68,11 +65,11 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 	<div class="field consent">
 		<label class="choice">
 			<input type="checkbox" name="consent" id="rsvp-consent" required />
-			<span>I agree that {controller} may use my details, including any dietary or access needs I choose to share (passed to the venue only where needed to arrange access), to organise this event and email me about it, as described in the <a href={privacyHref}>privacy notice</a>. My details are deleted from the registration system 30 days after the event, and from backups within a further 30 days. <span aria-hidden="true">*</span></span>
+			<span>I agree that {controller} may use my details, including any dietary or access needs I share, to run this event and email me about it, as in the <a href={privacyHref}>privacy notice</a>. <span aria-hidden="true">*</span></span>
 		</label>
 		<label class="choice">
 			<input type="checkbox" name="share_contact" id="rsvp-share" />
-			<span>Optional: share my email address with the hosts of the sessions I attend, so they can contact me about them. Otherwise hosts see only my name and whether I have a place, so if plans change at the last minute they may not be able to reach me directly.</span>
+			<span>Optional: share my email address with the hosts of my sessions, so they can contact me.</span>
 		</label>
 	</div>
 
@@ -81,8 +78,7 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 	<p class="help"><span aria-hidden="true">*</span> Required</p>
 	<button type="submit" class="submit">Register</button>
 	<div id="rsvp-result" role="status" aria-live="polite"></div>
-	<p class="help"><a href={contactHref}>Contact us</a> if you have a problem registering.</p>
-	<p class="help beta">Registrations via <a href={sourceUrl}>Events&amp;I</a> beta – all feedback hugely welcome: <a href={contactHref}>contact us</a>.</p>
+	<p class="help beta">Registrations via <a href={sourceUrl}>Events&amp;I</a> (beta): <a href={contactHref}>feedback welcome</a>.</p>
 </form>
 
 <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
@@ -119,7 +115,9 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 				(document.getElementById('rsvp-extra-field') as HTMLElement).hidden = false;
 			}
 			const deadline = new Date(s.event.deadline).toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/London' });
-			avail.textContent = `${s.in_person_available ? 'In-person places are available.' : 'In-person places are full: new in-person registrations join the waiting list.'} Remote places are unlimited. Registration closes ${deadline} (UK time).`;
+			// Only the deadline: saying places are full would put people off registering, and the waiting list is how
+			// demand beyond the room shows up.
+			avail.textContent = `Registration closes ${deadline} (UK time).`;
 			for (const t of s.tours) {
 				const label = document.createElement('label');
 				label.className = 'choice';

@@ -2,6 +2,10 @@
 
 Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
+## 2026-10-06
+
+- [x] **Registration form: say less** — the form no longer says whether in-person places are available (a "full" notice would stop people registering, and the waiting list is how demand beyond the room shows up) or that remote places are unlimited: only the closing time; dropped help lines that repeat the page, shortened the consent and host-sharing text (retention stays in the privacy notice), one feedback link instead of two; the White City credit no longer names the crop.
+
 ## 2026-10-05
 
 - [x] **"AMYBO Event", and amy.bo/event** — the 13 November event is renamed AMYBO Event across the site, contact-form subjects and (once, in the seed) its registration-system title; dinner shows ~£45 a head (page and the dinner choice); joining instructions version 3 carries the new name, lunch at 13:30 and talks resuming at 14:30; the When card says to arrive any time from 10:30 to 12:00; amy.bo/event is a temporary (302) link to the event page in the amy.bo Worker, so it can move to the next event.
