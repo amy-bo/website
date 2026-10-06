@@ -1,0 +1,218 @@
+---
+// Events&I – Copyright (C) 2026 andeye Ltd. AGPL-3.0, see ../LICENSE.
+/**
+ * Ranked polls for a registrant, under the manage panel on the same page (it uses the same signed link, which
+ * ManagePanel hands over in its "registration-updated" event once it has loaded or saved the registration).
+ */
+---
+<section class="not-content" id="poll" aria-label="Polls" hidden></section>
+
+<script>
+	type Option = { id: string; label: string; detail: string | null; url: string | null; mine: boolean; in_review: boolean };
+	type Result = { id: string; label: string; points: number; going: number; not_going: number; names: string[]; hidden: number };
+	type Poll = {
+		id: string; question: string; closes_at: string; open: boolean; eligible: boolean; session: { id: string; label: string } | null;
+		options: Option[]; suggestions_left: number; voters: number; results: Result[];
+		ballot: { ranking: string[]; above_line: number; show_name: boolean; updated_at: string } | null;
+	};
+	const LINE = '__line__';
+	const root = document.getElementById('poll')!;
+	let token: string | null = null;
+
+	const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> & Record<string, unknown> = {}, ...kids: (Node | string)[]) => {
+		const e = document.createElement(tag);
+		for (const [k, v] of Object.entries(props)) {
+			if (k.startsWith('aria-') || k.startsWith('data-')) e.setAttribute(k, String(v));
+			else (e as unknown as Record<string, unknown>)[k] = v;
+		}
+		e.append(...kids);
+		return e;
+	};
+	const uk = (iso: string) => new Date(iso).toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
+
+	async function call(method: 'GET' | 'POST', body?: object) {
+		const res = await fetch(method === 'GET' ? `/api/rsvp/poll?t=${encodeURIComponent(token ?? '')}` : '/api/rsvp/poll', {
+			method, headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify({ t: token, ...body }) : undefined,
+		});
+		const d = await res.json();
+		if (!d.ok) throw new Error(d.error || 'Something went wrong.');
+		return d as { polls: Poll[]; suggestion?: { status: string } };
+	}
+
+	/** The voter's list: their saved order with the line, and any option they haven't ranked yet just above the line. */
+	function initialOrder(p: Poll): string[] {
+		const ids = p.options.map((o) => o.id);
+		if (!p.ballot) return [...ids, LINE];
+		const ranked = p.ballot.ranking.filter((id) => ids.includes(id));
+		const above = p.ballot.ranking.slice(0, p.ballot.above_line).filter((id) => ids.includes(id));
+		const below = ranked.filter((id) => !above.includes(id));
+		const fresh = ids.filter((id) => !ranked.includes(id));
+		return [...above, ...fresh, LINE, ...below];
+	}
+
+	function render(polls: Poll[], notes: Record<string, string> = {}) {
+		root.replaceChildren();
+		root.hidden = !polls.length;
+		for (const p of polls) root.append(renderPoll(p, notes[p.id]));
+	}
+
+	function renderPoll(p: Poll, note?: string) {
+		const box = el('div', { className: 'poll', id: `poll-${p.id}` });
+		box.append(el('h2', { id: `poll-h-${p.id}` }, p.question));
+		box.append(el('p', { className: 'help' }, p.open ? `Voting closes ${uk(p.closes_at)} (UK time). You can change your vote until then.` : 'Voting has closed.'));
+		if (!p.eligible) {
+			box.append(el('p', {}, p.session ? `To vote, tick "${p.session.label}" in your registration above and save your changes.` : 'You cannot vote in this poll.'));
+			return box;
+		}
+		const ids = new Map(p.options.map((o) => [o.id, o]));
+		const order = initialOrder(p);
+		const fresh = new Set(p.ballot ? p.options.filter((o) => !p.ballot!.ranking.includes(o.id)).map((o) => o.id) : []);
+		const live = el('p', { className: 'sr-only', 'aria-live': 'polite' });
+
+		box.append(el('p', {}, 'Put the options in order, favourite first, then move the line: put everything you would ', el('strong', {}, 'not'), ' go to below it (you would rather do your own thing). Use the arrow buttons, or drag.'));
+		const list = el('ol', { className: 'rank', 'aria-labelledby': `poll-h-${p.id}` });
+		const move = (i: number, j: number) => {
+			if (j < 0 || j >= order.length) return;
+			const [x] = order.splice(i, 1);
+			order.splice(j, 0, x);
+			draw();
+			const name = x === LINE ? 'The line' : ids.get(x)!.label;
+			live.textContent = `${name} moved to position ${j + 1} of ${order.length}.`;
+			(list.children[j]?.querySelector(j > i ? 'button.down' : 'button.up') as HTMLButtonElement | null)?.focus();
+		};
+		let dragFrom = -1;
+		const draw = () => {
+			list.replaceChildren(...order.map((id, i) => {
+				const isLine = id === LINE;
+				const lineAt = order.indexOf(LINE);
+				const o = ids.get(id);
+				const name = isLine ? "I wouldn't go to anything below this line" : o!.label;
+				const li = el('li', { className: isLine ? 'line' : i > lineAt ? 'below' : 'above', draggable: p.open });
+				const text = el('span', { className: 'text' });
+				if (isLine) text.append(el('strong', {}, name));
+				else {
+					text.append(o!.url ? el('a', { href: o!.url, target: '_blank', rel: 'noopener' }, o!.label) : el('strong', {}, o!.label));
+					if (o!.detail) text.append(el('span', { className: 'detail' }, ` – ${o!.detail}`));
+					if (o!.in_review) text.append(' ', el('span', { className: 'tag' }, 'your suggestion: waiting for an organiser to check it, only you can see it'));
+					else if (o!.mine) text.append(' ', el('span', { className: 'tag' }, 'your suggestion'));
+					if (fresh.has(id)) text.append(' ', el('span', { className: 'tag new' }, 'new since you voted'));
+				}
+				li.append(text);
+				if (p.open) {
+					li.append(el('span', { className: 'moves' },
+						el('button', { type: 'button', className: 'up', disabled: i === 0, 'aria-label': `Move ${name} up`, onclick: () => move(i, i - 1) }, '↑'),
+						el('button', { type: 'button', className: 'down', disabled: i === order.length - 1, 'aria-label': `Move ${name} down`, onclick: () => move(i, i + 1) }, '↓')));
+					li.addEventListener('dragstart', (e) => { dragFrom = i; e.dataTransfer?.setData('text/plain', id); });
+					li.addEventListener('dragover', (e) => e.preventDefault());
+					li.addEventListener('drop', (e) => { e.preventDefault(); if (dragFrom >= 0 && dragFrom !== i) move(dragFrom, i); dragFrom = -1; });
+				}
+				return li;
+			}));
+		};
+		draw();
+		box.append(list, live);
+
+		if (p.open) {
+			const show = el('input', { type: 'checkbox', id: `poll-show-${p.id}`, checked: p.ballot ? p.ballot.show_name : true });
+			box.append(el('label', { className: 'choice' }, show, ' Show my first name to other voters beside the options I would go to (organisers always see it)'));
+			const status = el('p', { role: 'status', 'aria-live': 'polite' }, note ?? (p.ballot ? `Your vote was saved ${uk(p.ballot.updated_at)}.` : 'You have not voted yet.'));
+			const save = el('button', { type: 'button', className: 'primary' }, p.ballot ? 'Save my changes' : 'Save my vote');
+			save.addEventListener('click', async () => {
+				save.disabled = true;
+				try {
+					const line = order.indexOf(LINE);
+					const d = await call('POST', { action: 'vote', poll: p.id, ranking: order.filter((x) => x !== LINE), above_line: line, show_name: show.checked });
+					render(d.polls, { [p.id]: 'Thank you: your vote is saved. The results below include it.' });
+				} catch (e) { status.textContent = (e as Error).message; save.disabled = false; }
+			});
+			box.append(el('div', { className: 'actions' }, save), status);
+
+			// Add your own option.
+			const add = el('form', { className: 'suggest', noValidate: true });
+			add.append(el('h3', {}, 'Something else?'));
+			if (p.suggestions_left > 0) {
+				const label = el('input', { type: 'text', id: `poll-new-${p.id}`, maxLength: 80, required: true, placeholder: 'e.g. Walk along the South Bank' });
+				const detail = el('input', { type: 'text', id: `poll-new-d-${p.id}`, maxLength: 200, placeholder: 'e.g. free, ends at a pub' });
+				const out = el('p', { role: 'status', 'aria-live': 'polite' });
+				const btn = el('button', { type: 'submit', className: 'secondary' }, 'Add this option');
+				add.append(
+					el('p', { className: 'help' }, `Add your own idea and it joins the list for everyone once a quick automatic check confirms it is suitable (otherwise an organiser looks at it first). It goes just above your line; save your vote afterwards if you move anything. You can add ${p.suggestions_left} more.`),
+					el('label', { htmlFor: label.id }, 'What would you like to do?'), label,
+					el('label', { htmlFor: detail.id }, 'Any detail: where, cost, time (optional)'), detail,
+					el('div', { className: 'actions' }, btn), out);
+				add.addEventListener('submit', async (e) => {
+					e.preventDefault();
+					if (!label.value.trim()) { out.textContent = 'Please say what you would like to do.'; label.focus(); return; }
+					btn.disabled = true;
+					out.textContent = 'Checking…';
+					try {
+						const d = await call('POST', { action: 'suggest', poll: p.id, label: label.value, detail: detail.value });
+						render(d.polls, { [p.id]: d.suggestion?.status === 'approved'
+							? 'Your option has been added, and everyone can see it now. It is just above your line.'
+							: 'Thank you: an organiser will check your option before others see it. Meanwhile it is in your list, just above your line.' });
+					} catch (err) { out.textContent = (err as Error).message; btn.disabled = false; }
+				});
+			} else add.append(el('p', { className: 'help' }, 'You have added as many options as you can. Thank you!'));
+			box.append(add);
+		}
+
+		// Results so far.
+		const res = el('div', { className: 'results' });
+		res.append(el('h3', {}, p.open ? 'Results so far' : 'Results'));
+		if (!p.voters) res.append(el('p', {}, 'Nobody has voted yet.'));
+		else {
+			const n = p.results.length;
+			res.append(el('p', { className: 'help' }, `${p.voters} ${p.voters === 1 ? 'person has' : 'people have'} voted. Each first choice scores ${n} points, the second ${n - 1}, and so on down to the voter's line; nothing scores below it.`));
+			const t = el('table');
+			t.append(el('thead', {}, el('tr', {}, el('th', { scope: 'col' }, 'Option'), el('th', { scope: 'col' }, 'Points'), el('th', { scope: 'col' }, 'Would go'), el('th', { scope: 'col' }, "Wouldn't go"))));
+			t.append(el('tbody', {}, ...p.results.map((r) => el('tr', {},
+				el('th', { scope: 'row' }, r.label), el('td', {}, String(r.points)),
+				el('td', {}, `${r.going}${r.names.length || r.hidden ? `: ${[...r.names, ...(r.hidden ? [`${r.hidden} more`] : [])].join(', ')}` : ''}`),
+				el('td', {}, String(r.not_going))))));
+			res.append(el('div', { className: 'scroll' }, t));
+		}
+		box.append(res);
+		return box;
+	}
+
+	async function load() {
+		try { render((await call('GET')).polls); } catch { root.hidden = true; }
+	}
+	document.addEventListener('registration-updated', (e) => {
+		const t = (e as CustomEvent<{ t?: string }>).detail?.t;
+		if (t) token = t;
+		if (token) load();
+	});
+</script>
+
+<style>
+	#poll { display: grid; gap: 1.5rem; max-width: 40rem; margin-block: 2rem; }
+	#poll :global(.poll) { display: grid; gap: 0.75rem; border-top: 2px solid var(--sl-color-gray-5); padding-top: 1rem; }
+	#poll :global(h2) { font-size: var(--sl-text-h3); margin: 0; }
+	#poll :global(h3) { font-size: var(--sl-text-lg); margin: 0.5rem 0 0; }
+	#poll :global(.rank) { list-style: decimal; padding-left: 1.75rem; margin: 0; display: grid; gap: 0.35rem; }
+	#poll :global(.rank li) { display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; padding: 0.45rem 0.6rem; border: 1px solid var(--sl-color-gray-4); border-radius: 0.4rem; background: var(--sl-color-bg); }
+	#poll :global(.rank li.below) { opacity: 0.7; border-style: dashed; }
+	#poll :global(.rank li.line) { list-style: none; counter-increment: list-item 0; margin-left: -1.75rem; border: 0; border-top: 3px solid #b3261e; border-radius: 0; background: transparent; color: #b3261e; }
+	:global([data-theme='dark']) #poll :global(.rank li.line) { color: #ff8a80; border-top-color: #ff8a80; }
+	#poll :global(.rank li[draggable='true']) { cursor: grab; }
+	#poll :global(.moves) { display: flex; gap: 0.25rem; flex-shrink: 0; }
+	#poll :global(.moves button) { min-width: 2.5rem; min-height: 2.5rem; border: 1px solid var(--sl-color-gray-3); border-radius: 0.3rem; background: var(--sl-color-gray-6); color: var(--sl-color-text); cursor: pointer; font-size: 1.1rem; }
+	#poll :global(.moves button:disabled) { opacity: 0.35; cursor: default; }
+	#poll :global(.detail), #poll :global(.help) { font-size: var(--sl-text-sm); color: var(--sl-color-gray-2); }
+	#poll :global(.help) { margin: 0; }
+	#poll :global(.tag) { font-size: var(--sl-text-xs); padding: 0.05rem 0.4rem; border-radius: 0.3rem; background: var(--sl-color-gray-5); white-space: normal; }
+	#poll :global(.tag.new) { background: #ffe8b3; color: #111; }
+	#poll :global(.choice) { display: flex; gap: 0.5rem; align-items: flex-start; }
+	#poll :global(.choice input) { margin-top: 0.3rem; }
+	#poll :global(.suggest) { display: grid; gap: 0.35rem; }
+	#poll :global(.suggest label) { font-weight: 600; }
+	#poll :global(input[type='text']) { padding: 0.5rem; border: 1px solid var(--sl-color-gray-3); border-radius: 0.3rem; background: var(--sl-color-bg); color: var(--sl-color-text); font: inherit; }
+	#poll :global(.actions) { display: flex; gap: 1rem; flex-wrap: wrap; }
+	#poll :global(.primary) { background: #0069a0; color: #fff; border: 0; border-radius: 999px; padding: 0.6rem 1.4rem; font-weight: 700; cursor: pointer; }
+	#poll :global(.secondary) { background: transparent; color: var(--sl-color-text); border: 2px solid #0069a0; border-radius: 999px; padding: 0.5rem 1.2rem; font-weight: 700; cursor: pointer; }
+	#poll :global(.scroll) { overflow-x: auto; }
+	#poll :global(table) { border-collapse: collapse; width: 100%; font-size: var(--sl-text-sm); }
+	#poll :global(th), #poll :global(td) { text-align: left; vertical-align: top; padding: 0.35rem; border-bottom: 1px solid var(--sl-color-gray-5); }
+	#poll :global(.sr-only) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>

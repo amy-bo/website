@@ -1,9 +1,10 @@
 // Events&I – Copyright (C) 2026 andeye Ltd. AGPL-3.0, see ../../../LICENSE.
 import { handle, readJson } from '../../http';
 import { mdToHtml } from '../../markdown';
+import { addOption, adminPolls, editOption, setOptionStatus, updatePoll } from '../../poll';
 import {
 	addInstructions, adminDelete, adminSummary, audienceRecipients, cancelMessage, createMessage, listInstructions, listMessages, parseAudience,
-	promote, promoteAll, registrationsCsv, sentLogMarkdown, updateSessions, updateSettings,
+	promote, promoteAll, registrationsCsv, sentLogMarkdown, updateSessions, updateSettings, UserError,
 } from '../../rsvp';
 
 const ev = (request: Request) => new URL(request.url).searchParams.get('event') || '';
@@ -73,4 +74,15 @@ export const sentLog = handle(async ({ env, request }) => {
 export const preview = handle(async ({ request }) => {
 	const body = await readJson(request);
 	return { ok: true, html: mdToHtml(typeof body.body_md === 'string' ? body.body_md : '') };
+});
+
+export const pollGet = handle(async ({ env, request }) => adminPolls(env, ev(request)));
+/** { action: 'status', id, status } | { action: 'add', poll, label, detail, url } | { action: 'edit', id, label, detail, url } | { action: 'settings', poll, closes_at, question } */
+export const pollPost = handle(async ({ env, request }) => {
+	const body = await readJson(request);
+	if (body.action === 'status') return setOptionStatus(env, body);
+	if (body.action === 'add') return addOption(env, body);
+	if (body.action === 'edit') return editOption(env, body);
+	if (body.action === 'settings') return updatePoll(env, body);
+	throw new UserError('Unknown action.');
 });

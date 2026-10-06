@@ -11,6 +11,7 @@ const { contactHref } = Astro.props;
 	<p class="help"><a href={contactHref}>Contact us</a> if something is not right.</p>
 </div>
 <script>
+	import { lowerLabel } from '../src/labels';
 	const q = new URLSearchParams(location.search);
 	const t = q.get('t');
 	const notMe = q.get('not-me') === '1';
@@ -53,11 +54,12 @@ const { contactHref } = Astro.props;
 			btn.hidden = true;
 			document.getElementById('confirm-intro')!.hidden = true;
 			const lines: string[] = [d.already ? 'Your registration was already confirmed.' : 'Thank you, your registration is complete.'];
-			if (r.mode === 'extras') lines.push(`You are joining us for ${(r.optin_labels ?? []).join(' and ').toLowerCase()} only. We have emailed you the details, with a calendar invitation.`);
+			if (r.mode === 'extras') lines.push(`You are joining us for ${[...(r.tour_label ? [`the ${r.tour_label}`] : []), ...(r.optin_labels ?? []).map((l: string) => lowerLabel(l))].join(' and ')} only. We have emailed you the details, with a calendar invitation.`);
 			else if (r.attendance === 'remote') lines.push('You are registered to join the talks remotely. We have emailed you the joining instructions, with calendar invitations.');
 			else if (r.place === 'waitlist') lines.push('In-person places are currently full, so you are on the waiting list. We will email you if a place becomes available.');
 			else lines.push('You have an in-person place. We have emailed you the joining instructions, with calendar invitations.');
 			if (r.tour_label) lines.push(r.tour_place === 'waitlist' ? `You are on the waiting list for the ${r.tour_label}.` : `You are booked on the ${r.tour_label}.`);
+			for (const q of r.polls ?? []) lines.push(`Have your say: "${q}" Rank the options, or add your own, with the "Manage my registration" link in your email.`);
 			lines.push('To change or cancel, use the "Manage my registration" link in your emails.');
 			out.replaceChildren(...lines.map((l, i) => { const p = document.createElement('p'); if (i === 0) { const s = document.createElement('strong'); s.textContent = l; p.append(s); } else p.textContent = l; return p; }));
 		} catch (e) {

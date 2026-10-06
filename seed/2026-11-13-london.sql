@@ -147,3 +147,64 @@ UPDATE instructions SET body_md = replace(body_md, 'To change or cancel your reg
 
 To change or cancel your registration, use your personal link below.')
   WHERE event_id = '2026-11-13-london' AND version = 4 AND body_md NOT LIKE '%:::extras%';
+
+-- 6 October 2026: Saturday 14 November, decided by a ranked poll (Events&I migration 0004). People can sign up for
+-- Saturday on its own, or with the day, a tour or dinner. Times and place are placeholders until the vote is in: edit
+-- them on the admin page. Insert-only.
+INSERT OR IGNORE INTO sessions (id, event_id, label, kind, mode, choice_group, starts_at, ends_at, capacity, sort, host_name, host_email, location, optin) VALUES
+  ('2026-11-13-london-saturday', '2026-11-13-london', 'Saturday 14 November', 'social', 'in_person', NULL, '2026-11-14T11:00:00Z', '2026-11-14T18:00:00Z', NULL, 6, NULL, NULL,
+   'Central London: the plan is chosen by vote', 1);
+
+INSERT OR IGNORE INTO polls (id, event_id, session_id, question, closes_at) VALUES
+  ('2026-11-13-london-saturday', '2026-11-13-london', '2026-11-13-london-saturday', 'What shall we do on Saturday 14 November?', '2026-11-08T18:00:00Z');
+
+INSERT OR IGNORE INTO poll_options (id, poll_id, label, detail, url, status, suggested_by, check_note, sort, created_at) VALUES
+  ('sat-renoir', '2026-11-13-london-saturday', 'Renoir and Love, National Gallery', 'Trafalgar Square; paid exhibition, booked in advance', 'https://www.nationalgallery.org.uk/', 'approved', NULL, 'Added by an organiser', 1, strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  ('sat-bayeux', '2026-11-13-london-saturday', 'The Bayeux Tapestry, British Museum', 'Bloomsbury; timed tickets £27 to £33, booked in advance', 'https://www.britishmuseum.org/exhibitions/bayeux-tapestry', 'approved', NULL, 'Added by an organiser', 2, strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  ('sat-chinatown', '2026-11-13-london-saturday', 'Chinatown', 'Soho; wander, eat and shop, free', NULL, 'approved', NULL, 'Added by an organiser', 3, strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  ('sat-club', '2026-11-13-london-saturday', 'A club night', 'Venue to be confirmed', NULL, 'approved', NULL, 'Added by an organiser', 4, strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+
+-- Joining instructions version 5 (6 October): sections for the optional parts, shown only to the people signed up for
+-- them (Events&I ":::only" blocks), so someone coming for just a tour or just Saturday gets what they need and no more.
+-- Saving a version emails nobody: new registrants get it; send existing ones a short message (see the README). Insert-only.
+INSERT OR IGNORE INTO instructions (event_id, version, subject, body_md, change_note, created_at, created_by) VALUES
+  ('2026-11-13-london', 5, 'Joining instructions: AMYBO Event, 13 November 2026',
+':::in-person
+**Where:** Room 516, Bezos Centre for Sustainable Protein, Imperial College White City campus, 84 Wood Lane, London W12 0BZ.
+
+**Getting there:** Wood Lane station (Hammersmith & City and Circle lines) is a few minutes'' walk away, and White City station (Central line) is also close.
+
+**Schedule (UK time):**
+
+- 10:30 First optional lab tour
+- 11:15 Second optional lab tour, and networking
+- 12:00 Welcome and talks
+- 13:30 Lunch
+- 14:30 Talks and discussion
+- 16:30 Close
+- 17:00 Dinner, for those who signed up
+
+**Food:** attendance is free, and snacks and soft drinks are provided. Unless a sponsor comes forward, please buy or bring your own meals. The Works (Sir Michael Uren Hub, on campus) serves hot food at lunchtime.
+:::
+
+:::remote
+**Joining remotely:** the talks are on Google Meet from 12:00 to 13:30 and from 14:30 to 16:30 (UK time), and they are recorded. The links will be in your calendar entries.
+:::
+
+:::only 2026-11-13-london-tour-1030 2026-11-13-london-tour-1115
+**Lab tour:** please be at Room 516, Bezos Centre for Sustainable Protein, Imperial College White City campus, 84 Wood Lane, London W12 0BZ, when your tour starts. Wood Lane station (Hammersmith & City and Circle lines) is a few minutes'' walk away. Closed shoes are needed in the labs.
+:::
+
+:::only 2026-11-13-london-pub
+**Dinner:** 17:00 at The Broadcaster, 89 Wood Lane, London W12 7FX, opposite Wood Lane station. We will try to book a private space, at about £45 a head, paid on the night. We pay a £250 deposit, so please tell us as soon as you can if you can''t make it.
+:::
+
+:::only 2026-11-13-london-saturday
+**Saturday 14 November:** we will decide together what to do. Use "Manage my registration" below to put the options in order, add your own idea, and draw the line below which you would rather do your own thing. Voting closes at 18:00 on Sunday 8 November, and we will email the plan soon after.
+:::
+
+To change or cancel your registration, use your personal link below.', 'Sections for each optional part (tour, dinner, Saturday) shown only to those signed up; Saturday vote', strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'setup');
+
+-- Saturday now has its own sign-up and poll, so the free-text question no longer asks about it. Runs once.
+UPDATE events SET extra_question = 'Anything else you would like to tell the organisers?'
+  WHERE id = '2026-11-13-london' AND extra_question = 'Staying on for Saturday 14 November? Tell us if you would like to do something together, and what you fancy.';

@@ -1,4 +1,5 @@
 // Events&I – Copyright (C) 2026 andeye Ltd. AGPL-3.0, see ../LICENSE.
+import { lowerLabel } from './labels';
 import { type Mode, modeOf } from './mode';
 import type { Attachment, OutgoingEmail } from './email';
 import { type CalEntry, addLinks } from './ics';
@@ -107,21 +108,35 @@ function button(href: string, label: string): string {
 
 /**
  * Joining instructions can carry sections for one kind of attendee only:
- *   :::in-person            :::remote
- *   …markdown…              …markdown…
- *   :::                     :::
+ *   :::in-person            :::remote            :::extras (just the optional sessions)
+ *   …markdown…              …markdown…           …markdown…
+ *   :::                     :::                  :::
+ * or for the people signed up to particular optional sessions (a booked tour place, or an opt-in such as dinner),
+ * whichever way they attend:
+ *   :::only <session-id> [<session-id> …]
+ *   …markdown…
+ *   :::
  * Everything outside such a block goes to everyone.
  */
-export function forAudience(md: string, mode: Mode): string {
+export function forAudience(md: string, mode: Mode, sessionIds: string[] = []): string {
 	const out: string[] = [];
 	let keep = true;
 	const tag = { in_person: 'in-person', remote: 'remote', extras: 'extras' }[mode];
 	for (const line of md.split('\n')) {
-		const m = /^:::\s*(in-person|remote|extras)?\s*$/.exec(line.trim());
-		if (m) { keep = !m[1] || m[1] === tag; continue; }
+		const m = /^:::\s*(in-person|remote|extras|only\s+\S.*)?\s*$/.exec(line.trim());
+		if (m) {
+			keep = !m[1] || m[1] === tag || (m[1].startsWith('only') && m[1].slice(4).trim().split(/\s+/).some((id) => sessionIds.includes(id)));
+			continue;
+		}
 		if (keep) out.push(line);
 	}
 	return out.join('\n').replace(/\n{3,}/g, '\n\n');
+}
+
+/** The optional sessions a registration has: a tour it has a place on, and the opt-ins it signed up to. */
+export function signedUpIds(reg: Pick<RegistrationRow, 'attendance' | 'optins' | 'tour_id' | 'tour_place'>): string[] {
+	if (reg.attendance !== 'in_person') return [];
+	return [...(reg.tour_id && reg.tour_place === 'place' ? [reg.tour_id] : []), ...(reg.optins ? reg.optins.split(',') : [])];
 }
 
 /** The opt-in sessions (e.g. dinner) this registration signed up to. Only in-person registrations can. */
@@ -131,12 +146,21 @@ export function optedIn(reg: Pick<RegistrationRow, 'attendance' | 'optins'>, ses
 	return sessions.filter((s) => s.optin && ids.includes(s.id));
 }
 
+/** What someone coming only for the optional parts is joining, e.g. "the 10:30 lab tour and dinner". */
+export function extrasWhat(reg: Pick<RegistrationRow, 'attendance' | 'optins' | 'tour_id'>, sessions: SessionRow[]): string {
+	const tour = reg.tour_id ? sessions.find((s) => s.id === reg.tour_id) : undefined;
+	const parts = [...(tour ? [`the ${tour.label}`] : []), ...optedIn(reg, sessions).map((s) => lowerLabel(s.label))];
+	return parts.length ? parts.join(' and ') : 'the optional sessions';
+}
+
 export function statusLines(reg: RegistrationRow, sessions: SessionRow[]): string[] {
 	const lines: string[] = [];
 	const mode = modeOf(reg);
 	if (mode === 'extras') {
-		const what = optedIn(reg, sessions).map((s) => s.label.charAt(0).toLowerCase() + s.label.slice(1)).join(' and ') || 'the optional sessions';
-		return [`You are joining us for ${what} only.`];
+		lines.push(`You are joining us for ${extrasWhat(reg, sessions)} only.`);
+		const t = reg.tour_id ? sessions.find((x) => x.id === reg.tour_id) : undefined;
+		if (t) lines.push(reg.tour_place === 'waitlist' ? `You are on the waiting list for the ${t.label}.` : `You are booked on the ${t.label}.`);
+		return lines;
 	}
 	if (reg.attendance === 'remote') lines.push('You are registered to join the talks remotely.');
 	else if (reg.place === 'waitlist') lines.push('You are on the waiting list for an in-person place. We will email you if a place becomes available.');
@@ -145,7 +169,7 @@ export function statusLines(reg: RegistrationRow, sessions: SessionRow[]): strin
 		const t = sessions.find((x) => x.id === reg.tour_id);
 		if (t) lines.push(reg.tour_place === 'waitlist' ? `You are on the waiting list for the ${t.label}.` : `You are booked on the ${t.label}.`);
 	}
-	for (const s of optedIn(reg, sessions)) lines.push(`You would like to join us for ${s.label.charAt(0).toLowerCase()}${s.label.slice(1)}.`);
+	for (const s of optedIn(reg, sessions)) lines.push(`You would like to join us for ${lowerLabel(s.label)}.`);
 	return lines;
 }
 
@@ -218,7 +242,7 @@ export function instructionsEmail(
 ): OutgoingEmail {
 	const st = statusLines(reg, sessions);
 	const thanks = `Thank you for registering for the ${ev.title}, on ${ukDate(ev.starts_at, ev.timezone)}.`;
-	const body = forAudience(instr.body_md, modeOf(reg));
+	const body = forAudience(instr.body_md, modeOf(reg), signedUpIds(reg));
 	const html = layout(b, instr.subject, `
 <p>Hello ${escapeHtml(reg.name)},</p>
 ${intro?.html ?? ''}

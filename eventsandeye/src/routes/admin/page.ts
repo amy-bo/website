@@ -85,6 +85,12 @@ const HTML = /* html */ `<!doctype html>
 		<div style="overflow-x:auto"><table id="regs"><caption class="small" style="text-align:left">Waiting lists are in order of confirmation. Unconfirmed = email not yet confirmed.</caption><thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Attendance</th><th scope="col">Tour</th><th scope="col">Affiliation</th><th scope="col">Needs</th><th scope="col">Extra</th><th scope="col">Shares email with hosts</th><th scope="col">Instr. v</th><th scope="col">Actions</th></tr></thead><tbody></tbody></table></div>
 	</section>
 
+	<section aria-labelledby="h-poll" id="poll-section" hidden>
+		<h2 id="h-poll">Polls</h2>
+		<p class="small">Voters rank the options and draw a line below which they would not go. Their own suggestions go live straight away if the automatic check approves them; otherwise they wait here, visible only to the person who suggested them. You are emailed about every suggestion either way. Removing an option hides it from everyone and takes it out of the results; voters' other rankings are unaffected.</p>
+		<div id="polls-box"></div>
+	</section>
+
 	<section aria-labelledby="h-instr">
 		<h2 id="h-instr">Joining instructions</h2>
 		<p class="small">The latest version is emailed automatically, with calendar invitations, to each person when they confirm (or are promoted from the in-person waiting list), and to anyone who registers again. Saving a new version does <strong>not</strong> email anyone already registered: to update them, write a short message below to "people on an older version" and tick "Include the latest joining instructions".</p>
@@ -107,6 +113,7 @@ const HTML = /* html */ `<!doctype html>
 			<div class="row">
 				<div><label for="m-att">Attendance</label><select id="m-att"><option value="all">Everyone</option><option value="in_person">In person</option><option value="remote">Remote</option></select></div>
 				<div><label for="m-tour">Tour</label><select id="m-tour"><option value="">Any</option><option value="none">No tour</option></select></div>
+				<div><label for="m-optin">Signed up for</label><select id="m-optin"><option value="">Anything</option></select></div>
 				<div><label for="m-below">Only people whose joining instructions are older than version</label><input id="m-below" type="number" min="1" placeholder="(everyone)" /></div>
 				<div><label><input type="checkbox" id="m-instr" style="width:auto" /> Include the latest joining instructions</label><p class="small">Your message comes first, then the full joining instructions with any calendar changes. Everyone sent it counts as having the latest version.</p></div>
 			</div>
@@ -159,7 +166,7 @@ const uk = (iso) => iso ? new Date(iso).toLocaleString('en-GB', { dateStyle: 'me
 let sessions = [], tours = [], latestVersion = 0, eventId = EVENT;
 
 function audience() {
-	return { attendance: $('m-att').value, tour_id: $('m-tour').value || undefined, below_version: $('m-below').value ? Number($('m-below').value) : undefined, include_waitlist: $('m-wait').checked };
+	return { attendance: $('m-att').value, tour_id: $('m-tour').value || undefined, optin_id: $('m-optin').value || undefined, below_version: $('m-below').value ? Number($('m-below').value) : undefined, include_waitlist: $('m-wait').checked };
 }
 function sessionEdits() {
 	return sessions.map((s) => {
@@ -211,11 +218,14 @@ async function load() {
 	const tourSel = $('m-tour');
 	tourSel.querySelectorAll('option[data-t]').forEach((o) => o.remove());
 	for (const t of tours) { const o = document.createElement('option'); o.value = t.id; o.textContent = t.label; o.dataset.t = '1'; tourSel.append(o); }
+	const optSel = $('m-optin');
+	optSel.querySelectorAll('option[data-t]').forEach((o) => o.remove());
+	for (const x of sessions.filter((x) => x.optin)) { const o = document.createElement('option'); o.value = x.id; o.textContent = x.label; o.dataset.t = '1'; optSel.append(o); }
 
 	$('regs').querySelector('tbody').innerHTML = s.registrations.map((r) => {
 		const tour = tours.find((t) => t.id === r.tour_id);
 		const pend = r.status === 'pending' ? '<span class="tag pending">unconfirmed</span> ' : '';
-		const where = r.attendance === 'remote' ? 'Remote' : !r.place ? '<span class="tag ok">' + esc(s.sessions.filter((x) => x.optin && (r.optins || '').split(',').includes(x.id)).map((x) => x.label).join(', ') || 'Opt-in') + ' only</span>' : r.place === 'waitlist' ? '<span class="tag wait">in person: waiting since ' + esc(uk(r.waitlist_since)) + '</span>' : '<span class="tag ok">in person</span>';
+		const where = r.attendance === 'remote' ? 'Remote' : !r.place ? '<span class="tag ok">' + esc([...(tour ? [tour.label] : []), ...s.sessions.filter((x) => x.optin && (r.optins || '').split(',').includes(x.id)).map((x) => x.label)].join(', ') || 'Optional sessions') + ' only</span>' : r.place === 'waitlist' ? '<span class="tag wait">in person: waiting since ' + esc(uk(r.waitlist_since)) + '</span>' : '<span class="tag ok">in person</span>';
 		const opts = r.attendance === 'in_person' && r.optins ? s.sessions.filter((x) => x.optin && r.optins.split(',').includes(x.id)).map((x) => esc(x.label)) : [];
 		const tourCell = (tour ? (r.tour_place === 'waitlist' ? '<span class="tag wait">' + esc(tour.label) + ': waiting</span>' : esc(tour.label)) : '') + (opts.length ? (tour ? '<br>' : '') + 'Signed up: ' + opts.join(', ') : '');
 		const actions = [
@@ -228,6 +238,8 @@ async function load() {
 	$('csv-link').href = '/api/admin/export?format=csv&event=' + encodeURIComponent(eventId);
 	$('log-link').href = '/api/admin/sent-log?event=' + encodeURIComponent(eventId);
 
+	await loadPolls();
+
 	const iv = await api('/api/admin/instructions?event=' + encodeURIComponent(eventId));
 	const latest = iv.versions[0];
 	$('instr-versions').innerHTML = iv.versions.map((v) => '<details><summary>Version ' + esc(v.version) + ' – ' + esc(uk(v.created_at)) + ' – ' + esc(v.subject) + (v.change_note ? ' – <em>' + esc(v.change_note) + '</em>' : '') + '</summary><pre style="white-space:pre-wrap">' + esc(v.body_md) + '</pre></details>').join('');
@@ -237,6 +249,46 @@ async function load() {
 	const ms = await api('/api/admin/messages?event=' + encodeURIComponent(eventId));
 	$('msgs').querySelector('tbody').innerHTML = ms.messages.map((m) => '<tr><td>' + esc(uk(m.sent_at || m.scheduled_at || m.created_at)) + '</td><td>' + esc(m.subject) + '</td><td>' + esc(m.status) + (m.error ? ': ' + esc(m.error) : '') + '</td><td>' + esc(m.recipients_count ?? '') + '</td><td><code>' + esc(m.audience) + '</code></td><td>' + (m.status === 'scheduled' ? '<button class="danger" data-cancel="' + esc(m.id) + '">Cancel</button>' : '') + '</td></tr>').join('') || '<tr><td colspan="6">Nothing sent yet.</td></tr>';
 }
+
+async function loadPolls() {
+	const d = await api('/api/admin/poll?event=' + encodeURIComponent(eventId));
+	$('poll-section').hidden = !d.polls.length;
+	const statusTag = (st) => st === 'approved' ? '<span class="tag ok">live</span>' : st === 'review' ? '<span class="tag wait">waiting for you</span>' : '<span class="tag">removed</span>';
+	$('polls-box').innerHTML = d.polls.map((p) => {
+		const id = esc(p.id);
+		const results = p.voters ? '<table><caption class="small" style="text-align:left">' + esc(p.voters) + ' voter(s) counted. First choice scores as many points as there are live options, then one fewer each place, down to the voter\'s line. Names include voters who hid theirs from other voters.</caption><thead><tr><th scope="col">Option</th><th scope="col">Points</th><th scope="col">Would go</th><th scope="col">Wouldn\'t go</th></tr></thead><tbody>'
+			+ p.results.map((r) => '<tr><td>' + esc(r.label) + '</td><td>' + esc(r.points) + '</td><td>' + esc(r.going) + (r.names.length ? ': ' + esc(r.names.join(', ')) : '') + '</td><td>' + esc(r.not_going) + '</td></tr>').join('') + '</tbody></table>' : '<p>Nobody has voted yet.</p>';
+		const options = '<table><thead><tr><th scope="col">Option</th><th scope="col">Status</th><th scope="col">From</th><th scope="col">Check</th><th scope="col">Actions</th></tr></thead><tbody>'
+			+ p.options.map((o) => '<tr><td><strong>' + esc(o.label) + '</strong>' + (o.detail ? '<br><span class="small">' + esc(o.detail) + '</span>' : '') + (o.url ? '<br><a class="small" href="' + esc(o.url) + '">' + esc(o.url) + '</a>' : '') + '</td><td>' + statusTag(o.status) + '</td><td>' + esc(o.suggested_by_name || 'Organisers') + '</td><td class="small">' + esc(o.check_note) + '</td><td>'
+				+ (o.status !== 'approved' ? '<button data-opt-status="approved" data-id="' + esc(o.id) + '">Approve</button> ' : '')
+				+ (o.status !== 'removed' ? '<button class="danger" data-opt-status="removed" data-id="' + esc(o.id) + '" data-label="' + esc(o.label) + '">Remove</button> ' : '')
+				+ '<button class="secondary" data-opt-edit="' + esc(o.id) + '" data-label="' + esc(o.label) + '" data-detail="' + esc(o.detail) + '" data-url="' + esc(o.url) + '">Edit</button></td></tr>').join('') + '</tbody></table>';
+		const ballots = p.ballots.length ? '<details><summary>Every ballot (' + p.ballots.length + ')</summary><ul>' + p.ballots.map((b) => '<li>' + esc(b.name) + (b.counted ? '' : ' <span class="tag">not counted: no longer signed up</span>') + (b.show_name ? '' : ' <span class="tag">name hidden from voters</span>') + ': would go to ' + esc(b.going.join(' > ') || 'nothing') + (b.not_going.length ? '; not ' + esc(b.not_going.join(', ')) : '') + ' <span class="small">(' + esc(uk(b.updated_at)) + ')</span></li>').join('') + '</ul></details>' : '';
+		return '<fieldset><legend>' + esc(p.question) + ' <span class="small">(' + (p.open ? 'open' : 'closed') + (p.session_label ? ', for people signed up to ' + esc(p.session_label) : '') + ')</span></legend>'
+			+ '<h3>Results</h3>' + results + ballots
+			+ '<h3>Options</h3>' + options
+			+ '<form data-poll-add="' + id + '"><div class="row"><div><label for="pa-l-' + id + '">New option</label><input id="pa-l-' + id + '" type="text" maxlength="80" required /></div><div><label for="pa-d-' + id + '">Detail (optional)</label><input id="pa-d-' + id + '" type="text" maxlength="200" /></div><div><label for="pa-u-' + id + '">Link (optional)</label><input id="pa-u-' + id + '" type="url" placeholder="https://…" /></div></div><button type="submit">Add option</button></form>'
+			+ '<form data-poll-settings="' + id + '"><div class="row"><div><label for="ps-q-' + id + '">Question</label><input id="ps-q-' + id + '" type="text" maxlength="200" value="' + esc(p.question) + '" required /></div><div><label for="ps-c-' + id + '">Voting closes (UK time)</label><input id="ps-c-' + id + '" type="datetime-local" value="' + esc(isoToUkLocal(p.closes_at)) + '" required /></div></div><button type="submit" class="secondary">Save question and closing time</button></form>'
+			+ '</fieldset>';
+	}).join('');
+}
+document.body.addEventListener('submit', async (e) => {
+	const f = e.target;
+	if (!f.dataset || !(f.dataset.pollAdd || f.dataset.pollSettings)) return;
+	e.preventDefault();
+	try {
+		if (f.dataset.pollAdd) {
+			const id = f.dataset.pollAdd;
+			await api('/api/admin/poll', 'POST', { action: 'add', poll: id, label: $('pa-l-' + id).value, detail: $('pa-d-' + id).value, url: $('pa-u-' + id).value });
+			toast('Option added. Voters see it straight away.');
+		} else {
+			const id = f.dataset.pollSettings;
+			await api('/api/admin/poll', 'POST', { action: 'settings', poll: id, question: $('ps-q-' + id).value, closes_at: ukLocalToIso($('ps-c-' + id).value) });
+			toast('Poll saved.');
+		}
+		loadPolls();
+	} catch (err) { toast(err.message); }
+});
 
 $('settings-form').addEventListener('submit', async (e) => {
 	e.preventDefault();
@@ -273,6 +325,14 @@ document.body.addEventListener('click', async (e) => {
 		} else if (b.dataset.delete) {
 			if (!confirm(b.dataset.confirmed === '1' ? 'Remove ' + b.dataset.name + '? They have confirmed, so they will be emailed that their registration has been cancelled, and their calendar entries removed.' : 'Remove ' + b.dataset.name + '? They never confirmed, so no email is sent (use this for spam, typos or duplicates).')) return;
 			await api('/api/admin/registration', 'DELETE', { id: b.dataset.delete }); toast('Removed.'); load();
+		} else if (b.dataset.optStatus) {
+			if (b.dataset.optStatus === 'removed' && !confirm('Remove "' + b.dataset.label + '"? Voters will no longer see it, and it leaves the results.')) return;
+			await api('/api/admin/poll', 'POST', { action: 'status', id: b.dataset.id, status: b.dataset.optStatus }); toast(b.dataset.optStatus === 'approved' ? 'Approved: voters can see it now.' : 'Removed.'); loadPolls();
+		} else if (b.dataset.optEdit) {
+			const label = prompt('Option', b.dataset.label); if (label === null) return;
+			const detail = prompt('Detail (optional)', b.dataset.detail || ''); if (detail === null) return;
+			const url = prompt('Link (optional, https://…)', b.dataset.url || ''); if (url === null) return;
+			await api('/api/admin/poll', 'POST', { action: 'edit', id: b.dataset.optEdit, label, detail, url }); toast('Option updated.'); loadPolls();
 		} else if (b.dataset.cancel) {
 			await api('/api/admin/messages/cancel', 'POST', { id: b.dataset.cancel }); toast('Scheduled message cancelled.'); load();
 		} else if (b.dataset.preview) {

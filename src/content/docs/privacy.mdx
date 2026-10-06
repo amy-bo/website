@@ -23,6 +23,7 @@ When you register for an event we collect:
 - optionally, your answer to the event's extra question (for example, plans for the day after)
 - the time you gave consent and confirmed your email address
 - whether you agreed to share your email address with session hosts
+- if you vote in an event poll (for example, what to do on the Saturday after), your ranking of the options, any option you suggest, and whether other voters may see your first name
 - a record of the emails and calendar invitations we sent you
 
 Dietary or access needs can reveal information about your health or beliefs. Only share what you are comfortable with, and only what we need to make the event work for you.
@@ -41,20 +42,21 @@ The talks are recorded so that people who could not come can watch them. Our law
 
 ## Who can see it
 
-Only the AMYBO organisers can see the full registrations. The host of each session you attend (for example a lab tour leader) is emailed the list for that session whenever it changes, so they can plan it: your name and whether you have a place or are on the waiting list. Your email address and organisation are included only if you tick the optional box to share them with session hosts; you can change that at any time with your "Manage my registration" link. Hosts are asked to use the list only for that session and to delete it afterwards. We use these service providers to run the website and send email:
+Only the AMYBO organisers can see the full registrations. The host of each session you attend (for example a lab tour leader) is emailed the list for that session whenever it changes, so they can plan it: your name and whether you have a place or are on the waiting list. Your email address and organisation are included only if you tick the optional box to share them with session hosts; you can change that at any time with your "Manage my registration" link. Hosts are asked to use the list only for that session and to delete it afterwards. In an event poll, other people voting in it see the results so far, including the first names of those who would go to each option, unless you untick that box; options you suggest are shown to them without your name, and organisers see every ballot. We use these service providers to run the website and send email:
 
 - **Cloudflare** hosts the website and the registration database, and provides spam protection (Turnstile, which checks your browser and IP address when you submit the form; we do not store your IP address). The database is held in Cloudflare's **EU jurisdiction**, so registrations are stored and processed in the European Union.
 - **Resend** sends our emails, from its EU region.
 - **Google Workspace** hosts the organisers' mailbox, which receives a notification when someone registers, changes or cancels (with their name, organisation and registration details), and which organisers may use to send a message to registrants using blind copies.
 - **Imperial College London**, which hosts the event, receives the access needs of people attending in person only where that is needed to arrange access to the building, and never dietary information unless catering is arranged with them.
 - **Google Meet** streams the talks. If you join remotely, Google processes your name and email address under its own terms when you join the call.
+- **Anthropic** checks the text of any poll option you suggest (only that text, never your name or email address) with its Claude AI model, so that suitable ideas appear straight away; anything it is unsure about waits for an organiser instead. Anthropic processes the text in the United States and does not use it to train its models.
 - Registrations are handled by **Events&I**, open source registration software that runs on our own Cloudflare account; no other organisation receives your data through it.
 
-Cloudflare, Resend and Google act as data processors on our behalf. Where they process data outside the UK (the EU for the registration database and email sending; Google and Cloudflare's support and security operations may involve the United States), transfers rely on the UK adequacy regulations for the EU and on the UK International Data Transfer Addendum to each provider's standard contractual clauses elsewhere. We do not sell or share your data with anyone else. If we name speakers on an event page, it is only with their agreement; attendees are never listed publicly.
+Cloudflare, Resend, Google and Anthropic act as data processors on our behalf. Where they process data outside the UK (the EU for the registration database and email sending; Google and Cloudflare's support and security operations may involve the United States), transfers rely on the UK adequacy regulations for the EU and on the UK International Data Transfer Addendum to each provider's standard contractual clauses elsewhere. We do not sell or share your data with anyone else. If we name speakers on an event page, it is only with their agreement; attendees are never listed publicly.
 
 ## How long we keep it
 
-Unconfirmed registrations are deleted automatically if the email address is not confirmed in time. All registrations for an event, the record of emails sent to them, the lists sent to session hosts and the hosts' own contact details are **deleted from our registration system 30 days after the event ends**. The database keeps a point-in-time backup for up to 30 days more (Cloudflare D1 Time Travel), so a deleted record can be restored from backup for that long and is then gone. Notification emails about registrations in our organisers' mailbox are deleted within 30 days after the event. Resend keeps its own delivery logs under its retention policy.
+Unconfirmed registrations are deleted automatically if the email address is not confirmed in time. All registrations for an event, the record of emails sent to them, the lists sent to session hosts, the hosts' own contact details, and the event's polls with their ballots and suggested options are **deleted from our registration system 30 days after the event ends**. The database keeps a point-in-time backup for up to 30 days more (Cloudflare D1 Time Travel), so a deleted record can be restored from backup for that long and is then gone. Notification emails about registrations in our organisers' mailbox are deleted within 30 days after the event. Resend keeps its own delivery logs under its retention policy.
 
 ## Withdrawing consent and your rights
 
@@ -66,4 +68,4 @@ You have the right to access, correct or delete your data, to restrict or object
 
 This website does not use tracking or advertising cookies. If you edit a link page, signing in sets one strictly necessary cookie that keeps you signed in for up to 60 days, until you sign out. Cloudflare Turnstile, which protects the registration form from spam, may set a strictly necessary cookie to do that job. Videos from YouTube and Vimeo load only when you click play (YouTube) or with Vimeo's do-not-track setting, so their cookies are not set just by visiting a page. Video thumbnails are loaded from YouTube's image server, which receives your IP address.
 
-*Last updated 2 October 2026 (link-page counts); before that 25 September 2026 (EU database, Google Workspace, Imperial, recordings, backups and what session hosts see).*
+*Last updated 6 October 2026 (event polls and the automatic check of suggestions); before that 2 October 2026 (link-page counts); before that 25 September 2026 (EU database, Google Workspace, Imperial, recordings, backups and what session hosts see).*

@@ -37,7 +37,7 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 	</fieldset>
 
 	<fieldset class="field" id="rsvp-tour-fieldset">
-		<legend>Optional lab tour (in person only)</legend>
+		<legend>Optional lab tour (not for remote attendees)</legend>
 		<label class="choice"><input type="radio" name="tour_id" value="none" checked /> No tour, thanks</label>
 		<div id="rsvp-tours"></div>
 	</fieldset>
@@ -86,6 +86,7 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 
 <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script>
+	import { lowerLabel } from '../src/labels';
 	const form = document.getElementById('rsvp-form') as HTMLFormElement;
 	const event = form.dataset.event!;
 	const result = document.getElementById('rsvp-result')!;
@@ -94,17 +95,29 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 	const tourFs = document.getElementById('rsvp-tour-fieldset') as HTMLFieldSetElement;
 	const optFs = document.getElementById('rsvp-optins-fieldset') as HTMLFieldSetElement;
 
+	/** "11:00" on the event's day, "Sat 14 Nov, 11:00" on another (unless the label already names the day). */
+	function when(iso: string, eventStart: string, label = '') {
+		const day = (t: string) => new Date(t).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/London' });
+		const time = new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
+		return day(iso) === day(eventStart) || /^(Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day\b/.test(label) ? time : `${day(iso)}, ${time}`;
+	}
+	/** "a lab tour, dinner and/or Saturday 14 November": what someone can come for without the main programme. */
+	function extrasParts(tours: { label: string }[], optins: { label: string }[]) {
+		const items = [...(tours.length ? [`a ${tours[0].label.replace(/^\d{1,2}[:.]\d{2}\s*/, '')}`] : []), ...optins.map((o) => lowerLabel(o.label))];
+		return items.length > 1 ? `${items.slice(0, -1).join(', ')} and/or ${items[items.length - 1]}` : items[0] ?? '';
+	}
 	function syncTour() {
 		const mode = (form.elements.namedItem('attendance') as RadioNodeList).value;
 		const inPerson = mode === 'in_person', extras = mode === 'extras';
-		tourFs.disabled = !inPerson;
+		// A tour can be booked with the day or on its own; only remote attendees can't.
+		tourFs.disabled = !inPerson && !extras;
 		optFs.disabled = !inPerson && !extras;
 		document.getElementById('rsvp-optins-legend')!.textContent = extras ? 'Joining us for' : 'Also joining us for (in person only)';
 		const boxes = [...optFs.querySelectorAll('input')] as HTMLInputElement[];
 		if (!inPerson && !extras) boxes.forEach((el) => (el.checked = false));
-		// Just the dinner (say): with only one optional session there's nothing to choose, so tick it.
-		if (extras && boxes.length === 1) boxes[0].checked = true;
-		if (!inPerson) (form.querySelector('input[name=tour_id][value=none]') as HTMLInputElement).checked = true;
+		// Just the dinner (say): with only one optional session and no tour there's nothing to choose, so tick it.
+		if (extras && boxes.length === 1 && !toursBox.children.length) boxes[0].checked = true;
+		if (!inPerson && !extras) (form.querySelector('input[name=tour_id][value=none]') as HTMLInputElement).checked = true;
 	}
 	form.addEventListener('change', syncTour);
 	syncTour();
@@ -144,13 +157,13 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 				input.type = 'checkbox';
 				input.name = 'optins';
 				input.value = o.id;
-				const time = new Date(o.starts_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
-				label.append(input, ` ${o.label}, ${time}${o.location ? `, ${o.location}` : ''}`);
+				label.append(input, ` ${o.label}, ${when(o.starts_at, s.event.starts_at, o.label)}${o.location ? `, ${o.location}` : ''}`);
 				(document.getElementById('rsvp-optins') as HTMLElement).append(label);
 			}
 			optFs.hidden = !(s.optins ?? []).length;
-			if ((s.optins ?? []).length) {
-				document.getElementById('rsvp-extras-label')!.textContent = `Just the ${(s.optins as { label: string }[]).map((o) => o.label.toLowerCase()).join(' and ')}`;
+			const parts = extrasParts(s.tours ?? [], s.optins ?? []);
+			if (parts) {
+				document.getElementById('rsvp-extras-label')!.textContent = `Just ${parts}, not the talks`;
 				document.getElementById('rsvp-extras-choice')!.hidden = false;
 			}
 			syncTour();

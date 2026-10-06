@@ -169,10 +169,17 @@ jobs:
           V_TOKEN_SECRET: ${{ secrets.TOKEN_SECRET }}
           V_RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           V_TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+          V_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           for n in TOKEN_SECRET RESEND_API_KEY TURNSTILE_SECRET_KEY; do
             v="V_$n"; printf '%s' "${!v}" | npx wrangler pages secret put "$n" --project-name "$PROJECT"
           done
+          # Optional: the Claude API key that checks poll suggestions. Without it, an organiser reviews every one.
+          if [ -n "$V_ANTHROPIC_API_KEY" ]; then
+            printf '%s' "$V_ANTHROPIC_API_KEY" | npx wrangler pages secret put ANTHROPIC_API_KEY --project-name "$PROJECT"
+          else
+            echo "::notice::ANTHROPIC_API_KEY is not set: poll suggestions wait for an organiser instead of the automatic check."
+          fi
 
       - name: Deploy the site and its Functions (production)
         if: steps.prod.outputs.is_prod == 'true'

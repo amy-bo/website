@@ -61,6 +61,10 @@ The 13 November 2026 get-together page is `src/content/docs/events/2026-11-13-lo
 - **Calendars:** in-person attendees get one entry for their day, remote attendees one per online talk session, each with reminders and add-to-calendar links.
 - **Hosts:** a session with a host email gets the attendee list whenever it changes (names, plus emails of people who opted in to share them).
 
+**Saturday 14 November** is an opt-in session with a ranked poll ("What shall we do on Saturday?"). People signed up for it vote on the manage page (below their registration): they put the options in order, draw a line below which they would rather do their own thing, and can add their own option. A suggestion appears to everyone at once if Claude approves it (repository secret `ANTHROPIC_API_KEY`; model `claude-haiku-4-5`, or `MODERATION_MODEL`); otherwise, or without a key, it waits for you on the admin page under **Polls**, and you are emailed about every suggestion either way. The admin page shows the results with every voter's name and ballot, and lets you approve, remove, edit or add options and change the closing time. People can sign up for any mix of a lab tour, dinner and Saturday without the talks.
+
+**Joining instructions** can carry `:::in-person`, `:::remote` and `:::extras` sections, and `:::only <session-id> …` sections for whoever is signed up to those sessions (a tour place, dinner, Saturday).
+
 **The automatic emails** are: confirm your email; a reminder with joining instructions for anyone who registers twice; joining instructions with calendar invitations on confirmation or promotion; calendar updates only when someone's entries change; cancellation confirmation; notifications to the organisers' mailbox (`NOTIFY_EMAIL` in `wrangler.toml`); host lists. Editing a page or saving new joining instructions never emails anyone.
 
 **Admin page:** [amybo.org/admin/rsvps](https://amybo.org/admin/rsvps/), behind Cloudflare Access. It shows counts and every registration, and lets you:

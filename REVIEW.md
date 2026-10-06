@@ -10,7 +10,7 @@ Every page carries `source:` in its frontmatter:
 
 `provenance:` explains pages that mix sources. To see exactly what changed on a Hugo page, compare it with the Hugo original in git history of [amy-bo/pages](https://github.com/amy-bo/pages).
 
-Totals: 10 amy, 17 new, 28 hugo.
+Totals: 9 amy, 18 new, 28 hugo.
 
 ## Pages
 
@@ -18,7 +18,7 @@ Totals: 10 amy, 17 new, 28 hugo.
 | --- | --- | --- | --- | --- |
 | [`/`](/) | SUSTAINABLE PROTEIN FOR ALL | amy | `/` | Hero, tagline and the first three cards by Amy (her one-line description rewritten for search results) (forest photo by Ozark Drones on Unsplash). The event banner, the electroPioreactor card and the 'What we are doing now' section are new. Below that, 'We need your help' and 'Let's democratise food' are the Hugo homepage's words; its 2023 lines about fortnightly videos and editable pages were rewritten. |
 | [`/404/`](/404/) | Page not found | new | – |  |
-| [`/about/`](/about/) | About AMYBO | hugo | `/about/` | Verbatim from Hugo, except for these relaunch changes. Removed: a stray lead line, the 'all pages are editable' line, the 2023 note about fortnightly videos, an empty closing heading, Amanda Lake's line (at Martin's request, 25 September 2026) and the paragraph about the Docsy porridge photo (not used on this site). Corrected: a typo and Cam Davidson-Pilon's name. Added: the 'Get involved' heading so headings nest. Moved: the origin story into a History section at the end (Why AMYBO links to it). |
+| [`/about/`](/about/) | About AMYBO | hugo | `/about/` | Verbatim from Hugo, except for these relaunch changes. Removed: a stray lead line, the 'all pages are editable' line, the 2023 note about fortnightly videos, an empty closing heading, Amanda Lake's line (at Martin's request, 25 September 2026) and the paragraph about the Docsy porridge photo (not used on this site). Corrected: a typo and Cam Davidson-Pilon's name. Added: the 'Get involved' heading so headings nest. Moved: the origin story into a History section at the end, with the first video under it. Merged in Why AMYBO (6 October 2026): Martin's mission statement and its three points at the top, the hydrogen-oxidising bacteria paragraph, How we work and Where we are. |
 | [`/background/`](/background/) | Background | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
 | [`/background/overview/`](/background/overview/) | Overview (2023) | hugo | `/docs/overview/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/background/plan-2023/`](/background/plan-2023/) | Next steps (2023 plan) | hugo | `/docs/overview/plan/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
@@ -36,14 +36,14 @@ Totals: 10 amy, 17 new, 28 hugo.
 | [`/collaborate/volunteer/`](/collaborate/volunteer/) | Get involved | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch; the list of skills is from the Hugo homepage. |
 | [`/contact/`](/contact/) | Contact AMYBO | amy | – | Title by Amy (capitalised as AMYBO); her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch; the legal details are from Companies House. |
 | [`/events/`](/events/) | Events | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
-| [`/events/2026-11-13-london/`](/events/2026-11-13-london/) | AMYBO get-together, London – Friday 13 November 2026 | new | – |  |
+| [`/events/2026-11-13-london/`](/events/2026-11-13-london/) | AMYBO Event London – Friday 13 November 2026 | new | – |  |
+| [`/events/check-email/`](/events/check-email/) | Nearly there: check your email | new | – |  |
 | [`/events/confirm/`](/events/confirm/) | Complete your registration | new | – |  |
 | [`/events/manage/`](/events/manage/) | Manage your registration | new | – |  |
 | [`/experiments/community_experiments/`](/experiments/community_experiments/) | Community Experiments | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch, linking the migrated Hugo experiment pages. |
 | [`/experiments/hardware/`](/experiments/hardware/) | Hardware | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch, linking the migrated Hugo pages. |
 | [`/experiments/protocols/`](/experiments/protocols/) | Experimental protocols | amy | – | Title corrected from Amy's 'Experiments Protocols'; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch. |
 | [`/experiments/submit/`](/experiments/submit/) | Submit an Experiment | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch. |
-| [`/mission/`](/mission/) | Why AMYBO | amy | – | Title by Amy (capitalised as AMYBO). Body written by Martin Currie with Claude for the 2026 relaunch, drawing on the Hugo Overview and About pages. |
 | [`/privacy/`](/privacy/) | Privacy notice | new | – |  |
 | [`/projects/`](/projects/) | Projects | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
 | [`/projects/carma-hub/`](/projects/carma-hub/) | CARMA Hub project | new | – | Written by Martin Currie with Claude for the 2026 relaunch, from the repository's AsepticElectroPioreactor README and results. |

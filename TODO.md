@@ -4,6 +4,7 @@ Open work on amybo.org. Done work is in [CHANGELOG.md](CHANGELOG.md). Abandoned 
 
 ## Open
 
+- [ ] **Saturday poll, before telling people** (6 Oct): (1) name the club (ask Amir or Nelly which one Imperial postgrads go to where people in their late 40s fit in) and rename "A club night" on the admin page; (2) add the `ANTHROPIC_API_KEY` repository secret (an Anthropic API key with only Messages access), or every suggestion waits for an organiser; (3) set Saturday's real times and place on the admin page once the vote is in; (4) send people already registered a short message (audience "In person", then the Saturday filter for reminders) pointing them to "Manage my registration" to sign up for Saturday and vote; (5) check the privacy-notice line on Anthropic against its current commercial terms; (6) decide whether 8 November 18:00 leaves enough time to book Bayeux tickets if it wins.
 - [ ] **Link pages: shake to undo on phones** — Back already retraces map moves; shake needs DeviceMotion permission on iOS (a tap to allow), so it wants a small opt-in.
 
 - [ ] **"Contact Martin" heading on the contact form:** contact.andeye.com should read a `heading` parameter (brief in brain2 andeye/contact-form-links, 3 October); amy.bo/~martin already sends it.

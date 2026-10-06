@@ -20,6 +20,10 @@ export interface Env {
 	/** Secret for signing self-service and confirmation links (32+ random bytes). Rotating it invalidates all links. */
 	TOKEN_SECRET: string;
 	TURNSTILE_SECRET_KEY?: string;
+	/** Claude API key for checking poll suggestions before others see them. Without it, an organiser reviews each one. */
+	ANTHROPIC_API_KEY?: string;
+	/** Model for that check (default claude-haiku-4-5). */
+	MODERATION_MODEL?: string;
 	/** Cloudflare Access team domain, e.g. myteam.cloudflareaccess.com */
 	ACCESS_TEAM_DOMAIN?: string;
 	/** Cloudflare Access application audience (AUD) tag. */

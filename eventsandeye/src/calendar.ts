@@ -67,15 +67,31 @@ export function entriesFor(env: Env, ev: EventRow, sessions: SessionRow[], reg: 
 		description: [`${s.label}${s.location ? `, ${s.location}` : ''}`, '', manage].join('\n'),
 		alarms: ['-P1D', '-PT1H'],
 	}));
-	if (modeOf(reg) === 'extras') return optinEntries;
+	if (modeOf(reg) === 'extras') {
+		// Just a tour and/or the opt-in sessions: an entry for the tour (once they have a place on it) beside the others.
+		const t = reg.tour_id && reg.tour_place === 'place' ? ordered.find((s) => s.id === reg.tour_id) : undefined;
+		return t ? [{
+			key: `s-${t.id}`,
+			uid: uid(`s-${t.id}`),
+			summary: `${ev.title}: ${t.label}`,
+			location: t.location || ev.location,
+			start: t.starts_at,
+			end: t.ends_at,
+			description: [`${t.label}${t.location ? `, ${t.location}` : ''}`, '', manage].join('\n'),
+			alarms: ['-P1D', `-PT${(ev.travel_minutes || 60) + 15}M`, '-PT15M'],
+		}, ...optinEntries] : optinEntries;
+	}
 
 	const core = ordered.filter((s) => isCore(s) && s.mode !== 'online');
 	const tour = reg.tour_id && reg.tour_place === 'place' ? ordered.find((s) => s.id === reg.tour_id) : undefined;
 	if (!core.length && !tour) return optinEntries;
 	const starts = [...core.map((s) => s.starts_at), ...(tour ? [tour.starts_at] : [])].sort();
 	const ends = [...core.map((s) => s.ends_at), ...(tour ? [tour.ends_at] : [])].sort();
+	// Social sessions on another day (e.g. a Saturday outing) are not part of "your day": they get their own entry if
+	// the person signed up for them.
+	const day = (t: string) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'short', timeZone: tz }).format(new Date(t));
 	const schedule = ordered
-		.filter((s) => isCore(s) ? s.mode !== 'online' : s.id === reg.tour_id || s.kind === 'social')
+		.filter((s) => isCore(s) ? s.mode !== 'online' : s.id === reg.tour_id || (s.kind === 'social' && day(s.starts_at) === day(ev.starts_at)))
 		.map((s) => {
 			let note = '';
 			if (s.id === reg.tour_id) note = reg.tour_place === 'waitlist' ? ' (you are on the waiting list)' : ' (booked)';

@@ -47,6 +47,8 @@ writeFileSync('.dev.vars', [
 	'ADMIN_EMAILS=admin@example.org',
 	// Check the token's own methods here (the live site relies on the Access application's MFA instead).
 	'ACCESS_MFA=claim',
+	// A local stand-in for the AI check of poll suggestions: approves anything without "BLOCK" in it (moderation.ts).
+	'ANTHROPIC_API_KEY=dev-fake',
 	`ACCESS_JWKS_JSON=${JSON.stringify({ keys: [jwk] })}`,
 	'',
 ].join('\n'));
@@ -214,7 +216,7 @@ try {
 	const dina = 'dina@example.org';
 	check('dinner only without ticking dinner → 400', (await register({ name: 'Dina', email: dina, attendance: 'extras', optins: [] })).status === 400);
 	const heldBefore = (await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN)).data.capacity.inPerson.held;
-	r = await register({ name: 'Dina', email: dina, attendance: 'extras', optins: [DINNER], tour_id: TOUR1 });
+	r = await register({ name: 'Dina', email: dina, attendance: 'extras', optins: [DINNER], tour_id: 'none' });
 	check('dinner only registers', r.status === 200 && r.data.ok, JSON.stringify(r.data));
 	let dm = await last(dina);
 	check('its confirm email says dinner only, and that the registration (not a place) would be deleted', /You are joining us for dinner only\./.test(dm.text_body) && /it will be deleted on/.test(dm.text_body) && !/place will be released/.test(dm.text_body), dm.text_body.slice(0, 500));
@@ -235,6 +237,89 @@ try {
 	dm = await last(dina);
 	check('remote → dinner only: says so', r.data.ok && /You have changed to joining us for dinner only\./.test(dm.text_body), dm.text_body.slice(0, 300));
 	await req('DELETE', '/api/rsvp/manage', { t: dinaManage });
+
+	console.log('\nJust a tour, or just Saturday');
+	{
+		const pollsAdmin = async () => (await req('GET', `/api/admin/poll?event=${EVENT}`, undefined, ADMIN)).data;
+		let pa = await pollsAdmin();
+		const POLL = pa.polls?.[0];
+		check('the seed has a poll tied to an opt-in session, with four options', POLL && POLL.session_id && POLL.options.length === 4 && POLL.options.every((o) => o.status === 'approved'), JSON.stringify(pa).slice(0, 300));
+		const SAT = POLL.session_id;
+		const opt = (label) => POLL.options.find((o) => o.label.includes(label)).id;
+		const erin = 'erin.tour@example.org';
+		r = await register({ name: 'Erin', email: erin, attendance: 'extras', tour_id: TOUR2, optins: [] });
+		check('a tour on its own registers', r.status === 200 && r.data.ok, JSON.stringify(r.data));
+		r = await req('POST', '/api/rsvp/confirm', { t: tokenFrom((await last(erin)).text_body, 'confirm') });
+		check('confirm page: just the tour', r.data.ok && r.data.registration.mode === 'extras' && /lab tour/.test(r.data.registration.tour_label) && r.data.registration.tour_place === 'place', JSON.stringify(r.data));
+		let em = await last(erin);
+		check('tour-only instructions: where to go for the tour and closed shoes; no dinner, Saturday or talks schedule', /Lab tour:/.test(em.text_body) && /Closed shoes/.test(em.text_body) && !/Broadcaster/.test(em.text_body) && !/Saturday 14/.test(em.text_body) && !/Welcome and talks/.test(em.text_body), em.text_body.slice(0, 900));
+		check('one calendar invitation, for the tour', em.att.length === 1 && /SUMMARY:[^\r\n]*lab tour/.test(em.att[0].content), em.att.map((x) => (/SUMMARY:[^\r\n]*/.exec(x.content) || [''])[0]).join(' | '));
+		sumD = (await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN)).data;
+		check('tour only takes a tour place but no room place', sumD.registrations.find((x) => x.email === erin).place === null && sumD.registrations.find((x) => x.email === erin).tour_place === 'place');
+		check('tour host is told', /Erin – booked/.test((await last('host2@example.org')).text_body));
+		await req('DELETE', '/api/rsvp/manage', { t: await manageOf(erin) });
+
+		const frank = 'frank.sat@example.org', gina = 'gina.sat@example.org';
+		const fr = await registerAndConfirm({ name: 'Frank Smith', email: frank, attendance: 'extras', optins: [SAT], tour_id: 'none' });
+		check('Saturday on its own registers; the confirm page points to the poll', fr.result.ok && fr.result.registration.mode === 'extras' && fr.result.registration.polls?.length === 1, JSON.stringify(fr.result));
+		em = await last(frank);
+		check('Saturday-only instructions: the Saturday section only', /Saturday 14 November:/.test(em.text_body) && /Manage my registration/.test(em.text_body) && !/Room 516|Broadcaster/.test(em.text_body), em.text_body.slice(0, 900));
+		check('one calendar invitation, on Saturday', em.att.length === 1 && icsProp(em.att[0].content, 'DTSTART').at(-1)?.includes('20261114'), em.att.map((x) => icsProp(x.content, 'DTSTART').join()).join(' | '));
+		const pollGet = async (t) => (await req('GET', `/api/rsvp/poll?t=${encodeURIComponent(t)}`)).data;
+		let pv = await pollGet(fr.manage);
+		check('Frank can vote: four options, no ballot, nobody voted yet', pv.ok && pv.polls[0].eligible && pv.polls[0].options.length === 4 && !pv.polls[0].ballot && pv.polls[0].voters === 0, JSON.stringify(pv).slice(0, 400));
+		check('a poll link that is not a manage link is refused', (await req('GET', `/api/rsvp/poll?t=${encodeURIComponent(fr.confirm)}`)).status === 404);
+		const hal = await registerAndConfirm({ name: 'Hal', email: 'hal.remote@example.org', attendance: 'remote' });
+		pv = await pollGet(hal.manage);
+		check('a remote attendee sees the poll but cannot vote, and sees no results', pv.ok && pv.polls[0].eligible === false && pv.polls[0].results.length === 0, JSON.stringify(pv).slice(0, 300));
+		check('…and their vote is refused', (await req('POST', '/api/rsvp/poll', { t: hal.manage, poll: POLL.id, action: 'vote', ranking: [opt('Bayeux')], above_line: 1 })).status === 403);
+		await req('DELETE', '/api/rsvp/manage', { t: hal.manage });
+		r = await req('POST', '/api/rsvp/poll', { t: fr.manage, poll: POLL.id, action: 'vote', ranking: [opt('Bayeux'), opt('Chinatown'), opt('Renoir'), opt('club'), 'not-an-option'], above_line: 2, show_name: true });
+		let res = r.data.polls?.[0];
+		check('Frank votes: Bayeux 4 points, Chinatown 3, the rest below his line score nothing', r.data.ok && res.voters === 1 && res.results[0].id === opt('Bayeux') && res.results[0].points === 4 && res.results[1].points === 3 && res.results.find((x) => x.id === opt('Renoir')).points === 0 && res.results.find((x) => x.id === opt('Renoir')).not_going === 1 && res.results[0].names.join() === 'Frank', JSON.stringify(res?.results));
+		check('his ballot is stored without the unknown option', JSON.stringify(res.ballot.ranking) === JSON.stringify([opt('Bayeux'), opt('Chinatown'), opt('Renoir'), opt('club')]) && res.ballot.above_line === 2);
+		const nn = (await mailsTo(NOTIFY)).length;
+		r = await req('POST', '/api/rsvp/poll', { t: fr.manage, poll: POLL.id, action: 'suggest', label: 'Walk along the South Bank', detail: 'free, ends at a pub' });
+		res = r.data.polls?.[0];
+		const walk = r.data.suggestion?.id;
+		check('a suggestion that passes the check goes live, just above the suggester\'s line', r.data.ok && r.data.suggestion.status === 'approved' && res.options.some((o) => o.id === walk && o.mine && !o.in_review) && res.ballot.ranking[2] === walk && res.ballot.above_line === 3, JSON.stringify(r.data).slice(0, 500));
+		check('the organisers are told it is live', (await mailsTo(NOTIFY)).slice(nn).some((x) => /New poll option \(live\)/.test(x.subject) && /South Bank/.test(x.text_body)));
+		check('a duplicate of an existing option is refused', (await req('POST', '/api/rsvp/poll', { t: fr.manage, poll: POLL.id, action: 'suggest', label: 'chinatown!' })).status === 409);
+		r = await req('POST', '/api/rsvp/poll', { t: fr.manage, poll: POLL.id, action: 'suggest', label: 'Something to BLOCK' });
+		const held = r.data.suggestion?.id;
+		check('a suggestion the check holds back waits for an organiser, visible only to its author', r.data.ok && r.data.suggestion.status === 'review' && r.data.polls[0].options.some((o) => o.id === held && o.in_review), JSON.stringify(r.data).slice(0, 300));
+		check('the organisers are asked to review it', (await mailsTo(NOTIFY)).some((x) => /Poll suggestion to review/.test(x.subject) && /BLOCK/.test(x.text_body)));
+		const gi = await registerAndConfirm({ name: 'Gina', email: gina, attendance: 'extras', optins: [SAT, DINNER], tour_id: 'none' });
+		pv = await pollGet(gi.manage);
+		check('another voter sees the live suggestion but not the held one', pv.polls[0].options.some((o) => o.id === walk) && !pv.polls[0].options.some((o) => o.id === held), JSON.stringify(pv.polls[0].options.map((o) => o.label)));
+		r = await req('POST', '/api/rsvp/poll', { t: gi.manage, poll: POLL.id, action: 'vote', ranking: [opt('Bayeux'), held, walk], above_line: 3, show_name: false });
+		res = r.data.polls?.[0];
+		check('Gina votes without her name shown: counted, not named, and someone else\'s held option cannot be ranked', r.data.ok && res.voters === 2 && res.results.find((x) => x.id === opt('Bayeux')).going === 2 && res.results.find((x) => x.id === opt('Bayeux')).hidden === 1 && !res.ballot.ranking.includes(held), JSON.stringify(res?.results));
+		pa = await pollsAdmin();
+		check('organisers see every voter\'s name, the held option and the check\'s reason', pa.polls[0].results.find((x) => x.id === opt('Bayeux')).names.includes('Gina') && pa.polls[0].options.some((o) => o.id === held && o.status === 'review' && o.check_note && o.suggested_by_name === 'Frank Smith'), JSON.stringify(pa.polls[0].options.map((o) => [o.label, o.status])));
+		check('poll admin needs Access', (await req('GET', `/api/admin/poll?event=${EVENT}`)).status === 401 && (await req('POST', '/api/admin/poll', { action: 'status', id: held, status: 'approved' })).status === 401);
+		r = await req('POST', '/api/admin/poll', { action: 'status', id: held, status: 'approved' }, ADMIN);
+		check('an organiser approves the held option; everyone sees it', r.data.ok && (await pollGet(gi.manage)).polls[0].options.some((o) => o.id === held));
+		r = await req('POST', '/api/admin/poll', { action: 'status', id: walk, status: 'removed' }, ADMIN);
+		res = (await pollGet(fr.manage)).polls[0];
+		check('an organiser removes an option: gone from the list and the results', r.data.ok && !res.options.some((o) => o.id === walk) && !res.results.some((x) => x.id === walk), JSON.stringify(res.results.map((x) => x.label)));
+		r = await req('POST', '/api/admin/poll', { action: 'edit', id: opt('club'), label: 'Club night at Somewhere', detail: 'Soho', url: 'https://example.org/club' }, ADMIN);
+		check('an organiser can rename an option (e.g. once the club is chosen)', r.data.ok && (await pollGet(gi.manage)).polls[0].options.some((o) => o.label === 'Club night at Somewhere'));
+		check('an organiser can add an option', (await req('POST', '/api/admin/poll', { action: 'add', poll: POLL.id, label: 'Science Museum', url: 'https://www.sciencemuseum.org.uk/' }, ADMIN)).data.ok && (await pollGet(gi.manage)).polls[0].options.some((o) => o.label === 'Science Museum'));
+		await req('POST', '/api/rsvp/poll', { t: fr.manage, poll: POLL.id, action: 'suggest', label: 'Third idea' });
+		check('each person can suggest at most three options', (await req('POST', '/api/rsvp/poll', { t: fr.manage, poll: POLL.id, action: 'suggest', label: 'Fourth idea' })).status === 409);
+		{ const c = (await req('POST', '/api/admin/messages', { event: EVENT, dry_run: true, audience: { optin_id: SAT } }, ADMIN)).data; check('email filter: signed up for Saturday → 2 people', c.count === 2, JSON.stringify(c)); }
+		r = await req('POST', '/api/rsvp/manage', { t: gi.manage, name: 'Gina', attendance: 'extras', optins: [DINNER] });
+		check('Gina drops Saturday: her ballot no longer counts', r.data.ok && (await pollGet(fr.manage)).polls[0].voters === 1);
+		check('people coming only for optional sessions are included in emails to everyone (no place is not "waiting")', (await req('POST', '/api/admin/messages', { event: EVENT, dry_run: true, audience: { optin_id: DINNER } }, ADMIN)).data.count >= 1);
+		r = await req('POST', '/api/admin/poll', { action: 'settings', poll: POLL.id, question: POLL.question, closes_at: new Date(Date.now() - 60_000).toISOString() }, ADMIN);
+		check('after the poll closes, votes and suggestions are refused', r.data.ok && (await req('POST', '/api/rsvp/poll', { t: fr.manage, poll: POLL.id, action: 'vote', ranking: [opt('Bayeux')], above_line: 1 })).status === 409 && (await req('POST', '/api/rsvp/poll', { t: fr.manage, poll: POLL.id, action: 'suggest', label: 'Late' })).status === 409);
+		await req('POST', '/api/admin/poll', { action: 'settings', poll: POLL.id, question: POLL.question, closes_at: POLL.closes_at }, ADMIN);
+		await req('DELETE', '/api/rsvp/manage', { t: fr.manage });
+		await req('DELETE', '/api/rsvp/manage', { t: gi.manage });
+		pa = await pollsAdmin();
+		check('cancelling deletes the ballot; suggestions stay, no longer linked to the person', pa.polls[0].ballots.length === 0 && pa.polls[0].options.find((o) => o.id === held).suggested_by === null, JSON.stringify(pa.polls[0].ballots));
+	}
 
 	console.log('\nSomeone registered my address: delete it');
 	const mallory = 'not-me@example.org';
@@ -513,6 +598,7 @@ try {
 	check('registrations kept until 30 days after the event', (await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN)).data.registrations.length > 0);
 	await cron(Date.parse(seeded.event.ends_at) + 31 * 24 * 3600_000);
 	check('all registrations deleted 30 days after the event', (await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN)).data.registrations.length === 0);
+	check('…and the event\'s polls, with everyone\'s suggestions', (await req('GET', `/api/admin/poll?event=${EVENT}`, undefined, ADMIN)).data.polls.length === 0);
 } catch (e) {
 	failures++;
 	console.error(e);

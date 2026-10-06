@@ -6,8 +6,9 @@ import { syncHosts } from './hosts';
 import { buildIcs } from './ics';
 import {
 	alreadyRegisteredIntro, type Brand, calendarUpdateEmail, cancellationEmail, confirmEmail, declinedEmail, type EventRow, instructionsEmail, messageEmail,
-	notification, optedIn, type RegistrationRow, type SessionRow, waitlistReminderEmail,
+	extrasWhat, notification, optedIn, type RegistrationRow, type SessionRow, waitlistReminderEmail,
 } from './templates';
+import { lowerLabel } from './labels';
 import { modeOf } from './mode';
 import { mdToHtml, mdToText } from './markdown';
 import { makeToken } from './tokens';
@@ -151,14 +152,15 @@ function parseCommon(input: RegistrationInput, sessions: SessionRow[]) {
 	const attendance = input.attendance === 'remote' ? 'remote' : input.attendance === 'in_person' || extras ? 'in_person' : null;
 	if (!attendance) throw new UserError('Please choose how you will attend.');
 	let tour_id: string | null = null;
-	if (attendance === 'in_person' && !extras && input.tour_id && input.tour_id !== 'none') {
+	// A tour can be booked with the day, or on its own (or with only the opt-in sessions), but not remotely.
+	if (attendance === 'in_person' && input.tour_id && input.tour_id !== 'none') {
 		const t = tourSessions(sessions).find((x) => x.id === input.tour_id);
 		if (!t) throw new UserError('Unknown tour.');
 		tour_id = t.id;
 	}
 	const asked = Array.isArray(input.optins) ? input.optins.map(String) : typeof input.optins === 'string' && input.optins ? input.optins.split(',') : [];
 	const optins = attendance === 'in_person' ? sessions.filter((s) => s.optin && asked.includes(s.id)).map((s) => s.id).join(',') || null : null;
-	if (extras && !optins) throw new UserError('Please tick what you would like to join us for.');
+	if (extras && !optins && !tour_id) throw new UserError('Please choose a tour or tick what you would like to join us for.');
 	return {
 		name, attendance, extras, tour_id, optins, affiliation: cleanText(input.affiliation, 200), needs: cleanText(input.needs, 1000), extra_answer: cleanText(input.extra_answer, 500),
 		share_contact: truthy(input.share_contact) ? 1 : 0,
@@ -288,9 +290,12 @@ async function notifyWaitlist(env: Env, ev: EventRow, sessions: SessionRow[], re
 }
 
 /** What the confirm page needs. No contact details or needs: whoever holds a confirm link may not be the registrant. */
-function confirmStatus(reg: RegistrationRow, sessions: SessionRow[]) {
+async function confirmStatus(env: Env, reg: RegistrationRow, sessions: SessionRow[]) {
 	const tour = reg.tour_id ? sessions.find((t) => t.id === reg.tour_id) : null;
-	return { status: reg.status, attendance: reg.attendance, mode: modeOf(reg), place: reg.place, tour_label: tour?.label ?? null, tour_place: reg.tour_place, optin_labels: optedIn(reg, sessions).map((s) => s.label) };
+	// Polls this person can vote in (see poll.ts), so the confirm page can point them to it.
+	const polls = (await env.DB.prepare('SELECT question, session_id FROM polls WHERE event_id = ? AND closes_at > ?').bind(reg.event_id, nowIso()).all<{ question: string; session_id: string | null }>()).results
+		.filter((p) => !p.session_id || (reg.attendance === 'in_person' && (reg.optins ?? '').split(',').includes(p.session_id))).map((p) => p.question);
+	return { status: reg.status, attendance: reg.attendance, mode: modeOf(reg), place: reg.place, tour_label: tour?.label ?? null, tour_place: reg.tour_place, optin_labels: optedIn(reg, sessions).map((s) => s.label), polls };
 }
 
 export function publicStatus(reg: RegistrationRow, sessions: SessionRow[]) {
@@ -308,7 +313,7 @@ export async function confirm(env: Env, id: string) {
 	if (!reg) throw new UserError('This registration no longer exists. Unconfirmed registrations are deleted after a while, so please register again.', 404);
 	const ev = await getEvent(env, reg.event_id);
 	const sessions = await getSessions(env, ev.id);
-	if (reg.status === 'confirmed') return { ok: true as const, already: true, registration: confirmStatus(reg, sessions) };
+	if (reg.status === 'confirmed') return { ok: true as const, already: true, registration: await confirmStatus(env, reg, sessions) };
 
 	const now = nowIso();
 	let place = reg.place, tour_place = reg.tour_place;
@@ -335,7 +340,7 @@ export async function confirm(env: Env, id: string) {
 	}
 	await notifyWaitlist(env, ev, sessions, reg, joinsWaitlist, joinsTourWaitlist, 'has confirmed and joined');
 	await syncHosts(env, brand(env), ev, sessions);
-	return { ok: true as const, already: false, registration: confirmStatus(reg, sessions) };
+	return { ok: true as const, already: false, registration: await confirmStatus(env, reg, sessions) };
 }
 
 export async function manageView(env: Env, id: string) {
@@ -366,7 +371,7 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 	// A tour whose booking has closed shows as a disabled choice, which browsers leave out of the form: an absent
 	// tour_id means "unchanged" (only an explicit 'none' drops the tour), so other details can still be saved.
 	const c = { ...parseCommon(input, sessions) };
-	if (input.tour_id === undefined && c.attendance === 'in_person' && !c.extras) c.tour_id = reg.tour_id;
+	if (input.tour_id === undefined && c.attendance === 'in_person') c.tour_id = reg.tour_id;
 	// Likewise an absent optins list means "unchanged" (an empty list clears them); remote attendees have none.
 	if (input.optins === undefined && c.attendance === 'in_person') c.optins = reg.optins ?? null;
 	const now = nowIso();
@@ -386,7 +391,7 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 	if (c.tour_id !== reg.tour_id) {
 		const old = reg.tour_id ? sessions.find((s) => s.id === reg.tour_id) : null;
 		// Switching to remote drops the tour even after its booking has closed; otherwise a closed tour cannot be changed.
-		if (old && !sessionBookingOpen(old) && c.attendance !== 'remote' && !c.extras) throw new UserError(`The ${old.label} has started or its booking has closed, so it can no longer be changed.`, 409);
+		if (old && !sessionBookingOpen(old) && c.attendance !== 'remote' && !(c.extras && !c.tour_id)) throw new UserError(`The ${old.label} has started or its booking has closed, so it can no longer be changed.`, 409);
 		if (c.tour_id) {
 			const t = sessions.find((s) => s.id === c.tour_id)!;
 			if (!sessionBookingOpen(t)) throw new UserError(`Booking for the ${t.label} has closed.`, 409);
@@ -415,10 +420,10 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 		// instructions for the new way of attending.
 		const switched = before !== after;
 		const say = (t: string) => ({ html: `<p><strong>${t.split('. ')[0]}.</strong>${t.includes('. ') ? ' ' + t.slice(t.indexOf('. ') + 2) : ''}</p>`, text: t });
-		const extrasLabel = optedIn(updated, sessions).map((s) => s.label.charAt(0).toLowerCase() + s.label.slice(1)).join(' and ');
+		const extrasLabel = extrasWhat(updated, sessions);
 		const intro = !switched ? undefined
-			: after === 'remote' ? say(before === 'extras' ? 'You have changed to joining remotely. Your sign-up for ' + (optedIn(reg, sessions).map((s) => s.label.toLowerCase()).join(' and ') || 'the optional sessions') + ' has been deleted.' : 'You have changed to joining remotely. Your in-person place has been deleted, along with any lab tour or dinner sign-up.')
-			: after === 'extras' ? say(`You have changed to joining us for ${extrasLabel} only.${before === 'in_person' ? ' Your daytime place has been deleted, along with any lab tour.' : ''}`)
+			: after === 'remote' ? say(before === 'extras' ? 'You have changed to joining remotely. Your sign-up for ' + (optedIn(reg, sessions).map((s) => lowerLabel(s.label)).join(' and ') || 'the optional sessions') + ' has been deleted.' : 'You have changed to joining remotely. Your in-person place has been deleted, along with any lab tour or dinner sign-up.')
+			: after === 'extras' ? say(`You have changed to joining us for ${extrasLabel} only.${before === 'in_person' ? ` Your daytime place has been deleted${updated.tour_id ? '' : ', along with any lab tour'}.` : ''}`)
 			: say('You have changed to attending in person.');
 		if (qualifies && (reg.instructions_version === 0 || switched)) await sendInstructions(env, ev, updated, sessions, { intro });
 		else await syncCalendar(env, ev, updated, sessions);
@@ -439,7 +444,7 @@ export async function cancel(env: Env, id: string, opts: { byOrganiser?: boolean
 	const state = parseState(reg.calendar_state);
 	const files = attachments(env, ev, reg, [], Object.values(state).map((s) => ({ ...s, seq: s.seq + 1 })));
 	await sendEmail(env, cancellationEmail(brand(env), ev, reg, `${siteUrl(env)}${ev.page_path}`, files, opts.byOrganiser));
-	const detail = reg.attendance === 'remote' ? 'remote' : !reg.place ? 'opt-in sessions only' : reg.place === 'waitlist' ? 'in person, waiting list' : 'in person';
+	const detail = reg.attendance === 'remote' ? 'remote' : !reg.place ? 'optional sessions only' : reg.place === 'waitlist' ? 'in person, waiting list' : 'in person';
 	await sendEmail(env, notification(brand(env), `Cancellation: ${ev.title}`, [
 		`${reg.name}${reg.affiliation ? ` (${reg.affiliation})` : ''} ${opts.byOrganiser ? 'was removed by an organiser' : 'cancelled'} (${reg.status}, ${detail}${reg.tour_id ? `, ${sessions.find((t) => t.id === reg.tour_id)?.label ?? 'tour'} ${reg.tour_place ?? ''}` : ''}).`,
 		...(await totalsLines(env, ev, sessions)),
@@ -525,6 +530,7 @@ export interface Audience {
 	tour_id?: string; // a tour session id, 'none' for no tour, or undefined for any
 	below_version?: number; // only people whose last joining instructions are older than this version
 	include_waitlist?: boolean; // include people waiting for an in-person place
+	optin_id?: string; // only people signed up to this opt-in session (e.g. dinner, or a Saturday outing)
 }
 
 export function parseAudience(v: unknown): Audience {
@@ -534,6 +540,7 @@ export function parseAudience(v: unknown): Audience {
 		tour_id: typeof a.tour_id === 'string' && a.tour_id ? a.tour_id : undefined,
 		below_version: Number.isInteger(a.below_version) && (a.below_version as number) > 0 ? (a.below_version as number) : undefined,
 		include_waitlist: a.include_waitlist === true,
+		optin_id: typeof a.optin_id === 'string' && a.optin_id ? a.optin_id : undefined,
 	};
 }
 
@@ -541,10 +548,12 @@ export async function audienceRecipients(env: Env, eventId: string, a: Audience)
 	const where = [`event_id = ?`, `status = 'confirmed'`];
 	const binds: unknown[] = [eventId];
 	if (a.attendance && a.attendance !== 'all') { where.push('attendance = ?'); binds.push(a.attendance); }
-	if (!a.include_waitlist) where.push(`NOT (attendance = 'in_person' AND place = 'waitlist')`);
+	// COALESCE: people coming only for the optional sessions have no place (NULL), and NOT (… = NULL) would drop them.
+	if (!a.include_waitlist) where.push(`NOT (attendance = 'in_person' AND COALESCE(place, '') = 'waitlist')`);
 	if (a.tour_id === 'none') where.push('tour_id IS NULL');
 	else if (a.tour_id) { where.push('tour_id = ?'); binds.push(a.tour_id); }
 	if (a.below_version) { where.push('instructions_version < ?'); binds.push(a.below_version); }
+	if (a.optin_id) { where.push(`attendance = 'in_person' AND (',' || COALESCE(optins, '') || ',') LIKE ?`); binds.push(`%,${a.optin_id},%`); }
 	return (await env.DB.prepare(`SELECT * FROM registrations WHERE ${where.join(' AND ')} ORDER BY created_at`).bind(...binds).all<RegistrationRow>()).results;
 }
 
@@ -747,7 +756,7 @@ export function registrationsCsv(regs: Omit<RegistrationRow, 'calendar_state'>[]
 		if (/^[\s]*[=+\-@]/.test(s) || /^[\r\n]/.test(s)) s = `'${s}`; // defuse spreadsheet formula injection
 		return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 	};
-	const rows = regs.map((r) => [r.name, r.email, modeOf(r) === 'extras' ? 'opt-in sessions only' : r.attendance, r.status, r.place, sessions.find((t) => t.id === r.tour_id)?.label ?? '', r.tour_place, optedIn(r, sessions).map((s) => s.label).join('; '),
+	const rows = regs.map((r) => [r.name, r.email, modeOf(r) === 'extras' ? 'optional sessions only' : r.attendance, r.status, r.place, sessions.find((t) => t.id === r.tour_id)?.label ?? '', r.tour_place, optedIn(r, sessions).map((s) => s.label).join('; '),
 		r.affiliation, r.needs, r.extra_answer ?? '', r.share_contact ? 'yes' : 'no', r.instructions_version, r.created_at, r.confirmed_at].map(esc).join(','));
 	return [cols.join(','), ...rows].join('\r\n') + '\r\n';
 }
@@ -812,6 +821,8 @@ export async function runScheduled(env: Env, now = Date.now()) {
 	report.retentionDeleted = r.meta.changes ?? 0;
 	await env.DB.prepare(`DELETE FROM host_snapshots WHERE session_id IN (SELECT s.id FROM sessions s JOIN events e ON e.id = s.event_id WHERE e.ends_at <= ?)`).bind(cutoff).run();
 	await env.DB.prepare(`UPDATE sessions SET host_name = NULL, host_email = NULL WHERE event_id IN (SELECT id FROM events WHERE ends_at <= ?)`).bind(cutoff).run();
+	// Polls go too (their options, including people's own suggestions, and any ballots left).
+	await env.DB.prepare(`DELETE FROM polls WHERE event_id IN (SELECT id FROM events WHERE ends_at <= ?)`).bind(cutoff).run();
 	await env.DB.prepare('DELETE FROM dev_outbox WHERE created_at <= ?').bind(cutoff).run();
 	return report;
 }
