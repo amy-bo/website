@@ -33,6 +33,7 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 		<legend>How will you attend? <span aria-hidden="true">*</span></legend>
 		<label class="choice"><input type="radio" name="attendance" value="in_person" required /> In person at White City</label>
 		<label class="choice"><input type="radio" name="attendance" value="remote" /> Remotely, talks only, on Google Meet</label>
+		<label class="choice" id="rsvp-extras-choice" hidden><input type="radio" name="attendance" value="extras" /> <span id="rsvp-extras-label">Just the optional sessions</span></label>
 	</fieldset>
 
 	<fieldset class="field" id="rsvp-tour-fieldset">
@@ -42,7 +43,7 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 	</fieldset>
 
 	<fieldset class="field" id="rsvp-optins-fieldset" hidden>
-		<legend>Also joining us for (in person only)</legend>
+		<legend id="rsvp-optins-legend">Also joining us for (in person only)</legend>
 		<div id="rsvp-optins"></div>
 	</fieldset>
 
@@ -94,10 +95,15 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 	const optFs = document.getElementById('rsvp-optins-fieldset') as HTMLFieldSetElement;
 
 	function syncTour() {
-		const inPerson = (form.elements.namedItem('attendance') as RadioNodeList).value === 'in_person';
+		const mode = (form.elements.namedItem('attendance') as RadioNodeList).value;
+		const inPerson = mode === 'in_person', extras = mode === 'extras';
 		tourFs.disabled = !inPerson;
-		optFs.disabled = !inPerson;
-		if (!inPerson) optFs.querySelectorAll('input').forEach((el) => ((el as HTMLInputElement).checked = false));
+		optFs.disabled = !inPerson && !extras;
+		document.getElementById('rsvp-optins-legend')!.textContent = extras ? 'Joining us for' : 'Also joining us for (in person only)';
+		const boxes = [...optFs.querySelectorAll('input')] as HTMLInputElement[];
+		if (!inPerson && !extras) boxes.forEach((el) => (el.checked = false));
+		// Just the dinner (say): with only one optional session there's nothing to choose, so tick it.
+		if (extras && boxes.length === 1) boxes[0].checked = true;
 		if (!inPerson) (form.querySelector('input[name=tour_id][value=none]') as HTMLInputElement).checked = true;
 	}
 	form.addEventListener('change', syncTour);
@@ -143,6 +149,10 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 				(document.getElementById('rsvp-optins') as HTMLElement).append(label);
 			}
 			optFs.hidden = !(s.optins ?? []).length;
+			if ((s.optins ?? []).length) {
+				document.getElementById('rsvp-extras-label')!.textContent = `Just the ${(s.optins as { label: string }[]).map((o) => o.label.toLowerCase()).join(' and ')}`;
+				document.getElementById('rsvp-extras-choice')!.hidden = false;
+			}
 			syncTour();
 		})
 		.catch(() => {

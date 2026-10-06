@@ -1,4 +1,5 @@
 // Events&I – Copyright (C) 2026 andeye Ltd. AGPL-3.0, see ../LICENSE.
+import { type Mode, modeOf } from './mode';
 import type { Attachment, OutgoingEmail } from './email';
 import { type CalEntry, addLinks } from './ics';
 import { mdToHtml, mdToText } from './markdown';
@@ -111,12 +112,13 @@ function button(href: string, label: string): string {
  *   :::                     :::
  * Everything outside such a block goes to everyone.
  */
-export function forAudience(md: string, attendance: 'in_person' | 'remote'): string {
+export function forAudience(md: string, mode: Mode): string {
 	const out: string[] = [];
 	let keep = true;
+	const tag = { in_person: 'in-person', remote: 'remote', extras: 'extras' }[mode];
 	for (const line of md.split('\n')) {
-		const m = /^:::\s*(in-person|remote)?\s*$/.exec(line.trim());
-		if (m) { keep = !m[1] || (m[1] === 'in-person') === (attendance === 'in_person'); continue; }
+		const m = /^:::\s*(in-person|remote|extras)?\s*$/.exec(line.trim());
+		if (m) { keep = !m[1] || m[1] === tag; continue; }
 		if (keep) out.push(line);
 	}
 	return out.join('\n').replace(/\n{3,}/g, '\n\n');
@@ -131,6 +133,11 @@ export function optedIn(reg: Pick<RegistrationRow, 'attendance' | 'optins'>, ses
 
 export function statusLines(reg: RegistrationRow, sessions: SessionRow[]): string[] {
 	const lines: string[] = [];
+	const mode = modeOf(reg);
+	if (mode === 'extras') {
+		const what = optedIn(reg, sessions).map((s) => s.label.charAt(0).toLowerCase() + s.label.slice(1)).join(' and ') || 'the optional sessions';
+		return [`You are joining us for ${what} only.`];
+	}
 	if (reg.attendance === 'remote') lines.push('You are registered to join the talks remotely.');
 	else if (reg.place === 'waitlist') lines.push('You are on the waiting list for an in-person place. We will email you if a place becomes available.');
 	else lines.push('You have an in-person place.');
@@ -171,7 +178,7 @@ export function confirmEmail(b: Brand, ev: EventRow, reg: RegistrationRow, sessi
 		reg.share_contact ? 'You chose to share your email address with the hosts of the sessions you attend.' : 'Session hosts will see only your name and whether you have a place.',
 	];
 	const waiting = reg.attendance === 'in_person' && reg.place === 'waitlist';
-	const held = reg.attendance === 'in_person' && !waiting ? 'your place will be released' : 'it will be deleted';
+	const held = modeOf(reg) === 'in_person' && !waiting ? 'your place will be released' : 'it will be deleted';
 	// On the waiting list there's no place to lose: the point of confirming is to stay on the list.
 	const why = waiting ? ' and join the waiting list: we will email you if a place comes up, for example if we can book a bigger room' : '';
 	const notMeUrl = `${confirmUrl}${confirmUrl.includes('?') ? '&' : '?'}not-me=1`;
@@ -211,7 +218,7 @@ export function instructionsEmail(
 ): OutgoingEmail {
 	const st = statusLines(reg, sessions);
 	const thanks = `Thank you for registering for the ${ev.title}, on ${ukDate(ev.starts_at, ev.timezone)}.`;
-	const body = forAudience(instr.body_md, reg.attendance);
+	const body = forAudience(instr.body_md, modeOf(reg));
 	const html = layout(b, instr.subject, `
 <p>Hello ${escapeHtml(reg.name)},</p>
 ${intro?.html ?? ''}

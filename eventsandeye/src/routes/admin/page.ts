@@ -184,7 +184,7 @@ async function load() {
 		stat('remote confirmed', c.remote),
 		stat('unconfirmed', c.pending),
 		...c.tours.map((t) => stat(t.label + ' (waiting ' + t.waiting + ')' + (t.open ? '' : ' – booking closed'), t.confirmed + ' / ' + (t.capacity ?? '∞'))),
-		...s.sessions.filter((x) => x.optin).map((x) => stat(x.label + ': signed up (confirmed, with a place)', s.registrations.filter((r) => r.status === 'confirmed' && r.attendance === 'in_person' && r.place === 'place' && (r.optins || '').split(',').includes(x.id)).length)),
+		...s.sessions.filter((x) => x.optin).map((x) => stat(x.label + ': signed up (confirmed, not waiting)', s.registrations.filter((r) => r.status === 'confirmed' && r.attendance === 'in_person' && r.place !== 'waitlist' && (r.optins || '').split(',').includes(x.id)).length)),
 		stat('registration closes', uk(s.event.deadline)),
 	].join('');
 	$('promote-all').hidden = !(c.inPerson.waiting > 0 && c.inPerson.held < c.inPerson.max);
@@ -213,7 +213,7 @@ async function load() {
 	$('regs').querySelector('tbody').innerHTML = s.registrations.map((r) => {
 		const tour = tours.find((t) => t.id === r.tour_id);
 		const pend = r.status === 'pending' ? '<span class="tag pending">unconfirmed</span> ' : '';
-		const where = r.attendance === 'remote' ? 'Remote' : r.place === 'waitlist' ? '<span class="tag wait">in person: waiting since ' + esc(uk(r.waitlist_since)) + '</span>' : '<span class="tag ok">in person</span>';
+		const where = r.attendance === 'remote' ? 'Remote' : !r.place ? '<span class="tag ok">' + esc(s.sessions.filter((x) => x.optin && (r.optins || '').split(',').includes(x.id)).map((x) => x.label).join(', ') || 'Opt-in') + ' only</span>' : r.place === 'waitlist' ? '<span class="tag wait">in person: waiting since ' + esc(uk(r.waitlist_since)) + '</span>' : '<span class="tag ok">in person</span>';
 		const opts = r.attendance === 'in_person' && r.optins ? s.sessions.filter((x) => x.optin && r.optins.split(',').includes(x.id)).map((x) => esc(x.label)) : [];
 		const tourCell = (tour ? (r.tour_place === 'waitlist' ? '<span class="tag wait">' + esc(tour.label) + ': waiting</span>' : esc(tour.label)) : '') + (opts.length ? (tour ? '<br>' : '') + 'Signed up: ' + opts.join(', ') : '');
 		const actions = [

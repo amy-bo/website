@@ -16,7 +16,10 @@ export function hostLines(s: SessionRow, regs: RegistrationRow[]): HostLine[] {
 	}
 	const out: HostLine[] = [];
 	for (const r of confirmed) {
-		if (r.attendance === 'remote') {
+		if (!r.place && r.attendance === 'in_person') {
+			// Just the opt-in sessions: listed only on the ones they signed up for.
+			if (s.optin && (r.optins ?? '').split(',').includes(s.id)) out.push(line(r, 'this session only'));
+		} else if (r.attendance === 'remote') {
 			if (s.mode !== 'in_person' && s.kind !== 'social') out.push(line(r, 'remote'));
 		} else if (s.mode !== 'online') {
 			out.push(line(r, r.place === 'waitlist' ? 'in-person waiting list' : 'in person'));

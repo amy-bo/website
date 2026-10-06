@@ -2,6 +2,7 @@
 import type { Attachment } from './email';
 import { type Env, fromAddress, orgName, siteUrl } from './env';
 import { buildIcs, type CalEntry } from './ics';
+import { modeOf } from './mode';
 import type { EventRow, RegistrationRow, SessionRow } from './templates';
 import { sha256 } from './util';
 
@@ -32,7 +33,7 @@ export function onlineTitle(ev: Pick<EventRow, 'title' | 'location'>): string {
 
 export function entriesFor(env: Env, ev: EventRow, sessions: SessionRow[], reg: RegistrationRow): CalEntry[] {
 	if (reg.status !== 'confirmed') return [];
-	if (reg.attendance === 'in_person' && reg.place !== 'place') return [];
+	if (reg.attendance === 'in_person' && reg.place === 'waitlist') return [];
 	const tz = ev.timezone;
 	const uid = (key: string) => `${reg.id}-${key}@${hostOf(env)}`;
 	// Calendar entries are often shared (delegates, forwarded invitations), so they never carry the manage link.
@@ -50,6 +51,21 @@ export function entriesFor(env: Env, ev: EventRow, sessions: SessionRow[], reg: 
 			end: s.ends_at,
 			description: [s.online_url ? `Join online: ${s.online_url}` : 'The online link will follow by email before the day.', '', manage].join('\n'),
 			alarms: ['-P1D', '-PT1H', '-PT10M'],
+		}));
+	}
+
+	// Just the opt-in sessions (e.g. only the dinner): one entry for each, at its own place.
+	if (modeOf(reg) === 'extras') {
+		const ids = (reg.optins ?? '').split(',');
+		return ordered.filter((s) => s.optin && ids.includes(s.id)).map((s) => ({
+			key: `s-${s.id}`,
+			uid: uid(`s-${s.id}`),
+			summary: `${ev.title}: ${s.label}`,
+			location: s.location || ev.location,
+			start: s.starts_at,
+			end: s.ends_at,
+			description: [`${s.label}${s.location ? `, ${s.location}` : ''}`, '', manage].join('\n'),
+			alarms: ['-P1D', '-PT1H'],
 		}));
 	}
 

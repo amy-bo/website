@@ -138,3 +138,12 @@ Closed shoes are needed in the labs.
 :::
 
 To change or cancel your registration, use your personal link below.', 'Shorter: no arrive-early line, no dinner deadline, no repeated links or attachments note', strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'setup');
+
+-- 6 October 2026: people can register for just the dinner. Version 4 gains a section only they see; everyone else's
+-- instructions are unchanged, so it stays version 4. Runs once (only while the section is missing).
+UPDATE instructions SET body_md = replace(body_md, 'To change or cancel your registration, use your personal link below.', ':::extras
+**Dinner:** 17:00 at The Broadcaster, 89 Wood Lane, London W12 7FX, opposite Wood Lane station. We will try to book a private space, at about £45 a head, paid on the night. We pay a £250 deposit, so please tell us as soon as you can if you can''t make it.
+:::
+
+To change or cancel your registration, use your personal link below.')
+  WHERE event_id = '2026-11-13-london' AND version = 4 AND body_md NOT LIKE '%:::extras%';

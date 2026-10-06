@@ -8,6 +8,7 @@ import {
 	alreadyRegisteredIntro, type Brand, calendarUpdateEmail, cancellationEmail, confirmEmail, declinedEmail, type EventRow, instructionsEmail, messageEmail,
 	notification, optedIn, type RegistrationRow, type SessionRow, waitlistReminderEmail,
 } from './templates';
+import { modeOf } from './mode';
 import { mdToHtml, mdToText } from './markdown';
 import { makeToken } from './tokens';
 import { cleanText, EMAIL_RE, nowIso, randomToken } from './util';
@@ -145,18 +146,21 @@ const truthy = (v: unknown) => v === true || v === 'on' || v === 'true' || v ===
 function parseCommon(input: RegistrationInput, sessions: SessionRow[]) {
 	const name = cleanText(input.name, 120);
 	if (!name) throw new UserError('Please enter your name.');
-	const attendance = input.attendance === 'remote' ? 'remote' : input.attendance === 'in_person' ? 'in_person' : null;
-	if (!attendance) throw new UserError('Please choose in person or remote.');
+	// 'extras' (just the opt-in sessions, e.g. only the dinner) is stored as in person with no place: see mode.ts.
+	const extras = input.attendance === 'extras';
+	const attendance = input.attendance === 'remote' ? 'remote' : input.attendance === 'in_person' || extras ? 'in_person' : null;
+	if (!attendance) throw new UserError('Please choose how you will attend.');
 	let tour_id: string | null = null;
-	if (attendance === 'in_person' && input.tour_id && input.tour_id !== 'none') {
+	if (attendance === 'in_person' && !extras && input.tour_id && input.tour_id !== 'none') {
 		const t = tourSessions(sessions).find((x) => x.id === input.tour_id);
 		if (!t) throw new UserError('Unknown tour.');
 		tour_id = t.id;
 	}
 	const asked = Array.isArray(input.optins) ? input.optins.map(String) : typeof input.optins === 'string' && input.optins ? input.optins.split(',') : [];
 	const optins = attendance === 'in_person' ? sessions.filter((s) => s.optin && asked.includes(s.id)).map((s) => s.id).join(',') || null : null;
+	if (extras && !optins) throw new UserError('Please tick what you would like to join us for.');
 	return {
-		name, attendance, tour_id, optins, affiliation: cleanText(input.affiliation, 200), needs: cleanText(input.needs, 1000), extra_answer: cleanText(input.extra_answer, 500),
+		name, attendance, extras, tour_id, optins, affiliation: cleanText(input.affiliation, 200), needs: cleanText(input.needs, 1000), extra_answer: cleanText(input.extra_answer, 500),
 		share_contact: truthy(input.share_contact) ? 1 : 0,
 	} as const;
 }
@@ -196,7 +200,7 @@ export async function register(env: Env, eventId: string, input: RegistrationInp
 	const now = Date.now();
 	const nowS = new Date(now).toISOString();
 	const cap = await capacity(env, ev, sessions, nowS);
-	const place = c.attendance === 'in_person' ? (cap.inPerson.available ? 'place' : 'waitlist') : null;
+	const place = c.attendance === 'in_person' && !c.extras ? (cap.inPerson.available ? 'place' : 'waitlist') : null;
 	const tourCap = tour ? cap.tours.find((t) => t.id === tour.id)! : null;
 	const tour_place = tourCap ? (tourCap.available ? 'place' : 'waitlist') : null;
 	const id = randomToken(16);
@@ -286,13 +290,13 @@ async function notifyWaitlist(env: Env, ev: EventRow, sessions: SessionRow[], re
 /** What the confirm page needs. No contact details or needs: whoever holds a confirm link may not be the registrant. */
 function confirmStatus(reg: RegistrationRow, sessions: SessionRow[]) {
 	const tour = reg.tour_id ? sessions.find((t) => t.id === reg.tour_id) : null;
-	return { status: reg.status, attendance: reg.attendance, place: reg.place, tour_label: tour?.label ?? null, tour_place: reg.tour_place };
+	return { status: reg.status, attendance: reg.attendance, mode: modeOf(reg), place: reg.place, tour_label: tour?.label ?? null, tour_place: reg.tour_place, optin_labels: optedIn(reg, sessions).map((s) => s.label) };
 }
 
 export function publicStatus(reg: RegistrationRow, sessions: SessionRow[]) {
 	const tour = reg.tour_id ? sessions.find((t) => t.id === reg.tour_id) : null;
 	return {
-		name: reg.name, email: reg.email, attendance: reg.attendance, affiliation: reg.affiliation, needs: reg.needs, extra_answer: reg.extra_answer ?? null, optins: reg.optins ? reg.optins.split(',') : [], optin_labels: optedIn(reg, sessions).map((s) => s.label), share_contact: !!reg.share_contact,
+		name: reg.name, email: reg.email, attendance: reg.attendance, mode: modeOf(reg), affiliation: reg.affiliation, needs: reg.needs, extra_answer: reg.extra_answer ?? null, optins: reg.optins ? reg.optins.split(',') : [], optin_labels: optedIn(reg, sessions).map((s) => s.label), share_contact: !!reg.share_contact,
 		status: reg.status, place: reg.place, tour_id: reg.tour_id, tour_label: tour?.label ?? null, tour_place: reg.tour_place,
 		hold_expires_at: reg.status === 'pending' ? reg.hold_expires_at : null,
 	};
@@ -311,7 +315,7 @@ export async function confirm(env: Env, id: string) {
 	if (reg.hold_expires_at && reg.hold_expires_at <= now) {
 		// Hold lapsed but not yet swept: re-check availability as if registering now (this row no longer holds a place).
 		const cap = await capacity(env, ev, sessions, now);
-		if (reg.attendance === 'in_person') place = cap.inPerson.available ? 'place' : 'waitlist';
+		if (reg.attendance === 'in_person' && reg.place) place = cap.inPerson.available ? 'place' : 'waitlist';
 		if (reg.tour_id) tour_place = cap.tours.find((t) => t.id === reg!.tour_id)?.available ? 'place' : 'waitlist';
 	}
 	const joinsWaitlist = place === 'waitlist';
@@ -362,17 +366,18 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 	// A tour whose booking has closed shows as a disabled choice, which browsers leave out of the form: an absent
 	// tour_id means "unchanged" (only an explicit 'none' drops the tour), so other details can still be saved.
 	const c = { ...parseCommon(input, sessions) };
-	if (input.tour_id === undefined && c.attendance === 'in_person') c.tour_id = reg.tour_id;
+	if (input.tour_id === undefined && c.attendance === 'in_person' && !c.extras) c.tour_id = reg.tour_id;
 	// Likewise an absent optins list means "unchanged" (an empty list clears them); remote attendees have none.
 	if (input.optins === undefined && c.attendance === 'in_person') c.optins = reg.optins ?? null;
 	const now = nowIso();
 	const cap = await capacity(env, ev, sessions, now);
 
 	let place = reg.place, waitlist_since = reg.waitlist_since;
-	if (c.attendance === 'remote') {
+	if (c.attendance === 'remote' || c.extras) {
 		place = null;
 		waitlist_since = null;
-	} else if (reg.attendance === 'remote') {
+	} else if (!reg.place) {
+		// From remote, or from just the extras, to the full day: a place if there is room, else the waiting list.
 		if (!registrationOpen(ev)) throw new UserError('Registration has closed, so in-person places can no longer be added. Please email ' + notifyEmail(env) + '.', 409);
 		place = cap.inPerson.available ? 'place' : 'waitlist';
 		waitlist_since = place === 'waitlist' && reg.status === 'confirmed' ? now : null;
@@ -381,7 +386,7 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 	if (c.tour_id !== reg.tour_id) {
 		const old = reg.tour_id ? sessions.find((s) => s.id === reg.tour_id) : null;
 		// Switching to remote drops the tour even after its booking has closed; otherwise a closed tour cannot be changed.
-		if (old && !sessionBookingOpen(old) && c.attendance !== 'remote') throw new UserError(`The ${old.label} has started or its booking has closed, so it can no longer be changed.`, 409);
+		if (old && !sessionBookingOpen(old) && c.attendance !== 'remote' && !c.extras) throw new UserError(`The ${old.label} has started or its booking has closed, so it can no longer be changed.`, 409);
 		if (c.tour_id) {
 			const t = sessions.find((s) => s.id === c.tour_id)!;
 			if (!sessionBookingOpen(t)) throw new UserError(`Booking for the ${t.label} has closed.`, 409);
@@ -404,12 +409,17 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 		// A remote registrant moving in person gets full joining instructions once they have a place; otherwise only calendar changes go out.
 		// Anyone who now qualifies for joining instructions but never had them (a remote person moving in person with a
 		// place, or someone leaving the in-person waiting list to join remotely) gets them in full.
-		const qualifies = updated.attendance === 'remote' || updated.place === 'place';
-		// A change between in person and remote is a different day: say so plainly, then give the instructions for the new way of attending.
-		const switched = reg.attendance !== updated.attendance;
-		const intro = !switched ? undefined : updated.attendance === 'remote'
-			? { html: '<p><strong>You have changed to joining remotely.</strong> Your in-person place has been deleted, along with any lab tour or dinner sign-up.</p>', text: 'You have changed to joining remotely. Your in-person place has been deleted, along with any lab tour or dinner sign-up.' }
-			: { html: '<p><strong>You have changed to attending in person.</strong></p>', text: 'You have changed to attending in person.' };
+		const before = modeOf(reg), after = modeOf(updated);
+		const qualifies = after !== 'in_person' || updated.place === 'place';
+		// A change between in person, remote and just the extras is a different day: say so plainly, then give the
+		// instructions for the new way of attending.
+		const switched = before !== after;
+		const say = (t: string) => ({ html: `<p><strong>${t.split('. ')[0]}.</strong>${t.includes('. ') ? ' ' + t.slice(t.indexOf('. ') + 2) : ''}</p>`, text: t });
+		const extrasLabel = optedIn(updated, sessions).map((s) => s.label.charAt(0).toLowerCase() + s.label.slice(1)).join(' and ');
+		const intro = !switched ? undefined
+			: after === 'remote' ? say(before === 'extras' ? 'You have changed to joining remotely. Your sign-up for ' + (optedIn(reg, sessions).map((s) => s.label.toLowerCase()).join(' and ') || 'the optional sessions') + ' has been deleted.' : 'You have changed to joining remotely. Your in-person place has been deleted, along with any lab tour or dinner sign-up.')
+			: after === 'extras' ? say(`You have changed to joining us for ${extrasLabel} only.${before === 'in_person' ? ' Your daytime place has been deleted, along with any lab tour.' : ''}`)
+			: say('You have changed to attending in person.');
 		if (qualifies && (reg.instructions_version === 0 || switched)) await sendInstructions(env, ev, updated, sessions, { intro });
 		else await syncCalendar(env, ev, updated, sessions);
 		await syncHosts(env, brand(env), ev, sessions);
@@ -429,7 +439,7 @@ export async function cancel(env: Env, id: string, opts: { byOrganiser?: boolean
 	const state = parseState(reg.calendar_state);
 	const files = attachments(env, ev, reg, [], Object.values(state).map((s) => ({ ...s, seq: s.seq + 1 })));
 	await sendEmail(env, cancellationEmail(brand(env), ev, reg, `${siteUrl(env)}${ev.page_path}`, files, opts.byOrganiser));
-	const detail = reg.attendance === 'remote' ? 'remote' : reg.place === 'waitlist' ? 'in person, waiting list' : 'in person';
+	const detail = reg.attendance === 'remote' ? 'remote' : !reg.place ? 'opt-in sessions only' : reg.place === 'waitlist' ? 'in person, waiting list' : 'in person';
 	await sendEmail(env, notification(brand(env), `Cancellation: ${ev.title}`, [
 		`${reg.name}${reg.affiliation ? ` (${reg.affiliation})` : ''} ${opts.byOrganiser ? 'was removed by an organiser' : 'cancelled'} (${reg.status}, ${detail}${reg.tour_id ? `, ${sessions.find((t) => t.id === reg.tour_id)?.label ?? 'tour'} ${reg.tour_place ?? ''}` : ''}).`,
 		...(await totalsLines(env, ev, sessions)),
@@ -578,7 +588,7 @@ export async function deliverMessage(env: Env, id: string) {
 		const withInstructions = !!latest && claim.marks_instructions_version === latest.version;
 		const ev = withInstructions ? await getEvent(env, claim.event_id) : null;
 		const sessions = ev ? await getSessions(env, ev.id) : [];
-		const plain = recipients.filter((r) => !withInstructions || (r.attendance === 'in_person' && r.place !== 'place'));
+		const plain = recipients.filter((r) => !withInstructions || r.place === 'waitlist');
 		const emails: OutgoingEmail[] = [];
 		for (const r of plain) emails.push(messageEmail(brand(env), r, claim, await manageUrl(env, r.id)));
 		const plainIds = await sendBatch(env, emails);
@@ -735,7 +745,7 @@ export function registrationsCsv(regs: Omit<RegistrationRow, 'calendar_state'>[]
 		if (/^[\s]*[=+\-@]/.test(s) || /^[\r\n]/.test(s)) s = `'${s}`; // defuse spreadsheet formula injection
 		return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 	};
-	const rows = regs.map((r) => [r.name, r.email, r.attendance, r.status, r.place, sessions.find((t) => t.id === r.tour_id)?.label ?? '', r.tour_place, optedIn(r, sessions).map((s) => s.label).join('; '),
+	const rows = regs.map((r) => [r.name, r.email, modeOf(r) === 'extras' ? 'opt-in sessions only' : r.attendance, r.status, r.place, sessions.find((t) => t.id === r.tour_id)?.label ?? '', r.tour_place, optedIn(r, sessions).map((s) => s.label).join('; '),
 		r.affiliation, r.needs, r.extra_answer ?? '', r.share_contact ? 'yes' : 'no', r.instructions_version, r.created_at, r.confirmed_at].map(esc).join(','));
 	return [cols.join(','), ...rows].join('\r\n') + '\r\n';
 }
@@ -787,7 +797,7 @@ export async function runScheduled(env: Env, now = Date.now()) {
 				const ev = await getEvent(env, r.event_id);
 				await sendEmail(env, notification(brand(env), `Unconfirmed registration half way to expiry: ${ev.title}`, [
 					`${r.name} registered at ${r.created_at} but has not confirmed their email address.`,
-					`Their ${r.attendance === 'in_person' ? (r.place === 'place' ? 'held in-person place' : 'waiting-list request') : 'remote registration'} will be deleted at ${r.hold_expires_at} unless they confirm.`,
+					`Their ${r.attendance === 'in_person' ? (r.place === 'place' ? 'held in-person place' : r.place === 'waitlist' ? 'waiting-list request' : 'sign-up for the optional sessions') : 'remote registration'} will be deleted at ${r.hold_expires_at} unless they confirm.`,
 				]));
 				report.holdsWarned++;
 			} catch (e) { console.error('hold warning failed', r.id, e); }

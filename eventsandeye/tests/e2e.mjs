@@ -210,6 +210,32 @@ try {
 	check('confirm email lists the choices being confirmed, without repeating the typed name', /You are confirming:/.test(mails[0].text_body) && /10:30 lab tour/.test(mails[0].text_body) && /share your email address with the hosts/.test(mails[0].text_body) && !/Alice/.test(mails[0].text_body));
 	check('confirm email offers a link to delete a registration the recipient did not make', /not-me=1/.test(mails[0].text_body) && /click here to delete the registration/.test(mails[0].html_body));
 
+	console.log('\nJust the dinner');
+	const dina = 'dina@example.org';
+	check('dinner only without ticking dinner → 400', (await register({ name: 'Dina', email: dina, attendance: 'extras', optins: [] })).status === 400);
+	const heldBefore = (await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN)).data.capacity.inPerson.held;
+	r = await register({ name: 'Dina', email: dina, attendance: 'extras', optins: [DINNER], tour_id: TOUR1 });
+	check('dinner only registers', r.status === 200 && r.data.ok, JSON.stringify(r.data));
+	let dm = await last(dina);
+	check('its confirm email says dinner only, and that the registration (not a place) would be deleted', /You are joining us for dinner only\./.test(dm.text_body) && /it will be deleted on/.test(dm.text_body) && !/place will be released/.test(dm.text_body), dm.text_body.slice(0, 500));
+	r = await req('POST', '/api/rsvp/confirm', { t: tokenFrom(dm.text_body, 'confirm') });
+	check('confirm page result knows it is dinner only', r.data.ok && r.data.registration.mode === 'extras' && r.data.registration.place === null, JSON.stringify(r.data));
+	dm = await last(dina);
+	check('dinner-only instructions: the dinner section, not the day (no room, no tour)', /Joining instructions/.test(dm.subject) && /The Broadcaster/.test(dm.text_body) && !/Room 516|Closed shoes/.test(dm.text_body) && !/lab tour/.test(dm.text_body), dm.text_body.slice(0, 900));
+	check('one calendar invitation, for the dinner, at the dinner\'s place', dm.att.length === 1 && /SUMMARY:[^\r\n]*Dinner/.test(dm.att[0].content) && /LOCATION:[^\r\n]*Broadcaster/.test(dm.att[0].content), dm.att.map((x) => (/SUMMARY:[^\r\n]*/.exec(x.content) || [''])[0]).join(' | '));
+	let sumD = (await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN)).data;
+	check('dinner only takes no room place and joins no waiting list', sumD.capacity.inPerson.held === heldBefore && sumD.registrations.find((x) => x.email === dina).place === null && sumD.registrations.find((x) => x.email === dina).tour_id === null);
+	const dinaManage = await manageOf(dina);
+	r = await req('GET', `/api/rsvp/manage?t=${encodeURIComponent(dinaManage)}`);
+	check('manage view says dinner only', r.data.ok && r.data.registration.mode === 'extras', JSON.stringify(r.data.registration));
+	r = await req('POST', '/api/rsvp/manage', { t: dinaManage, name: 'Dina', attendance: 'remote', tour_id: 'none' });
+	dm = await last(dina);
+	check('dinner only → remote: says the dinner sign-up is deleted; dinner invitation cancelled, talks added', r.data.ok && /You have changed to joining remotely\. Your sign-up for dinner has been deleted/.test(dm.text_body) && dm.att.some((x) => /METHOD:CANCEL/.test(x.content) && /Dinner/.test(x.content)) && dm.att.some((x) => /METHOD:REQUEST/.test(x.content) && /\(online\)/.test(x.content)), dm.text_body.slice(0, 300));
+	r = await req('POST', '/api/rsvp/manage', { t: dinaManage, name: 'Dina', attendance: 'extras', optins: [DINNER] });
+	dm = await last(dina);
+	check('remote → dinner only: says so', r.data.ok && /You have changed to joining us for dinner only\./.test(dm.text_body), dm.text_body.slice(0, 300));
+	await req('DELETE', '/api/rsvp/manage', { t: dinaManage });
+
 	console.log('\nSomeone registered my address: delete it');
 	const mallory = 'not-me@example.org';
 	await register({ name: 'Someone else', email: mallory });
