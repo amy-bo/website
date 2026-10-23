@@ -5,11 +5,11 @@ export interface Env {
 	DB: D1Database;
 	/** Resend API key. Required on the live site; without it emails go to the dev outbox and console (DEV_MODE only). */
 	RESEND_API_KEY?: string;
-	/** Sender and calendar organiser, e.g. "AMYBO <hello@amybo.org>". */
+	/** Sender and calendar organiser, e.g. "Example Organisers <events@example.org>". */
 	EMAIL_FROM?: string;
 	/** Where admin notifications go; also the reply-to address. */
 	NOTIFY_EMAIL?: string;
-	/** Public origin used in email links, e.g. https://amybo.org. */
+	/** Public origin used in email links, e.g. https://example.org. */
 	SITE_URL?: string;
 	/** Organisation name shown in emails and calendar entries. */
 	ORG_NAME?: string;

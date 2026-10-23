@@ -24,8 +24,8 @@ export const isCore = (s: SessionRow) => !s.choice_group && s.kind !== 'social';
  * them for the apps that honour them but no text promises them.
  * Nobody without a confirmed place gets entries (unconfirmed, or waiting for an in-person place).
  */
-/** An event's name for its online entries: without a trailing place that is part of its venue ("AMYBO Event, London"
- * becomes "AMYBO Event"), since someone joining online isn't going there. */
+/** An event's name for its online entries: without a trailing place that is part of its venue ("Community Day, Glasgow"
+ * becomes "Community Day"), since someone joining online isn't going there. */
 export function onlineTitle(ev: Pick<EventRow, 'title' | 'location'>): string {
 	const m = /^(.*\S),\s*([^,]+)$/.exec(ev.title);
 	return m && (ev.location ?? '').toLowerCase().includes(m[2].trim().toLowerCase()) ? m[1] : ev.title;
