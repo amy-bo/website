@@ -53,11 +53,13 @@ const { contactHref } = Astro.props;
 			btn.hidden = true;
 			document.getElementById('confirm-intro')!.hidden = true;
 			const lines: string[] = [d.already ? 'Your registration was already confirmed.' : 'Thank you, your registration is complete.'];
-			if (r.mode === 'extras') lines.push(`You are joining us for ${(r.optin_labels ?? []).join(' and ').toLowerCase()} only. We have emailed you the details, with a calendar invitation.`);
+			const waitingFor: string[] = r.optin_waiting_labels ?? [];
+			if (r.mode === 'extras') lines.push(`You are joining us for ${(r.optin_labels ?? []).join(' and ').toLowerCase()} only.${waitingFor.length < (r.optin_labels ?? []).length ? ' We have emailed you the details, with a calendar invitation.' : ''}`);
 			else if (r.attendance === 'remote') lines.push('You are registered to join the talks remotely. We have emailed you the joining instructions, with calendar invitations.');
 			else if (r.place === 'waitlist') lines.push('In-person places are currently full, so you are on the waiting list. We will email you if a place becomes available.');
 			else lines.push('You have an in-person place. We have emailed you the joining instructions, with calendar invitations.');
 			if (r.tour_label) lines.push(r.tour_place === 'waitlist' ? `You are on the waiting list for the ${r.tour_label}.` : `You are booked on the ${r.tour_label}.`);
+			for (const l of waitingFor) lines.push(`${l} is currently full, so you are on its waiting list. We will email you if a place becomes available.`);
 			lines.push('To change or cancel, use the "Manage my registration" link in your emails.');
 			out.replaceChildren(...lines.map((l, i) => { const p = document.createElement('p'); if (i === 0) { const s = document.createElement('strong'); s.textContent = l; p.append(s); } else p.textContent = l; return p; }));
 		} catch (e) {

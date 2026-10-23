@@ -145,7 +145,7 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 				input.name = 'optins';
 				input.value = o.id;
 				const time = new Date(o.starts_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
-				label.append(input, ` ${o.label}, ${time}${o.location ? `, ${o.location}` : ''}`);
+				label.append(input, ` ${o.label}, ${time}${o.location ? `, ${o.location}` : ''}${o.available === false ? ' (full: waiting list)' : ''}`);
 				(document.getElementById('rsvp-optins') as HTMLElement).append(label);
 			}
 			optFs.hidden = !(s.optins ?? []).length;

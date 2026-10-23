@@ -22,7 +22,7 @@ export const sessions = handle(async ({ env, request }) => {
 
 export const promoteHandler = handle(async ({ env, request }) => {
 	const body = await readJson(request);
-	return promote(env, String(body.id || ''), body.what === 'tour' ? 'tour' : 'event');
+	return promote(env, String(body.id || ''), body.what === 'tour' ? 'tour' : body.what === 'optin' ? 'optin' : 'event', String(body.session || ''));
 });
 
 export const promoteAllHandler = handle(async ({ env, request }) => promoteAll(env, String((await readJson(request)).event || '')));

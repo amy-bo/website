@@ -148,9 +148,9 @@ UPDATE instructions SET body_md = replace(body_md, 'To change or cancel your reg
 To change or cancel your registration, use your personal link below.')
   WHERE event_id = '2026-11-13-london' AND version = 4 AND body_md NOT LIKE '%:::extras%';
 
--- 23 October 2026: dinner booked at The Hawk's Nest (10 people, 17:30 to 20:30), and the venue is the I-HUB. Direct SQL,
+-- 23 October 2026: dinner booked at The Hawk's Nest for 10 (17:30 to 20:30; capacity 10, then a waiting list), and the venue is the I-HUB. Direct SQL,
 -- so nobody is emailed; calendars catch up with each person's next email. Each runs once (only while the old value is there).
-UPDATE sessions SET label = 'Dinner', starts_at = '2026-11-13T17:30:00Z', ends_at = '2026-11-13T20:30:00Z',
+UPDATE sessions SET label = 'Dinner', starts_at = '2026-11-13T17:30:00Z', ends_at = '2026-11-13T20:30:00Z', capacity = 10,
   location = 'The Hawk''s Nest, Goldhawk Road, Shepherd''s Bush Market, London W12 8DF (pay on the night)'
   WHERE id = '2026-11-13-london-pub' AND location LIKE '%Broadcaster%';
 UPDATE events SET location = 'I-HUB, Imperial College White City campus, 84 Wood Lane, London W12 0BZ'
@@ -177,7 +177,7 @@ INSERT OR IGNORE INTO instructions (event_id, version, subject, body_md, change_
 
 Closed shoes are needed in the labs.
 
-**Food:** attendance is free, and snacks and soft drinks are provided. Unless a sponsor comes forward, please buy or bring your own meals. The Works (Sir Michael Uren Hub, on campus) serves hot food at lunchtime. For dinner, we have booked tables from 17:30 at The Hawk''s Nest, a pizza and cocktail bar under the railway arches at Shepherd''s Bush Market (Goldhawk Road, W12 8DF), about 30 minutes'' walk or two stops on the Hammersmith & City line from Wood Lane to Goldhawk Road. They currently have a £14.50 Margherita pizza + Margarita cocktail offer on until 19:00. Pay for your own on the night, and please tell us as soon as you can if you can''t make it.
+**Food:** attendance is free, and snacks and soft drinks are provided. Unless a sponsor comes forward, please buy or bring your own meals. The Works (Sir Michael Uren Hub, on campus) serves hot food at lunchtime. For dinner, we have booked a table from 17:30 at The Hawk''s Nest, a pizza and cocktail bar under the railway arches at Shepherd''s Bush Market (Goldhawk Road, W12 8DF), about 20 minutes'' walk or two stops on the Hammersmith & City line from Wood Lane to Goldhawk Road. They currently have a £14.50 Margherita pizza + Margarita cocktail offer on. Pay for your own on the night, and please tell us as soon as you can if you can''t make it.
 :::
 
 :::remote
@@ -185,7 +185,7 @@ Closed shoes are needed in the labs.
 :::
 
 :::extras
-**Dinner:** 17:30 at The Hawk''s Nest, Goldhawk Road, Shepherd''s Bush Market, London W12 8DF, a pizza and cocktail bar under the railway arches by Goldhawk Road station (Hammersmith & City and Circle lines). They currently have a £14.50 Margherita pizza + Margarita cocktail offer on until 19:00. Pay for your own on the night, and please tell us as soon as you can if you can''t make it.
+**Dinner:** 17:30 at The Hawk''s Nest, Goldhawk Road, Shepherd''s Bush Market, London W12 8DF, a pizza and cocktail bar under the railway arches by Goldhawk Road station (Hammersmith & City and Circle lines). They currently have a £14.50 Margherita pizza + Margarita cocktail offer on. Pay for your own on the night, and please tell us as soon as you can if you can''t make it.
 :::
 
 To change or cancel your registration, use your personal link below.', 'I-HUB entrance and reception; dinner 17:30 at The Hawk''s Nest', strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'setup');

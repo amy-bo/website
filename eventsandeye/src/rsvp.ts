@@ -6,7 +6,7 @@ import { syncHosts } from './hosts';
 import { buildIcs } from './ics';
 import {
 	alreadyRegisteredIntro, type Brand, calendarUpdateEmail, cancellationEmail, confirmEmail, declinedEmail, type EventRow, instructionsEmail, messageEmail,
-	notification, optedIn, type RegistrationRow, type SessionRow, waitlistReminderEmail,
+	notification, onlyWaiting, optedIn, optinWaiting, type RegistrationRow, type SessionRow, waitingForPlace, waitlistReminderEmail,
 } from './templates';
 import { modeOf } from './mode';
 import { mdToHtml, mdToText } from './markdown';
@@ -84,6 +84,20 @@ export async function capacity(env: Env, ev: EventRow, sessions: SessionRow[], n
 	).bind(now, ev.id).all<{ tour_id: string; held: number; confirmed: number; waiting: number }>();
 	const n = (x: number | null | undefined) => x ?? 0;
 	const nowMs = Date.parse(now);
+	// Opt-in sessions (e.g. dinner): everyone who ticked one is in optins; those still waiting are also in optins_waiting.
+	const listed = (col: string) => `(',' || COALESCE(${col}, '') || ',') LIKE ('%,' || ?1 || ',%')`;
+	const optins = [];
+	for (const s of sessions.filter((x) => x.optin)) {
+		const r = await env.DB.prepare(
+			`SELECT
+				SUM(CASE WHEN ${listed('optins_waiting')} THEN 0 WHEN status = 'confirmed' OR (status = 'pending' AND hold_expires_at > ?2) THEN 1 ELSE 0 END) AS held,
+				SUM(CASE WHEN ${listed('optins_waiting')} THEN 0 WHEN status = 'confirmed' THEN 1 ELSE 0 END) AS confirmed,
+				SUM(CASE WHEN ${listed('optins_waiting')} AND status = 'confirmed' THEN 1 ELSE 0 END) AS waiting
+			 FROM registrations WHERE event_id = ?3 AND attendance = 'in_person' AND ${listed('optins')}`,
+		).bind(s.id, now, ev.id).first<{ held: number | null; confirmed: number | null; waiting: number | null }>();
+		const held = n(r?.held), waiting = n(r?.waiting);
+		optins.push({ id: s.id, label: s.label, capacity: s.capacity, held, confirmed: n(r?.confirmed), waiting, available: held < (s.capacity ?? Infinity) && waiting === 0 });
+	}
 	return {
 		inPerson: {
 			max: ev.in_person_max, held: n(inPerson?.held), confirmed: n(inPerson?.confirmed), waiting: n(inPerson?.waiting),
@@ -100,8 +114,12 @@ export async function capacity(env: Env, ev: EventRow, sessions: SessionRow[], n
 				open: sessionBookingOpen(t, nowMs), available: held < cap && waiting === 0,
 			};
 		}),
+		optins,
 	};
 }
+
+const ids = (list: string | null | undefined) => (list ?? '').split(',').filter(Boolean);
+const joinIds = (list: string[]) => list.join(',') || null;
 
 /** Hold for unconfirmed registrations: the shorter of 48 hours or a third of the time left to the deadline. */
 export function holdMs(ev: EventRow, now = Date.now()): number {
@@ -185,7 +203,7 @@ export async function register(env: Env, eventId: string, input: RegistrationInp
 
 	const existing = await env.DB.prepare('SELECT * FROM registrations WHERE event_id = ? AND email = ?').bind(ev.id, email).first<RegistrationRow>();
 	if (existing && existing.status === 'confirmed') {
-		if (existing.attendance === 'in_person' && existing.place === 'waitlist') {
+		if (waitingForPlace(existing, sessions)) {
 			const pid = await sendEmail(env, waitlistReminderEmail(brand(env), ev, existing, sessions, await manageUrl(env, existing.id)));
 			await recordDelivery(env, existing.id, 'already_registered', pid);
 		} else {
@@ -203,17 +221,21 @@ export async function register(env: Env, eventId: string, input: RegistrationInp
 	const place = c.attendance === 'in_person' && !c.extras ? (cap.inPerson.available ? 'place' : 'waitlist') : null;
 	const tourCap = tour ? cap.tours.find((t) => t.id === tour.id)! : null;
 	const tour_place = tourCap ? (tourCap.available ? 'place' : 'waitlist') : null;
+	const optins_waiting = joinIds(ids(c.optins).filter((o) => !cap.optins.find((x) => x.id === o)!.available));
 	const id = randomToken(16);
 	await env.DB.prepare(
-		`INSERT INTO registrations (id, event_id, name, email, attendance, affiliation, needs, extra_answer, optins, share_contact, status, place, tour_id, tour_place,
-			consent_at, created_at, updated_at, hold_expires_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-	).bind(id, ev.id, c.name, email, c.attendance, c.affiliation, c.needs, c.extra_answer, c.optins, c.share_contact, 'pending', place, c.tour_id, tour_place,
+		`INSERT INTO registrations (id, event_id, name, email, attendance, affiliation, needs, extra_answer, optins, optins_waiting, share_contact, status, place, tour_id, tour_place,
+			consent_at, created_at, updated_at, hold_expires_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+	).bind(id, ev.id, c.name, email, c.attendance, c.affiliation, c.needs, c.extra_answer, c.optins, optins_waiting, c.share_contact, 'pending', place, c.tour_id, tour_place,
 		nowS, nowS, nowS, new Date(now + holdMs(ev, now)).toISOString()).run();
 	// D1 has no row locks: if two people took the last place at the same moment, the later one moves to the waiting list.
 	const after = await capacity(env, ev, sessions, nowS);
 	if (place === 'place' && after.inPerson.held > ev.in_person_max) await demoteIfLatest(env, id, 'place');
 	const tourAfter = tour ? after.tours.find((t) => t.id === tour.id)! : null;
 	if (tour && tour_place === 'place' && tourAfter && tour.capacity != null && tourAfter.held > tour.capacity) await demoteIfLatest(env, id, 'tour_place', tour.id);
+	for (const o of after.optins) {
+		if (o.capacity != null && o.held > o.capacity && ids(c.optins).includes(o.id) && !ids(optins_waiting).includes(o.id)) await demoteOptinIfLatest(env, id, o.id);
+	}
 	const reg = (await getRegistration(env, id))!;
 	let pid: string;
 	try {
@@ -234,6 +256,16 @@ async function demoteIfLatest(env: Env, id: string, field: 'place' | 'tour_place
 		`SELECT COUNT(*) AS n FROM registrations WHERE event_id = ? AND ${field} = 'place' AND created_at > ? ${tourId ? 'AND tour_id = ?' : `AND attendance = 'in_person'`}`,
 	).bind(...[reg.event_id, reg.created_at, ...(tourId ? [tourId] : [])]).first<{ n: number }>();
 	if ((newer?.n ?? 0) === 0) await env.DB.prepare(`UPDATE registrations SET ${field} = 'waitlist' WHERE id = ?`).bind(id).run();
+}
+
+/** Puts this registration on an opt-in session's waiting list if it is the newest of those with a place there. */
+async function demoteOptinIfLatest(env: Env, id: string, sessionId: string) {
+	const reg = (await getRegistration(env, id))!;
+	const listed = (col: string) => `(',' || COALESCE(${col}, '') || ',') LIKE ('%,' || ?2 || ',%')`;
+	const newer = await env.DB.prepare(
+		`SELECT COUNT(*) AS n FROM registrations WHERE event_id = ?1 AND attendance = 'in_person' AND ${listed('optins')} AND NOT ${listed('optins_waiting')} AND created_at > ?3`,
+	).bind(reg.event_id, sessionId, reg.created_at).first<{ n: number }>();
+	if ((newer?.n ?? 0) === 0) await env.DB.prepare('UPDATE registrations SET optins_waiting = ? WHERE id = ?').bind(joinIds([...ids(reg.optins_waiting), sessionId]), id).run();
 }
 
 /**
@@ -273,14 +305,16 @@ async function totalsLines(env: Env, ev: EventRow, sessions: SessionRow[]) {
 		`In person: ${cap.inPerson.confirmed} confirmed of ${cap.inPerson.max} places, ${cap.inPerson.waiting} on the waiting list.`,
 		`Remote: ${cap.remote} confirmed. Unconfirmed registrations: ${cap.pending}.`,
 		...cap.tours.map((t) => `${t.label}: ${t.confirmed} of ${t.capacity ?? 'unlimited'} booked, ${t.waiting} waiting.`),
+		...cap.optins.map((o) => `${o.label}: ${o.confirmed} of ${o.capacity ?? 'unlimited'} signed up, ${o.waiting} waiting.`),
 		`Admin: ${siteUrl(env)}/admin/rsvps/`,
 	];
 }
 
-/** Tells the organiser when a confirmed registrant newly joins the in-person or a tour waiting list, with current totals. */
-async function notifyWaitlist(env: Env, ev: EventRow, sessions: SessionRow[], reg: RegistrationRow, event: boolean, tour: boolean, verb: string) {
-	if (!event && !tour) return;
-	const what = [event ? 'the in-person waiting list' : null, tour ? `the ${sessions.find((t) => t.id === reg.tour_id)?.label} waiting list` : null].filter(Boolean).join(' and ');
+/** Tells the organiser when a confirmed registrant newly joins the in-person, a tour or an opt-in waiting list, with current totals. */
+async function notifyWaitlist(env: Env, ev: EventRow, sessions: SessionRow[], reg: RegistrationRow, event: boolean, tour: boolean, verb: string, optinIds: string[] = []) {
+	if (!event && !tour && !optinIds.length) return;
+	const what = [event ? 'the in-person waiting list' : null, tour ? `the ${sessions.find((t) => t.id === reg.tour_id)?.label} waiting list` : null,
+		...optinIds.map((o) => `the ${sessions.find((s) => s.id === o)?.label} waiting list`)].filter(Boolean).join(' and ');
 	await sendEmail(env, notification(brand(env), `New waiting-list registration: ${ev.title}`, [
 		`${reg.name}${reg.affiliation ? ` (${reg.affiliation})` : ''} ${verb} ${what}.`,
 		...(await totalsLines(env, ev, sessions)),
@@ -290,13 +324,15 @@ async function notifyWaitlist(env: Env, ev: EventRow, sessions: SessionRow[], re
 /** What the confirm page needs. No contact details or needs: whoever holds a confirm link may not be the registrant. */
 function confirmStatus(reg: RegistrationRow, sessions: SessionRow[]) {
 	const tour = reg.tour_id ? sessions.find((t) => t.id === reg.tour_id) : null;
-	return { status: reg.status, attendance: reg.attendance, mode: modeOf(reg), place: reg.place, tour_label: tour?.label ?? null, tour_place: reg.tour_place, optin_labels: optedIn(reg, sessions).map((s) => s.label) };
+	return { status: reg.status, attendance: reg.attendance, mode: modeOf(reg), place: reg.place, tour_label: tour?.label ?? null, tour_place: reg.tour_place, optin_labels: optedIn(reg, sessions).map((s) => s.label),
+		optin_waiting_labels: optedIn(reg, sessions).filter((s) => optinWaiting(reg, s.id)).map((s) => s.label) };
 }
 
 export function publicStatus(reg: RegistrationRow, sessions: SessionRow[]) {
 	const tour = reg.tour_id ? sessions.find((t) => t.id === reg.tour_id) : null;
 	return {
-		name: reg.name, email: reg.email, attendance: reg.attendance, mode: modeOf(reg), affiliation: reg.affiliation, needs: reg.needs, extra_answer: reg.extra_answer ?? null, optins: reg.optins ? reg.optins.split(',') : [], optin_labels: optedIn(reg, sessions).map((s) => s.label), share_contact: !!reg.share_contact,
+		name: reg.name, email: reg.email, attendance: reg.attendance, mode: modeOf(reg), affiliation: reg.affiliation, needs: reg.needs, extra_answer: reg.extra_answer ?? null, optins: reg.optins ? reg.optins.split(',') : [], optin_labels: optedIn(reg, sessions).map((s) => s.label),
+		optins_waiting: ids(reg.optins_waiting), optin_waiting_labels: optedIn(reg, sessions).filter((s) => optinWaiting(reg, s.id)).map((s) => s.label), share_contact: !!reg.share_contact,
 		status: reg.status, place: reg.place, tour_id: reg.tour_id, tour_label: tour?.label ?? null, tour_place: reg.tour_place,
 		hold_expires_at: reg.status === 'pending' ? reg.hold_expires_at : null,
 	};
@@ -311,29 +347,30 @@ export async function confirm(env: Env, id: string) {
 	if (reg.status === 'confirmed') return { ok: true as const, already: true, registration: confirmStatus(reg, sessions) };
 
 	const now = nowIso();
-	let place = reg.place, tour_place = reg.tour_place;
+	let place = reg.place, tour_place = reg.tour_place, optins_waiting = reg.optins_waiting ?? null;
 	if (reg.hold_expires_at && reg.hold_expires_at <= now) {
 		// Hold lapsed but not yet swept: re-check availability as if registering now (this row no longer holds a place).
 		const cap = await capacity(env, ev, sessions, now);
 		if (reg.attendance === 'in_person' && reg.place) place = cap.inPerson.available ? 'place' : 'waitlist';
 		if (reg.tour_id) tour_place = cap.tours.find((t) => t.id === reg!.tour_id)?.available ? 'place' : 'waitlist';
+		optins_waiting = joinIds(ids(reg.optins).filter((o) => !cap.optins.find((x) => x.id === o)?.available));
 	}
 	const joinsWaitlist = place === 'waitlist';
 	const joinsTourWaitlist = tour_place === 'waitlist';
 	await env.DB.prepare(
-		`UPDATE registrations SET status='confirmed', confirmed_at=?, updated_at=?, hold_expires_at=NULL, place=?, tour_place=?,
-			waitlist_since = CASE WHEN ? THEN ? ELSE NULL END, tour_waitlist_since = CASE WHEN ? THEN ? ELSE NULL END
+		`UPDATE registrations SET status='confirmed', confirmed_at=?, updated_at=?, hold_expires_at=NULL, place=?, tour_place=?, optins_waiting=?,
+			waitlist_since = CASE WHEN ? THEN ? ELSE NULL END, tour_waitlist_since = CASE WHEN ? THEN ? ELSE NULL END, optins_waitlist_since = CASE WHEN ? THEN ? ELSE NULL END
 		 WHERE id=? AND status='pending'`,
-	).bind(now, now, place, tour_place, joinsWaitlist ? 1 : 0, now, joinsTourWaitlist ? 1 : 0, now, id).run();
+	).bind(now, now, place, tour_place, optins_waiting, joinsWaitlist ? 1 : 0, now, joinsTourWaitlist ? 1 : 0, now, optins_waiting ? 1 : 0, now, id).run();
 	reg = (await getRegistration(env, id))!;
 
-	if (!joinsWaitlist) await sendInstructions(env, ev, reg, sessions);
+	if (!waitingForPlace(reg, sessions)) await sendInstructions(env, ev, reg, sessions);
 	else {
 		// Waiting for an in-person place: no joining instructions yet, but they need their manage link.
 		const pid = await sendEmail(env, waitlistReminderEmail(brand(env), ev, reg, sessions, await manageUrl(env, reg.id), true));
 		await recordDelivery(env, reg.id, 'waitlist_confirmed', pid);
 	}
-	await notifyWaitlist(env, ev, sessions, reg, joinsWaitlist, joinsTourWaitlist, 'has confirmed and joined');
+	await notifyWaitlist(env, ev, sessions, reg, joinsWaitlist, joinsTourWaitlist, 'has confirmed and joined', ids(reg.optins_waiting));
 	await syncHosts(env, brand(env), ev, sessions);
 	return { ok: true as const, already: false, registration: confirmStatus(reg, sessions) };
 }
@@ -350,7 +387,7 @@ export async function manageView(env: Env, id: string) {
 		ok: true as const,
 		event: { id: ev.id, title: ev.title, starts_at: ev.starts_at, deadline: ev.deadline, page_path: ev.page_path, open: registrationOpen(ev) },
 		tours: cap.tours.map((t) => ({ id: t.id, label: t.label, available: t.available, open: t.open })),
-		optins: sessions.filter((s) => s.optin).map((s) => ({ id: s.id, label: s.label, starts_at: s.starts_at, location: s.location })),
+		optins: sessions.filter((s) => s.optin).map((s) => ({ id: s.id, label: s.label, starts_at: s.starts_at, location: s.location, available: !!cap.optins.find((o) => o.id === s.id)?.available })),
 		registration: publicStatus(reg, sessions),
 		calendar: entriesFor(env, ev, sessions, reg).map((e) => ({ key: e.key, summary: e.summary, start: e.start, url: ics(e.key) })),
 	};
@@ -397,20 +434,27 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 			tour_waitlist_since = null;
 		}
 	}
+	// Opt-in sessions kept keep their place or waiting-list position; newly ticked ones get a place if there is room.
+	const had = reg.attendance === 'in_person' ? ids(reg.optins) : [], wasWaiting = ids(reg.optins_waiting);
+	const waitingNow = ids(c.optins).filter((o) => (had.includes(o) ? wasWaiting.includes(o) : !cap.optins.find((x) => x.id === o)!.available));
+	const newlyWaiting = waitingNow.filter((o) => !wasWaiting.includes(o));
+	// One date orders all of a person's opt-in waiting lists: kept while they are still waiting for something.
+	const optins_waitlist_since = !waitingNow.length ? null : waitingNow.some((o) => wasWaiting.includes(o)) && reg.optins_waitlist_since ? reg.optins_waitlist_since : now;
 	await env.DB.prepare(
-		`UPDATE registrations SET name=?, attendance=?, affiliation=?, needs=?, extra_answer=?, optins=?, share_contact=?, place=?, waitlist_since=?, tour_id=?, tour_place=?,
-			tour_waitlist_since=?, updated_at=? WHERE id=?`,
-	).bind(c.name, c.attendance, c.affiliation, c.needs, c.extra_answer, c.optins, c.share_contact, place, waitlist_since, c.tour_id, tour_place, tour_waitlist_since, now, id).run();
+		`UPDATE registrations SET name=?, attendance=?, affiliation=?, needs=?, extra_answer=?, optins=?, optins_waiting=?, optins_waitlist_since=?, share_contact=?, place=?, waitlist_since=?,
+			tour_id=?, tour_place=?, tour_waitlist_since=?, updated_at=? WHERE id=?`,
+	).bind(c.name, c.attendance, c.affiliation, c.needs, c.extra_answer, c.optins, joinIds(waitingNow), optins_waitlist_since, c.share_contact, place, waitlist_since,
+		c.tour_id, tour_place, tour_waitlist_since, now, id).run();
 	if (reg.status === 'confirmed') {
 		const updated = (await getRegistration(env, id))!;
 		const newEvent = updated.place === 'waitlist' && reg.place !== 'waitlist';
 		const newTour = updated.tour_place === 'waitlist' && !(reg.tour_place === 'waitlist' && reg.tour_id === updated.tour_id);
-		await notifyWaitlist(env, ev, sessions, updated, newEvent, newTour, 'changed their registration and joined');
+		await notifyWaitlist(env, ev, sessions, updated, newEvent, newTour, 'changed their registration and joined', newlyWaiting);
 		// A remote registrant moving in person gets full joining instructions once they have a place; otherwise only calendar changes go out.
 		// Anyone who now qualifies for joining instructions but never had them (a remote person moving in person with a
 		// place, or someone leaving the in-person waiting list to join remotely) gets them in full.
 		const before = modeOf(reg), after = modeOf(updated);
-		const qualifies = after !== 'in_person' || updated.place === 'place';
+		const qualifies = !waitingForPlace(updated, sessions);
 		// A change between in person, remote and just the extras is a different day: say so plainly, then give the
 		// instructions for the new way of attending.
 		const switched = before !== after;
@@ -439,7 +483,8 @@ export async function cancel(env: Env, id: string, opts: { byOrganiser?: boolean
 	const state = parseState(reg.calendar_state);
 	const files = attachments(env, ev, reg, [], Object.values(state).map((s) => ({ ...s, seq: s.seq + 1 })));
 	await sendEmail(env, cancellationEmail(brand(env), ev, reg, `${siteUrl(env)}${ev.page_path}`, files, opts.byOrganiser));
-	const detail = reg.attendance === 'remote' ? 'remote' : !reg.place ? 'opt-in sessions only' : reg.place === 'waitlist' ? 'in person, waiting list' : 'in person';
+	const detail = (reg.attendance === 'remote' ? 'remote' : !reg.place ? 'opt-in sessions only' : reg.place === 'waitlist' ? 'in person, waiting list' : 'in person')
+		+ optedIn(reg, sessions).map((s) => `, ${s.label}${optinWaiting(reg, s.id) ? ' waiting' : ''}`).join('');
 	await sendEmail(env, notification(brand(env), `Cancellation: ${ev.title}`, [
 		`${reg.name}${reg.affiliation ? ` (${reg.affiliation})` : ''} ${opts.byOrganiser ? 'was removed by an organiser' : 'cancelled'} (${reg.status}, ${detail}${reg.tour_id ? `, ${sessions.find((t) => t.id === reg.tour_id)?.label ?? 'tour'} ${reg.tour_place ?? ''}` : ''}).`,
 		...(await totalsLines(env, ev, sessions)),
@@ -461,7 +506,7 @@ export async function calendarFile(env: Env, id: string, key: string) {
 
 // ---------- admin ----------
 
-export async function promote(env: Env, id: string, what: 'event' | 'tour') {
+export async function promote(env: Env, id: string, what: 'event' | 'tour' | 'optin', sessionId = '') {
 	const reg = await getRegistration(env, id);
 	if (!reg || reg.status !== 'confirmed') throw new UserError('Only confirmed registrations can be promoted.', 404);
 	const ev = await getEvent(env, reg.event_id);
@@ -469,13 +514,18 @@ export async function promote(env: Env, id: string, what: 'event' | 'tour') {
 	if (what === 'event') {
 		if (reg.attendance !== 'in_person' || reg.place !== 'waitlist') throw new UserError('This person is not on the in-person waiting list.');
 		await env.DB.prepare(`UPDATE registrations SET place='place', waitlist_since=NULL, updated_at=? WHERE id=?`).bind(nowIso(), id).run();
-	} else {
+	} else if (what === 'tour') {
 		if (reg.tour_place !== 'waitlist') throw new UserError('This person is not on a tour waiting list.');
 		await env.DB.prepare(`UPDATE registrations SET tour_place='place', tour_waitlist_since=NULL, updated_at=? WHERE id=?`).bind(nowIso(), id).run();
+	} else {
+		if (!optinWaiting(reg, sessionId)) throw new UserError('This person is not on that waiting list.');
+		const rest = ids(reg.optins_waiting).filter((o) => o !== sessionId);
+		await env.DB.prepare('UPDATE registrations SET optins_waiting=?, optins_waitlist_since=?, updated_at=? WHERE id=?')
+			.bind(joinIds(rest), rest.length ? reg.optins_waitlist_since : null, nowIso(), id).run();
 	}
 	const updated = (await getRegistration(env, id))!;
 	// Someone still waiting for an in-person place gets instructions only once they have one.
-	if (!(updated.attendance === 'in_person' && updated.place === 'waitlist')) await sendInstructions(env, ev, updated, sessions);
+	if (!waitingForPlace(updated, sessions)) await sendInstructions(env, ev, updated, sessions);
 	await syncHosts(env, brand(env), ev, sessions);
 	return { ok: true as const };
 }
@@ -545,7 +595,11 @@ export async function audienceRecipients(env: Env, eventId: string, a: Audience)
 	if (a.tour_id === 'none') where.push('tour_id IS NULL');
 	else if (a.tour_id) { where.push('tour_id = ?'); binds.push(a.tour_id); }
 	if (a.below_version) { where.push('instructions_version < ?'); binds.push(a.below_version); }
-	return (await env.DB.prepare(`SELECT * FROM registrations WHERE ${where.join(' AND ')} ORDER BY created_at`).bind(...binds).all<RegistrationRow>()).results;
+	const regs = (await env.DB.prepare(`SELECT * FROM registrations WHERE ${where.join(' AND ')} ORDER BY created_at`).bind(...binds).all<RegistrationRow>()).results;
+	if (a.include_waitlist) return regs;
+	// Likewise people coming only to the opt-in sessions who are still waiting for all of them.
+	const sessions = await getSessions(env, eventId);
+	return regs.filter((r) => !onlyWaiting(r, sessions));
 }
 
 interface MessageRow {
@@ -587,8 +641,8 @@ export async function deliverMessage(env: Env, id: string) {
 		const latest = await latestInstructions(env, claim.event_id);
 		const withInstructions = !!latest && claim.marks_instructions_version === latest.version;
 		const ev = withInstructions ? await getEvent(env, claim.event_id) : null;
-		const sessions = ev ? await getSessions(env, ev.id) : [];
-		const plain = recipients.filter((r) => !withInstructions || r.place === 'waitlist');
+		const sessions = await getSessions(env, claim.event_id);
+		const plain = recipients.filter((r) => !withInstructions || waitingForPlace(r, sessions));
 		const emails: OutgoingEmail[] = [];
 		for (const r of plain) emails.push(messageEmail(brand(env), r, claim, await manageUrl(env, r.id)));
 		const plainIds = await sendBatch(env, emails);
@@ -741,14 +795,14 @@ export async function adminSummary(env: Env, eventId: string) {
 }
 
 export function registrationsCsv(regs: Omit<RegistrationRow, 'calendar_state'>[], sessions: SessionRow[]): string {
-	const cols = ['name', 'email', 'attendance', 'status', 'place', 'tour', 'tour_place', 'signed_up_for', 'affiliation', 'needs', 'extra_answer', 'share_contact', 'instructions_version', 'created_at', 'confirmed_at'];
+	const cols = ['name', 'email', 'attendance', 'status', 'place', 'tour', 'tour_place', 'signed_up_for', 'waiting_for', 'affiliation', 'needs', 'extra_answer', 'share_contact', 'instructions_version', 'created_at', 'confirmed_at'];
 	const esc = (v: unknown) => {
 		let s = v == null ? '' : String(v).replace(/\t/g, ' ');
 		if (/^[\s]*[=+\-@]/.test(s) || /^[\r\n]/.test(s)) s = `'${s}`; // defuse spreadsheet formula injection
 		return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 	};
 	const rows = regs.map((r) => [r.name, r.email, modeOf(r) === 'extras' ? 'opt-in sessions only' : r.attendance, r.status, r.place, sessions.find((t) => t.id === r.tour_id)?.label ?? '', r.tour_place, optedIn(r, sessions).map((s) => s.label).join('; '),
-		r.affiliation, r.needs, r.extra_answer ?? '', r.share_contact ? 'yes' : 'no', r.instructions_version, r.created_at, r.confirmed_at].map(esc).join(','));
+		optedIn(r, sessions).filter((s) => optinWaiting(r, s.id)).map((s) => s.label).join('; '), r.affiliation, r.needs, r.extra_answer ?? '', r.share_contact ? 'yes' : 'no', r.instructions_version, r.created_at, r.confirmed_at].map(esc).join(','));
 	return [cols.join(','), ...rows].join('\r\n') + '\r\n';
 }
 
