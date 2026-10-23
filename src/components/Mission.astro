@@ -1,0 +1,34 @@
+---
+/**
+ * Mission statement with its bullet list. Each <span data-term> in the statement is paired, in order,
+ * with the list item at the same position: hovering or focusing either one highlights both.
+ * Without JavaScript it is just the statement and the list.
+ */
+---
+<div class="mission"><slot /></div>
+<script>
+	document.querySelectorAll<HTMLElement>('.mission').forEach((box) => {
+		const terms = [...box.querySelectorAll<HTMLElement>('[data-term]')];
+		const items = [...box.querySelectorAll<HTMLElement>(':scope > ul > li')];
+		terms.forEach((term, i) => {
+			const item = items[i];
+			if (!item) return;
+			term.tabIndex = 0;
+			const on = () => { term.classList.add('lit'); item.classList.add('lit'); };
+			const off = () => { term.classList.remove('lit'); item.classList.remove('lit'); };
+			for (const el of [term, item]) {
+				el.addEventListener('mouseenter', on);
+				el.addEventListener('mouseleave', off);
+			}
+			term.addEventListener('focus', on);
+			term.addEventListener('blur', off);
+		});
+	});
+</script>
+<style>
+	.mission :global([data-term]) { text-decoration: underline dotted var(--sl-color-accent); text-underline-offset: 0.2em; border-radius: 0.2rem; cursor: default; }
+	.mission :global([data-term]:focus-visible) { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+	.mission :global(li) { border-radius: 0.3rem; padding-inline: 0.3rem; margin-inline-start: -0.3rem; transition: background-color 0.15s; }
+	.mission :global(.lit) { background-color: var(--sl-color-accent-low); }
+	@media (prefers-reduced-motion: reduce) { .mission :global(li) { transition: none; } }
+</style>
