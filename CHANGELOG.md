@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-10-23
 
+- [x] **Events&I ready to go public** — the copy in `eventsandeye/` matches andeyePro/eventsandeye: a step-by-step setup guide in its README (Events&I Plus stays on the roadmap), `examples/` (config, function wrappers, and a seed that is AMYBO's 13 November event, pointing to amy.bo/event), an AGENTS.md orientation file, and the CLA Assistant check on pull requests (upstream only). The e2e test keeps running on AMYBO's event, and its talk-time check now reads the seeded times, so it also passes with the example seed. e2e: 229 passed with either seed.
 - [x] **Dinner capacity and waiting list; dinner at The Hawk's Nest** — opt-in sessions (dinner) can now have a capacity, with a waiting list like the tours (migration 0004: `optins_waiting`, `optins_waitlist_since`). Once full, the form says "(full: waiting list)". People waiting get no dinner calendar entry, and anyone coming only for the dinner gets no joining instructions until an admin clicks **Promote to dinner**; the organiser is told when someone joins the waiting list. The seed quietly moves the dinner to The Hawk's Nest, 17:30 to 20:30 with capacity 10 (the table booked), moves the venue to the I-HUB and adds joining instructions v5. The event page gives the 17:30 table, a 20-minute walk and the £14.50 pizza and Margarita offer. e2e: 229 passed.
 
 ## 2026-10-06
