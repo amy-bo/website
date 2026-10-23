@@ -1,7 +1,7 @@
 ---
 /**
- * Mission statement with its bullet list. Each <span data-term> in the statement is paired, in order,
- * with the list item at the same position: hovering or focusing either one highlights both.
+ * A statement (the strapline or the mission statement) with its bullet list. Each <span data-term> in the statement is
+ * paired, in order, with the list item at the same position: hovering or focusing either one highlights both.
  * Without JavaScript it is just the statement and the list.
  */
 ---
@@ -29,6 +29,10 @@
 	.mission :global([data-term]) { text-decoration: underline dotted var(--sl-color-accent); text-underline-offset: 0.2em; border-radius: 0.2rem; cursor: default; }
 	.mission :global([data-term]:focus-visible) { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
 	.mission :global(li) { border-radius: 0.3rem; padding-inline: 0.3rem; margin-inline-start: -0.3rem; transition: background-color 0.15s; }
-	.mission :global(.lit) { background-color: var(--sl-color-accent-low); }
+	/* Brand green over whatever is behind it: pale green under dark text, dark olive under light text. */
+	.mission :global(.lit) { background-color: rgb(135 189 37 / 0.28); }
+	/* The strapline in the brand colours (blue #008BD2, green #87BD25) on brand black, which both read on in either theme. */
+	.mission :global(.strapline) { display: inline-block; margin: 0; padding: 0.4rem 1rem; border-radius: 0.4rem; background: #000; color: #008bd2; font-size: var(--sl-text-2xl); font-weight: 700; line-height: 1.3; }
+	.mission :global(.strapline .brand-green) { color: #87bd25; }
 	@media (prefers-reduced-motion: reduce) { .mission :global(li) { transition: none; } }
 </style>
