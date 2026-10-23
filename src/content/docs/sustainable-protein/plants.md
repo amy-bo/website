@@ -15,7 +15,7 @@ Farming keeps improving. [The Land Institute](https://landinstitute.org/our-work
 
 ## Plant-based meat
 
-Tofu and tempeh are ancient meat alternatives, bean burgers and veggie burgers took them into fast food, and companies like [Beyond Meat](https://www.beyondmeat.com), [Impossible Foods](https://impossiblefoods.com) and THIS have made plant-based meat a supermarket staple.
+Tofu and tempeh are ancient meat alternatives, bean burgers and veggie burgers took them into fast food, and companies like [Beyond Meat](https://www.beyondmeat.com) and [Impossible Foods](https://impossiblefoods.com) have made plant-based meat a supermarket staple.
 
 Sadly the market has cooled. Beyond Meat's sales fell through 2025 and it had to restructure its debt ([Green Queen](https://www.greenqueen.com.hk/beyond-meat-q1-2025-earnings-debt-funding-ahimsa-foundation/)). The reasons usually given are price (many products still cost more than the meat they replace), taste and texture that don't yet match expectations, and worries about processed food. Getting the market growing again will take products that cost the same as or less than meat, that taste at least as good, and clearer information about their health and environmental benefits.
 

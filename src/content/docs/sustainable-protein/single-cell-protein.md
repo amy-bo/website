@@ -21,7 +21,7 @@ Spirulina (*Arthrospira platensis*) is already sold as a supplement and has a sl
 
 ## Methane-eating bacteria
 
-Methanotrophs make protein from methane, mostly for animal and fish feed so far. Calysta, Unibio and String Bio are among the companies working on them.
+Methanotrophs make protein from methane, mostly for animal and fish feed so far. Calysta, Unibio (building a large plant in Saudi Arabia) and String Bio (India) are among the companies working on them.
 
 ## Hydrogen-oxidising bacteria
 
