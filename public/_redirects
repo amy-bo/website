@@ -1,12 +1,12 @@
 # Old Hugo/Docsy URLs.
 /docs/electropioreactor/electropioreactor-v0.02  /projects/past/electropioreactor-v0-02/  301
 /docs/electropioreactor/electropioreactor-v0.02/  /projects/past/electropioreactor-v0-02/  301
-/docs/proteins/precision-fermentation  /background/proteins/precision-fermentation/  301
-/docs/proteins/precision-fermentation/  /background/proteins/precision-fermentation/  301
+/docs/proteins/precision-fermentation  /sustainable-protein/precision-fermentation/  301
+/docs/proteins/precision-fermentation/  /sustainable-protein/precision-fermentation/  301
 /docs/contribution-guidelines/brand  /collaborate/brand/  301
 /docs/contribution-guidelines/brand/  /collaborate/brand/  301
-/docs/proteins/single-cell-protein  /background/proteins/single-cell-protein/  301
-/docs/proteins/single-cell-protein/  /background/proteins/single-cell-protein/  301
+/docs/proteins/single-cell-protein  /sustainable-protein/single-cell-protein/  301
+/docs/proteins/single-cell-protein/  /sustainable-protein/single-cell-protein/  301
 /docs/experiments/control-testing  /projects/past/experiments/control-testing/  301
 /docs/experiments/control-testing/  /projects/past/experiments/control-testing/  301
 /docs/experiments/spirulina-batch  /projects/past/experiments/spirulina-batch/  301
@@ -19,8 +19,8 @@
 /docs/experiments/co2-sparging/  /projects/past/experiments/co2-sparging/  301
 /docs/experiments/electrolysis  /projects/past/experiments/electrolysis/  301
 /docs/experiments/electrolysis/  /projects/past/experiments/electrolysis/  301
-/docs/proteins/cultivated-meat  /background/proteins/cultivated-meat/  301
-/docs/proteins/cultivated-meat/  /background/proteins/cultivated-meat/  301
+/docs/proteins/cultivated-meat  /sustainable-protein/cultivated-meat/  301
+/docs/proteins/cultivated-meat/  /sustainable-protein/cultivated-meat/  301
 /docs/contribution-guidelines  /collaborate/contribute/  301
 /docs/contribution-guidelines/  /collaborate/contribute/  301
 /docs/equipment/bioreactors  /projects/past/equipment/bioreactors/  301
@@ -40,18 +40,18 @@
 /docs/legal/disclaimer/  /collaborate/safety-and-legal/disclaimer/  301
 /docs/risk-assessments  /collaborate/safety-and-legal/risk-management/  301
 /docs/risk-assessments/  /collaborate/safety-and-legal/risk-management/  301
-/docs/overview/plan  /background/proteins/  301
-/docs/overview/plan/  /background/proteins/  301
+/docs/overview/plan  /sustainable-protein/  301
+/docs/overview/plan/  /sustainable-protein/  301
 /docs/experiments  /projects/past/experiments/  301
 /docs/experiments/  /projects/past/experiments/  301
 /docs/openvalve  /projects/other-hardware/openvalve/  301
 /docs/openvalve/  /projects/other-hardware/openvalve/  301
 /docs/equipment  /projects/past/equipment/  301
 /docs/equipment/  /projects/past/equipment/  301
-/docs/proteins  /background/proteins/  301
-/docs/proteins/  /background/proteins/  301
-/docs/overview  /background/proteins/  301
-/docs/overview/  /background/proteins/  301
+/docs/proteins  /sustainable-protein/  301
+/docs/proteins/  /sustainable-protein/  301
+/docs/overview  /sustainable-protein/  301
+/docs/overview/  /sustainable-protein/  301
 /docs/pioflo  /projects/pioflo/  301
 /docs/pioflo/  /projects/pioflo/  301
 /docs/legal  /collaborate/safety-and-legal/  301
@@ -69,9 +69,17 @@
 /mission /about/ 301
 
 # Background overview pages removed in October 2026 (Amy's review).
-/background  /background/proteins/  301
-/background/  /background/proteins/  301
-/background/overview  /background/proteins/  301
-/background/overview/  /background/proteins/  301
-/background/plan-2023  /background/proteins/  301
-/background/plan-2023/  /background/proteins/  301
+/background  /sustainable-protein/  301
+/background/  /sustainable-protein/  301
+/background/overview  /sustainable-protein/  301
+/background/overview/  /sustainable-protein/  301
+/background/plan-2023  /sustainable-protein/  301
+/background/plan-2023/  /sustainable-protein/  301
+/background/proteins  /sustainable-protein/  301
+/background/proteins/  /sustainable-protein/  301
+/background/proteins/single-cell-protein  /sustainable-protein/single-cell-protein/  301
+/background/proteins/single-cell-protein/  /sustainable-protein/single-cell-protein/  301
+/background/proteins/precision-fermentation  /sustainable-protein/precision-fermentation/  301
+/background/proteins/precision-fermentation/  /sustainable-protein/precision-fermentation/  301
+/background/proteins/cultivated-meat  /sustainable-protein/cultivated-meat/  301
+/background/proteins/cultivated-meat/  /sustainable-protein/cultivated-meat/  301
