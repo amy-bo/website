@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Strapline colour test</title>
+<style>
+  body { margin: 0; font-family: Arial, sans-serif; background: #fff; color: #000; }
+  main { max-width: 60rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+  h1 { font-size: 1.25rem; }
+  .row { display: grid; grid-template-columns: 11rem 1fr; gap: 1rem; align-items: center; padding: 1rem; border-top: 1px solid #ccc; }
+  .label { font-size: 0.85rem; }
+  .big { font-size: 2rem; font-weight: 700; }
+  .small { font-size: 1rem; }
+  .blue { color: #007cbb; } .oldblue { color: #008bd2; }
+  .green { color: #87bd25; } .darkgreen { color: #5c8119; }
+  .hl { background: #87bd25; color: #000; padding: 0 0.15em; border-radius: 0.15em; }
+  .ul { text-decoration: underline 0.18em #87bd25; text-underline-offset: 0.15em; }
+  .dark { background: #000; color: #fff; }
+  @media (max-width: 40rem) { .row { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Strapline colour test</h1>
+<p class="small">Each row shows the strapline large, then at body-text size. In Chrome: Cmd+Option+I, Cmd+Shift+P, "Show Rendering", then "Emulate vision deficiencies".</p>
+
+<div class="row"><div class="label">A. Green text on white (2.2:1, fails)</div><div><div class="big"><span class="blue">Sustainable Protein for</span> <span class="green">All</span></div><div class="small"><span class="blue">Sustainable Protein for</span> <span class="green">All</span></div></div></div>
+<div class="row"><div class="label">B. Black on green highlight (9.3:1)</div><div><div class="big"><span class="blue">Sustainable Protein for</span> <span class="hl">All</span></div><div class="small"><span class="blue">Sustainable Protein for</span> <span class="hl">All</span></div></div></div>
+<div class="row"><div class="label">C. Blue "All" with green underline</div><div><div class="big"><span class="blue">Sustainable Protein for <span class="ul">All</span></span></div><div class="small"><span class="blue">Sustainable Protein for <span class="ul">All</span></span></div></div></div>
+<div class="row"><div class="label">D. Dark green #5C8119 text (4.6:1)</div><div><div class="big"><span class="blue">Sustainable Protein for</span> <span class="darkgreen">All</span></div><div class="small"><span class="blue">Sustainable Protein for</span> <span class="darkgreen">All</span></div></div></div>
+<div class="row dark"><div class="label">E. On black: green text (9.3:1)</div><div><div class="big"><span class="blue">Sustainable Protein for</span> <span class="green">All</span></div><div class="small"><span class="blue">Sustainable Protein for</span> <span class="green">All</span></div></div></div>
+<div class="row"><div class="label">F. Old blue #008BD2 + green on white (banner)</div><div><div class="big"><span class="oldblue">Sustainable Protein for</span> <span class="green">All</span></div><div class="small"><span class="oldblue">Sustainable Protein for</span> <span class="green">All</span></div></div></div>
+</main>
+</body>
+</html>
