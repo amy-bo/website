@@ -45,6 +45,7 @@ export default defineConfig({
 			sidebar: [
 				{
 					label: 'Start here',
+					collapsed: true,
 					items: [
 						{ label: 'About', slug: 'about' },
 						{ label: 'Contact', slug: 'contact' },
@@ -52,15 +53,16 @@ export default defineConfig({
 				},
 				{
 					label: 'Projects',
+					collapsed: true,
 					items: [
 						{ label: 'All projects', slug: 'projects' },
-						{ label: 'electroPioreactor', autogenerate: { directory: 'projects/electropioreactor' } },
+						{ label: 'electroPioreactor', collapsed: true, autogenerate: { directory: 'projects/electropioreactor' } },
 						{ label: 'CARMA Hub project', slug: 'projects/carma-hub' },
 						{ label: 'Growth medium', slug: 'projects/media' },
 						{ label: 'Methods', slug: 'projects/methods' },
 						{ label: 'Literature', slug: 'projects/literature' },
-						{ label: 'PioFlo', autogenerate: { directory: 'projects/pioflo' } },
-						{ label: 'Other hardware', autogenerate: { directory: 'projects/other-hardware' } },
+						{ label: 'PioFlo', collapsed: true, autogenerate: { directory: 'projects/pioflo' } },
+						{ label: 'Other hardware', collapsed: true, autogenerate: { directory: 'projects/other-hardware' } },
 						{
 							label: 'Past projects',
 							collapsed: true,
@@ -74,20 +76,22 @@ export default defineConfig({
 						},
 					],
 				},
-				{ label: 'Events', autogenerate: { directory: 'events' } },
+				{ label: 'Events', collapsed: true, autogenerate: { directory: 'events' } },
 				{
 					label: 'Collaborate',
+					collapsed: true,
 					items: [
 						{ label: 'Get involved', slug: 'collaborate/volunteer' },
 						{ label: 'Fund us', slug: 'collaborate/fund_us' },
 						{ label: 'Pioreactor', slug: 'collaborate/pioreactor' },
-						{ label: 'Safety and legal', autogenerate: { directory: 'collaborate/safety-and-legal' } },
+						{ label: 'Safety and legal', collapsed: true, autogenerate: { directory: 'collaborate/safety-and-legal' } },
 						{ label: 'Contribute to this site', slug: 'collaborate/contribute' },
 						{ label: 'Our name and logo', slug: 'collaborate/brand' },
 					],
 				},
 				{
 					label: 'Open experiments',
+					collapsed: true,
 					items: [
 						{ label: 'Community experiments', slug: 'experiments/community_experiments' },
 						{ label: 'Experimental protocols', slug: 'experiments/protocols' },
@@ -98,12 +102,7 @@ export default defineConfig({
 				{
 					label: 'Background',
 					collapsed: true,
-					items: [
-						{ label: 'Overview', slug: 'background' },
-						{ label: 'Overview (2023)', slug: 'background/overview' },
-						{ label: 'Proteins', autogenerate: { directory: 'background/proteins' } },
-						{ label: 'Next steps (2023 plan)', slug: 'background/plan-2023' },
-					],
+					autogenerate: { directory: 'background/proteins' },
 				},
 				{ label: 'Privacy', slug: 'privacy' },
 			],

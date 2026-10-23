@@ -10,6 +10,7 @@ sidebar:
 
 import YouTube from '../../components/YouTube.astro';
 import Mission from '../../components/Mission.astro';
+import { LinkButton } from '@astrojs/starlight/components';
 
 <Mission>
 
@@ -52,11 +53,12 @@ Imperial College London and the University of Edinburgh are using our kit under 
 
 We need biotechnologists, chefs, coders, creatives, engineers, enthusiasts, environmentalists, makers, medics, microbiologists, nutritionists, others.
 
-### [Contributions welcome!](https://github.com/amy-bo)
-
 Every page has an edit link, so please [add more, fix what's wrong, or just get in touch](/collaborate/contribute/).
 
-### [Subscribe on YouTube](https://www.youtube.com/@AMYBO)
+<div class="card-actions">
+    <LinkButton href="https://github.com/amy-bo">Contributions welcome</LinkButton>
+    <LinkButton href="https://www.youtube.com/@AMYBO" variant="secondary">Subscribe on YouTube</LinkButton>
+</div>
 
 ## History
 

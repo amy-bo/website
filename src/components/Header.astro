@@ -56,6 +56,8 @@ const shouldRenderSearch =
                         <div
                             class="site_link relative"
                             x-data={`{ open${idx}: false }`}
+                            @pointerenter={`if ($event.pointerType === 'mouse') open${idx} = true`}
+                            @pointerleave={`if ($event.pointerType === 'mouse') open${idx} = false`}
                         >
                             <button
                                 type="button"

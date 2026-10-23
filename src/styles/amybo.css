@@ -2,7 +2,8 @@
     --sl-text-5xl: 3.5rem;
 }
 
-.content-panel {
+/* Amy's full-bleed hero sits flush under the header; every other page keeps Starlight's space under the title line. */
+:root[data-has-hero] .content-panel {
     margin-top: 0 !important;
     padding-top: 0 !important;
 }

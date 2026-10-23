@@ -40,8 +40,8 @@
 /docs/legal/disclaimer/  /collaborate/safety-and-legal/disclaimer/  301
 /docs/risk-assessments  /collaborate/safety-and-legal/risk-management/  301
 /docs/risk-assessments/  /collaborate/safety-and-legal/risk-management/  301
-/docs/overview/plan  /background/plan-2023/  301
-/docs/overview/plan/  /background/plan-2023/  301
+/docs/overview/plan  /background/proteins/  301
+/docs/overview/plan/  /background/proteins/  301
 /docs/experiments  /projects/past/experiments/  301
 /docs/experiments/  /projects/past/experiments/  301
 /docs/openvalve  /projects/other-hardware/openvalve/  301
@@ -50,8 +50,8 @@
 /docs/equipment/  /projects/past/equipment/  301
 /docs/proteins  /background/proteins/  301
 /docs/proteins/  /background/proteins/  301
-/docs/overview  /background/overview/  301
-/docs/overview/  /background/overview/  301
+/docs/overview  /background/proteins/  301
+/docs/overview/  /background/proteins/  301
 /docs/pioflo  /projects/pioflo/  301
 /docs/pioflo/  /projects/pioflo/  301
 /docs/legal  /collaborate/safety-and-legal/  301
@@ -67,3 +67,11 @@
 /event    /events/next    302
 /mission/ /about/ 301
 /mission /about/ 301
+
+# Background overview pages removed in October 2026 (Amy's review).
+/background  /background/proteins/  301
+/background/  /background/proteins/  301
+/background/overview  /background/proteins/  301
+/background/overview/  /background/proteins/  301
+/background/plan-2023  /background/proteins/  301
+/background/plan-2023/  /background/proteins/  301
