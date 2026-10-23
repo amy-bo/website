@@ -29,8 +29,8 @@
 	.mission :global([data-term]) { text-decoration: underline dotted var(--sl-color-accent); text-underline-offset: 0.2em; border-radius: 0.2rem; cursor: default; }
 	.mission :global([data-term]:focus-visible) { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
 	.mission :global(li) { border-radius: 0.3rem; padding-inline: 0.3rem; margin-inline-start: -0.3rem; transition: background-color 0.15s; }
-	/* Brand green over whatever is behind it: pale green under dark text, dark olive under light text. */
-	.mission :global(.lit) { background-color: rgb(135 189 37 / 0.28); }
+	/* Brand green highlight with black text (and black links), as the branding guide allows, in either theme. */
+	.mission :global(.lit), .mission :global(.lit a), .mission :global(.lit strong) { background-color: #87bd25; color: #000 !important; }
 	/* The strapline in the brand colours: "Sustainable Protein for" in blue #007CBB (4.5:1 on white and black; large text, so it also passes
 	   on the dark theme); "All" in green #87BD25 on the dark theme, and black on a green highlight on light, where green
 	   text would be illegible. */

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Generates the Open Graph images in public/ with sharp. Run: node scripts/og.mjs
-//   public/og.png        1200x630, brand gradient, logo and strapline (site-wide default)
+//   public/og.png        1200x630, brand black, logo and strapline in the brand colours (site-wide default)
 //   public/og-event.jpg  1200x630, AMYBO photo behind the 13 November 2026 event title
 //   public/logo.png      512x512, the AMYBO mark on white, for the Organization structured data
 import sharp from 'sharp';
@@ -29,13 +29,12 @@ await write('public/logo.png', `<svg xmlns="http://www.w3.org/2000/svg" width="5
 </svg>`);
 
 await write('public/og.png', `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b2e14"/><stop offset="1" stop-color="#175a00"/></linearGradient></defs>
-  <rect width="1200" height="630" fill="url(#g)"/>
+  <rect width="1200" height="630" fill="#000000"/>
   ${logoAt(90, 120, 420, 290)}
-  <text x="540" y="250" font-family="${FONT}" font-size="52" font-weight="700" fill="#ffffff">Sustainable protein</text>
-  <text x="540" y="322" font-family="${FONT}" font-size="52" font-weight="700" fill="#87BD25">for all</text>
-  <text x="540" y="400" font-family="${FONT}" font-size="28" fill="#dfe9d6">Open source protein fermentation</text>
-  <text x="540" y="442" font-family="${FONT}" font-size="28" fill="#dfe9d6">amybo.org</text>
+  <text x="540" y="250" font-family="${FONT}" font-size="52" font-weight="700" fill="#007CBB">Sustainable Protein</text>
+  <text x="540" y="322" font-family="${FONT}" font-size="52" font-weight="700" fill="#007CBB">for <tspan fill="#87BD25">All</tspan></text>
+  <text x="540" y="400" font-family="${FONT}" font-size="28" fill="#ffffff">Open source protein fermentation</text>
+  <text x="540" y="442" font-family="${FONT}" font-size="28" fill="#ffffff">amybo.org</text>
 </svg>`);
 
 // Photo: anode of an Aseptic electroPioreactor 0.1 after a run (AMYBO, CC BY-SA 4.0), darkened so the title reads.

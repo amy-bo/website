@@ -2,6 +2,22 @@
     --sl-text-5xl: 3.5rem;
 }
 
+/* Brand colours only: body text in black or white, page, header and sidebar on white or black, asides in brand
+   blue and green. Greys are kept for hairlines and secondary text. */
+:root {
+    --sl-color-text: var(--sl-color-white);
+    --sl-color-bg-nav: var(--sl-color-bg);
+    --sl-color-bg-sidebar: var(--sl-color-bg);
+    --sl-color-blue-low: #000; --sl-color-blue: #007cbb; --sl-color-blue-high: #007cbb;
+    --sl-color-purple-low: #000; --sl-color-purple: #87bd25; --sl-color-purple-high: #87bd25;
+    --sl-color-green-low: #000; --sl-color-green: #87bd25; --sl-color-green-high: #87bd25;
+}
+:root[data-theme='light'] {
+    --sl-color-blue-low: #fff; --sl-color-blue-high: #007cbb;
+    --sl-color-purple-low: #fff; --sl-color-purple-high: #000;
+    --sl-color-green-low: #fff; --sl-color-green-high: #000;
+}
+
 /* Amy's full-bleed hero sits flush under the header; every other page keeps Starlight's space under the title line. */
 :root[data-has-hero] .content-panel {
     margin-top: 0 !important;
@@ -62,6 +78,9 @@
 }
 .hero .sl-link-button.secondary:hover { background: rgba(0, 0, 0, 0.45); }
 
-/* The homepage's event button: purple, so it stands apart from the site's green. */
-.hero .sl-link-button.event-button { background: #6e11e6; border-color: #6e11e6; color: #fff; }
-.hero .sl-link-button.event-button:hover { background: #5a0dbd; border-color: #5a0dbd; }
+/* The homepage's event button: brand green with black text, so it stands apart from the blue buttons. */
+.hero .sl-link-button.event-button { background: #87bd25; border-color: #87bd25; color: #000; }
+.hero .sl-link-button.event-button:hover { background: #000; border-color: #87bd25; color: #87bd25; }
+
+/* Events&I's own buttons, in the brand blue (white text on #007CBB is 4.6:1). */
+.submit, .big, .primary:not(.sl-link-button) { background: #007cbb !important; color: #fff !important; }
