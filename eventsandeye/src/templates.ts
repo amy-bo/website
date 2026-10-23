@@ -36,7 +36,7 @@ export interface SessionRow {
 	capacity: number | null;
 	booking_deadline: string | null;
 	sort: number;
-	/** 1 for an optional session people sign up to without a capacity (e.g. dinner), so numbers are known. */
+	/** 1 for an optional session people sign up to (e.g. dinner), so numbers are known; with a capacity, it has a waiting list. */
 	optin?: number;
 }
 
@@ -49,8 +49,11 @@ export interface RegistrationRow {
 	affiliation: string | null;
 	needs: string | null;
 	extra_answer?: string | null;
-	/** Comma-separated ids of the opt-in sessions this person signed up to. */
+	/** Comma-separated ids of the opt-in sessions this person signed up to, whether they have a place or are waiting. */
 	optins?: string | null;
+	/** The subset of optins they are on the waiting list for. */
+	optins_waiting?: string | null;
+	optins_waitlist_since?: string | null;
 	share_contact: number;
 	status: 'pending' | 'confirmed';
 	place: 'place' | 'waitlist' | null;
@@ -124,19 +127,37 @@ export function forAudience(md: string, mode: Mode): string {
 	return out.join('\n').replace(/\n{3,}/g, '\n\n');
 }
 
-/** The opt-in sessions (e.g. dinner) this registration signed up to. Only in-person registrations can. */
+/** The opt-in sessions (e.g. dinner) this registration signed up to, with a place or waiting. Only in-person registrations can. */
 export function optedIn(reg: Pick<RegistrationRow, 'attendance' | 'optins'>, sessions: SessionRow[]): SessionRow[] {
 	if (reg.attendance !== 'in_person' || !reg.optins) return [];
 	const ids = reg.optins.split(',');
 	return sessions.filter((s) => s.optin && ids.includes(s.id));
 }
 
+export const optinWaiting = (reg: Pick<RegistrationRow, 'optins_waiting'>, id: string) => (reg.optins_waiting ?? '').split(',').includes(id);
+
+/** The opt-in sessions this registration has a place at (not just waiting for). */
+export const optinPlaces = (reg: Pick<RegistrationRow, 'attendance' | 'optins' | 'optins_waiting'>, sessions: SessionRow[]) =>
+	optedIn(reg, sessions).filter((s) => !optinWaiting(reg, s.id));
+
+/** Just the opt-in sessions, and waiting for every one of them: like the in-person waiting list, no joining instructions yet. */
+export const onlyWaiting = (reg: Pick<RegistrationRow, 'attendance' | 'place' | 'optins' | 'optins_waiting'>, sessions: SessionRow[]) =>
+	modeOf(reg) === 'extras' && optedIn(reg, sessions).length > 0 && !optinPlaces(reg, sessions).length;
+
+/** Waiting for a place: in person, or (for someone coming only to the opt-in sessions) for all of those. */
+export const waitingForPlace = (reg: Pick<RegistrationRow, 'attendance' | 'place' | 'optins' | 'optins_waiting'>, sessions: SessionRow[]) =>
+	(reg.attendance === 'in_person' && reg.place === 'waitlist') || onlyWaiting(reg, sessions);
+
+const lower = (s: SessionRow) => s.label.charAt(0).toLowerCase() + s.label.slice(1);
+const waitingLines = (reg: RegistrationRow, sessions: SessionRow[]) =>
+	optedIn(reg, sessions).filter((s) => optinWaiting(reg, s.id)).map((s) => `You are on the waiting list for ${lower(s)}. We will email you if a place becomes available.`);
+
 export function statusLines(reg: RegistrationRow, sessions: SessionRow[]): string[] {
 	const lines: string[] = [];
 	const mode = modeOf(reg);
 	if (mode === 'extras') {
-		const what = optedIn(reg, sessions).map((s) => s.label.charAt(0).toLowerCase() + s.label.slice(1)).join(' and ') || 'the optional sessions';
-		return [`You are joining us for ${what} only.`];
+		const what = optedIn(reg, sessions).map(lower).join(' and ') || 'the optional sessions';
+		return [`You are joining us for ${what} only.`, ...waitingLines(reg, sessions)];
 	}
 	if (reg.attendance === 'remote') lines.push('You are registered to join the talks remotely.');
 	else if (reg.place === 'waitlist') lines.push('You are on the waiting list for an in-person place. We will email you if a place becomes available.');
@@ -145,7 +166,8 @@ export function statusLines(reg: RegistrationRow, sessions: SessionRow[]): strin
 		const t = sessions.find((x) => x.id === reg.tour_id);
 		if (t) lines.push(reg.tour_place === 'waitlist' ? `You are on the waiting list for the ${t.label}.` : `You are booked on the ${t.label}.`);
 	}
-	for (const s of optedIn(reg, sessions)) lines.push(`You would like to join us for ${s.label.charAt(0).toLowerCase()}${s.label.slice(1)}.`);
+	for (const s of optinPlaces(reg, sessions)) lines.push(`You would like to join us for ${lower(s)}.`);
+	lines.push(...waitingLines(reg, sessions));
 	return lines;
 }
 
@@ -174,13 +196,13 @@ function calendarText(cal: CalendarBlock | undefined, tz: string): string {
 export function confirmEmail(b: Brand, ev: EventRow, reg: RegistrationRow, sessions: SessionRow[], confirmUrl: string): OutgoingEmail {
 	const subject = `Complete your registration: ${ev.title}`;
 	const choices = [
-		...statusLines(reg, sessions).map((l) => l.replace('You have an in-person place.', 'An in-person place is held for you.').replace('You are booked on', 'A place is held for you on').replace('You are on the waiting list for an in-person place. We will email you if a place becomes available.', 'You are joining the waiting list for an in-person place.')),
+		...statusLines(reg, sessions).map((l) => l.replace('You have an in-person place.', 'An in-person place is held for you.').replace('You are booked on', 'A place is held for you on').replace('You are on the waiting list for an in-person place. We will email you if a place becomes available.', 'You are joining the waiting list for an in-person place.').replace(/^You are on the waiting list for (.*)\. We will email you if a place becomes available\.$/, 'You are joining the waiting list for $1.')),
 		reg.share_contact ? 'You chose to share your email address with the hosts of the sessions you attend.' : 'Session hosts will see only your name and whether you have a place.',
 	];
-	const waiting = reg.attendance === 'in_person' && reg.place === 'waitlist';
+	const waiting = waitingForPlace(reg, sessions);
 	const held = modeOf(reg) === 'in_person' && !waiting ? 'your place will be released' : 'it will be deleted';
 	// On the waiting list there's no place to lose: the point of confirming is to stay on the list.
-	const why = waiting ? ' and join the waiting list: we will email you if a place comes up, for example if we can book a bigger room' : '';
+	const why = !waiting ? '' : reg.place === 'waitlist' ? ' and join the waiting list: we will email you if a place comes up, for example if we can book a bigger room' : ' and join the waiting list: we will email you if a place comes up';
 	const notMeUrl = `${confirmUrl}${confirmUrl.includes('?') ? '&' : '?'}not-me=1`;
 	const holdUntil = ukDateTime(reg.hold_expires_at ?? ev.deadline, ev.timezone);
 	const html = layout(b, subject, `

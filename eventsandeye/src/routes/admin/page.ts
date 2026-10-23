@@ -186,7 +186,7 @@ async function load() {
 		stat('remote confirmed', c.remote),
 		stat('unconfirmed', c.pending),
 		...c.tours.map((t) => stat(t.label + ' (waiting ' + t.waiting + ')' + (t.open ? '' : ' – booking closed'), t.confirmed + ' / ' + (t.capacity ?? '∞'))),
-		...s.sessions.filter((x) => x.optin).map((x) => stat(x.label + ': signed up (confirmed, not waiting)', s.registrations.filter((r) => r.status === 'confirmed' && r.attendance === 'in_person' && r.place !== 'waitlist' && (r.optins || '').split(',').includes(x.id)).length)),
+		...c.optins.map((o) => stat(o.label + ' signed up (waiting ' + o.waiting + ')', o.confirmed + ' / ' + (o.capacity ?? '∞'))),
 		stat('registration closes', uk(s.event.deadline)),
 	].join('');
 	$('promote-all').hidden = !(c.inPerson.waiting > 0 && c.inPerson.held < c.inPerson.max);
@@ -216,11 +216,14 @@ async function load() {
 		const tour = tours.find((t) => t.id === r.tour_id);
 		const pend = r.status === 'pending' ? '<span class="tag pending">unconfirmed</span> ' : '';
 		const where = r.attendance === 'remote' ? 'Remote' : !r.place ? '<span class="tag ok">' + esc(s.sessions.filter((x) => x.optin && (r.optins || '').split(',').includes(x.id)).map((x) => x.label).join(', ') || 'Opt-in') + ' only</span>' : r.place === 'waitlist' ? '<span class="tag wait">in person: waiting since ' + esc(uk(r.waitlist_since)) + '</span>' : '<span class="tag ok">in person</span>';
-		const opts = r.attendance === 'in_person' && r.optins ? s.sessions.filter((x) => x.optin && r.optins.split(',').includes(x.id)).map((x) => esc(x.label)) : [];
+		const waitingFor = (r.optins_waiting || '').split(',');
+		const optSessions = r.attendance === 'in_person' && r.optins ? s.sessions.filter((x) => x.optin && r.optins.split(',').includes(x.id)) : [];
+		const opts = optSessions.map((x) => waitingFor.includes(x.id) ? '<span class="tag wait">' + esc(x.label) + ': waiting</span>' : esc(x.label));
 		const tourCell = (tour ? (r.tour_place === 'waitlist' ? '<span class="tag wait">' + esc(tour.label) + ': waiting</span>' : esc(tour.label)) : '') + (opts.length ? (tour ? '<br>' : '') + 'Signed up: ' + opts.join(', ') : '');
 		const actions = [
 			r.status === 'confirmed' && r.place === 'waitlist' ? '<button data-promote="event" data-id="' + esc(r.id) + '">Promote to place</button>' : '',
 			r.status === 'confirmed' && r.tour_place === 'waitlist' ? '<button data-promote="tour" data-id="' + esc(r.id) + '">Promote to tour</button>' : '',
+			...(r.status === 'confirmed' ? optSessions.filter((x) => waitingFor.includes(x.id)).map((x) => '<button data-promote="optin" data-session="' + esc(x.id) + '" data-id="' + esc(r.id) + '">Promote to ' + esc(x.label.toLowerCase()) + '</button>') : []),
 			'<button class="danger" data-delete="' + esc(r.id) + '" data-name="' + esc(r.name) + '" data-confirmed="' + (r.status === 'confirmed' ? '1' : '0') + '">Remove</button>',
 		].join(' ');
 		return '<tr><td>' + esc(r.name) + '</td><td>' + esc(r.email) + '</td><td>' + pend + where + '</td><td>' + tourCell + '</td><td>' + esc(r.affiliation) + '</td><td>' + esc(r.needs) + '</td><td>' + esc(r.extra_answer) + '</td><td>' + (r.share_contact ? 'yes' : 'no') + '</td><td>' + esc(r.instructions_version) + '</td><td>' + actions + '</td></tr>';
@@ -269,7 +272,7 @@ document.body.addEventListener('click', async (e) => {
 			const d = await api('/api/admin/promote-all', 'POST', { event: eventId }); toast('Promoted and emailed ' + d.promoted + (d.still_waiting ? '; ' + d.still_waiting + ' still waiting.' : '.')); load();
 		} else if (b.dataset.promote) {
 			if (!confirm('Promote this person? They will be emailed the latest joining instructions.')) return;
-			await api('/api/admin/promote', 'POST', { id: b.dataset.id, what: b.dataset.promote }); toast('Promoted and emailed.'); load();
+			await api('/api/admin/promote', 'POST', { id: b.dataset.id, what: b.dataset.promote, session: b.dataset.session }); toast('Promoted and emailed.'); load();
 		} else if (b.dataset.delete) {
 			if (!confirm(b.dataset.confirmed === '1' ? 'Remove ' + b.dataset.name + '? They have confirmed, so they will be emailed that their registration has been cancelled, and their calendar entries removed.' : 'Remove ' + b.dataset.name + '? They never confirmed, so no email is sent (use this for spam, typos or duplicates).')) return;
 			await api('/api/admin/registration', 'DELETE', { id: b.dataset.delete }); toast('Removed.'); load();

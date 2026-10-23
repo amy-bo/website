@@ -2,6 +2,10 @@
 
 Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
+## 2026-10-23
+
+- [x] **Dinner capacity and waiting list; dinner at The Hawk's Nest** — opt-in sessions (dinner) can now have a capacity, with a waiting list like the tours (migration 0004: `optins_waiting`, `optins_waitlist_since`). Once full, the form says "(full: waiting list)". People waiting get no dinner calendar entry, and anyone coming only for the dinner gets no joining instructions until an admin clicks **Promote to dinner**; the organiser is told when someone joins the waiting list. The seed quietly moves the dinner to The Hawk's Nest, 17:30 to 20:30 with capacity 10 (the table booked), moves the venue to the I-HUB and adds joining instructions v5. The event page gives the 17:30 table, a 20-minute walk and the £14.50 pizza and Margarita offer. e2e: 229 passed.
+
 ## 2026-10-06
 
 - [x] **Save sessions without emailing anyone** — a second save button on the admin page leaves calendars as they were; each person's entries catch up with the next email that carries their joining instructions (e.g. a message with "Include the latest joining instructions"), so several changes reach them in one email.

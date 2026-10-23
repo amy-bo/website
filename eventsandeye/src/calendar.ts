@@ -54,10 +54,11 @@ export function entriesFor(env: Env, ev: EventRow, sessions: SessionRow[], reg: 
 		}));
 	}
 
-	// The opt-in sessions this person signed up for (e.g. dinner) each get an entry of their own, at their own place,
-	// whether they come for the day too or only for these.
+	// The opt-in sessions this person has a place at (e.g. dinner) each get an entry of their own, at their own place,
+	// whether they come for the day too or only for these. Waiting for one gets no entry until they are promoted.
 	const optinIds = (reg.optins ?? '').split(',');
-	const optinEntries: CalEntry[] = ordered.filter((s) => s.optin && optinIds.includes(s.id)).map((s) => ({
+	const waitingIds = (reg.optins_waiting ?? '').split(',');
+	const optinEntries: CalEntry[] = ordered.filter((s) => s.optin && optinIds.includes(s.id) && !waitingIds.includes(s.id)).map((s) => ({
 		key: `s-${s.id}`,
 		uid: uid(`s-${s.id}`),
 		summary: `${ev.title}: ${s.label}`,
@@ -79,7 +80,7 @@ export function entriesFor(env: Env, ev: EventRow, sessions: SessionRow[], reg: 
 		.map((s) => {
 			let note = '';
 			if (s.id === reg.tour_id) note = reg.tour_place === 'waitlist' ? ' (you are on the waiting list)' : ' (booked)';
-			if (s.kind === 'social') note = s.optin && reg.optins?.split(',').includes(s.id) ? ` (you signed up${s.location ? `, ${s.location}` : ''})` : ` (optional${s.location ? `, ${s.location}` : ''})`;
+			if (s.kind === 'social') note = s.optin && waitingIds.includes(s.id) && optinIds.includes(s.id) ? ' (you are on the waiting list)' : s.optin && optinIds.includes(s.id) ? ` (you signed up${s.location ? `, ${s.location}` : ''})` : ` (optional${s.location ? `, ${s.location}` : ''})`;
 			return `${hm(s.starts_at, tz)} ${s.label}${note}`;
 		});
 	const travel = ev.travel_minutes || 60;
