@@ -48,7 +48,7 @@ export default defineConfig({
 					collapsed: true,
 					items: [
 						{ label: 'About', slug: 'about' },
-						{ label: 'What is sustainable protein?', collapsed: true, autogenerate: { directory: 'sustainable-protein' } },
+						{ label: 'Sustainable protein', collapsed: true, autogenerate: { directory: 'sustainable-protein' } },
 						{ label: 'Contact', slug: 'contact' },
 					],
 				},
