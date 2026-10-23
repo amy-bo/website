@@ -1,15 +1,16 @@
-# Deploys amybo.org to Cloudflare from GitHub. See README "Deploying from GitHub".
+# Deploys the site to Cloudflare from GitHub. See README "Deploying from GitHub".
 #
-# Two jobs, so that code nobody has reviewed never runs next to a credential:
-#   build   no secrets at all: installs, builds the site, uploads it as an artifact.
-#   deploy  runs in the "production" GitHub Environment (add a required reviewer in the repository settings so every
-#           deploy waits for a two-factor-authenticated approval), installs without running package scripts, and only
-#           then uses the Cloudflare token, scoped to the steps that need it.
+# Three jobs, so that code nobody has reviewed never runs next to a credential:
+#   build       no secrets at all: installs, builds the site, uploads it as an artifact.
+#   dev         every push, to any branch, with no approval: the static pages go to the Pages branch "dev"
+#               (dev.amybo.org), marked noindex, without Functions or bindings, so dev code can never reach live
+#               registrations. The last push wins.
+#   production  pushes to main only, in the "production" GitHub Environment (add a required reviewer in the repository
+#               settings so it waits for a two-factor-authenticated approval): the live database, the Functions, the
+#               secrets and the Workers. It runs after dev, so what you approve is already on dev.amybo.org.
 #
-# Only the Pages project's production branch touches the live database and the cron Worker, and only it deploys the
-# Functions. Any other branch gets a preview of the static pages alone, deployed from an empty directory so that neither
-# ./functions nor wrangler.toml (with its database binding) comes along. Pushing to main makes main the production branch
-# (the one-way switch at merge).
+# Both deploy jobs install without running package scripts, and only then use the Cloudflare token, scoped to the
+# steps that need it.
 #
 # Needs GitHub Actions secret values for the API token, the account id, TOKEN_SECRET, the Resend key and the Turnstile
 # secret key, and variables PUBLIC_TURNSTILE_SITE_KEY (required), SITE_URL, ACCESS_TEAM_DOMAIN and ACCESS_AUD (optional).
@@ -17,12 +18,8 @@ name: Deploy to Cloudflare
 
 on:
   push:
-    branches: [launch-2026, main]
+    branches: ['**']
   workflow_dispatch:
-
-concurrency:
-  group: deploy
-  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -51,10 +48,52 @@ jobs:
           path: dist
           retention-days: 3
 
-  deploy:
+  dev:
     needs: build
     runs-on: ubuntu-24.04
+    environment: dev
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: true
+    env:
+      PROJECT: amybo
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install wrangler without running package scripts
+        run: |
+          npm ci --ignore-scripts
+          rm -f node_modules/.bin/node
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+      - name: Keep dev out of search engines
+        run: |
+          printf '\n# dev.amybo.org only (added by the dev deploy).\n/*\n  X-Robots-Tag: noindex\n' >> dist/_headers
+      - name: Deploy a static preview to the dev branch, without Functions or bindings
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # From an empty directory, so that neither ./functions nor wrangler.toml (with its database binding) comes along.
+          empty=$(mktemp -d)
+          cp -r dist "$empty/dist"
+          cd "$empty"
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" pages deploy dist --project-name "$PROJECT" --branch dev \
+            --commit-hash "$GITHUB_SHA" --commit-message "$GITHUB_REF_NAME" --commit-dirty=true
+
+  production:
+    needs: [build, dev]
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-24.04
     environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     env:
       PROJECT: amybo
       DB_NAME: amybo-rsvp-eu
@@ -107,7 +146,8 @@ jobs:
             prod=main
           fi
           echo "Production branch: $prod"
-          if [ "$GITHUB_REF_NAME" = "$prod" ]; then echo "is_prod=true" >> "$GITHUB_OUTPUT"; else echo "is_prod=false" >> "$GITHUB_OUTPUT"; fi
+          [ "$GITHUB_REF_NAME" = "$prod" ] || { echo "This job only deploys the production branch ($prod)"; exit 1; }
+          echo "is_prod=true" >> "$GITHUB_OUTPUT"
 
       - name: Put the site URL and Access details in the configs (when set)
         run: |
@@ -180,17 +220,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler pages deploy dist --project-name "$PROJECT" --branch "$GITHUB_REF_NAME" --commit-dirty=true
-
-      - name: Deploy a static preview, without Functions or bindings (other branches)
-        if: steps.prod.outputs.is_prod != 'true'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          empty=$(mktemp -d)
-          cp -r dist "$empty/dist"
-          cd "$empty"
-          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" pages deploy dist --project-name "$PROJECT" --branch "$GITHUB_REF_NAME" --commit-dirty=true
 
       - name: Deploy the amy.bo Worker (production, once switched on)
         if: steps.prod.outputs.is_prod == 'true' && vars.DEPLOY_AMYBO_WORKER == 'true'

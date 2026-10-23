@@ -90,12 +90,13 @@ Link-in-bio pages for AMYBO volunteers and supporters, and AMYBO's own at amy.bo
 
 ## Deploying from GitHub (the quick route)
 
-`.github/workflows/deploy.yml` deploys everything from GitHub Actions on every push to `launch-2026` or `main`, so nothing has to run on a laptop. It has two jobs:
+`.github/workflows/deploy.yml` deploys from GitHub Actions on every push, so nothing has to run on a laptop. It has three jobs:
 
 - **build** has no secrets at all: it installs, builds the site and hands it on as an artifact.
-- **deploy** runs in the `production` GitHub Environment and installs without running package scripts before it touches the Cloudflare token. It creates the D1 database in the **EU jurisdiction** if it is missing (`amybo-rsvp-eu`), applies the migrations and the insert-only seed, sets the secrets, deploys the site with its Functions and deploys the cron Worker.
+- **dev** runs on every push to any branch, with no approval. It deploys the static pages to the Pages branch `dev`, served at **dev.amybo.org** with a `noindex` header, with no Functions and no database binding, so dev code can never reach live registrations (the registration form does not work there). The last push wins.
+- **production** runs only for pushes to `main`, after dev, in the `production` GitHub Environment, so it waits for your approval. It installs without running package scripts before it touches the Cloudflare token, creates the D1 database in the **EU jurisdiction** if it is missing (`amybo-rsvp-eu`), applies the migrations and the insert-only seed, sets the secrets, deploys the site with its Functions and deploys the cron Worker.
 
-Only the Pages project's production branch touches the live database and the cron Worker, and only it deploys the registration Functions. Other branches get a preview of the static pages alone, with no Functions and no database binding, so preview code can never reach live registrations. The first push to `main` makes `main` the production branch, so merging the launch PR hands production over automatically.
+So the routine is: push, check dev.amybo.org, and when `main` is right, approve the waiting production job.
 
 One-off set-up:
 
@@ -103,8 +104,9 @@ One-off set-up:
 2. **Turnstile** (dashboard → Turnstile → Add widget): hostnames `amybo.org`, `www.amybo.org` and `amybo-4p1.pages.dev` (the project's own pages.dev address; `amybo.pages.dev` belongs to someone else), managed mode.
 3. **Resend**: add the domain `amybo.org` in the EU region, add the DNS records it shows (proxy off), verify, create an API key with sending access only.
 4. **GitHub** (repository → Settings → Secrets and variables → Actions). Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `TOKEN_SECRET` (`openssl rand -hex 32`; never paste it anywhere else), `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`. Variables: `PUBLIC_TURNSTILE_SITE_KEY`; `SITE_URL` (the address emails link to: `https://amybo-4p1.pages.dev` until amybo.org is attached, then `https://amybo.org`); `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` once step 6 below is done.
-5. **Environment** (Settings → Environments → `production`): add yourself as a required reviewer and restrict deployment branches to `launch-2026` and `main`. Every deploy then waits for an approval from a two-factor-authenticated GitHub account.
+5. **Environment** (Settings → Environments → `production`): add yourself as a required reviewer and restrict deployment branches to `main`. Every production deploy then waits for an approval from a two-factor-authenticated GitHub account. The `dev` environment is created by the first run and needs no reviewer.
 6. **Cloudflare Access** for the admin page, with **two-factor sign-in**: see step 6 of the manual set-up below. The admin page refuses any sign-in whose token does not report a second factor.
+7. **dev.amybo.org** (Cloudflare → Workers & Pages → `amybo` → Custom domains): add `dev.amybo.org`, then in the amybo.org DNS change the `dev` CNAME it creates to point at `dev.amybo-4p1.pages.dev`, so it follows the `dev` branch instead of production.
 
 ## Two-factor authentication on the logins that reach other people's data
 
