@@ -31,8 +31,10 @@
 	.mission :global(li) { border-radius: 0.3rem; padding-inline: 0.3rem; margin-inline-start: -0.3rem; transition: background-color 0.15s; }
 	/* Brand green over whatever is behind it: pale green under dark text, dark olive under light text. */
 	.mission :global(.lit) { background-color: rgb(135 189 37 / 0.28); }
-	/* The strapline in the brand colours (blue #008BD2, green #87BD25) on brand black, which both read on in either theme. */
-	.mission :global(.strapline) { display: inline-block; margin: 0; padding: 0.4rem 1rem; border-radius: 0.4rem; background: #000; color: #008bd2; font-size: var(--sl-text-2xl); font-weight: 700; line-height: 1.3; }
+	/* The strapline in the brand colours: "Sustainable Protein for" in blue #008BD2 (large text, so it passes on white and
+	   on the dark theme); "All" in green #87BD25 on the dark theme, and black on a green highlight on light, where green
+	   text would be illegible. */
+	.mission :global(.strapline) { margin: 0; color: #008bd2; font-size: var(--sl-text-2xl); font-weight: 700; line-height: 1.3; }
 	.mission :global(.strapline .brand-green) { color: #87bd25; }
-	@media (prefers-reduced-motion: reduce) { .mission :global(li) { transition: none; } }
+	:global([data-theme='light']) .mission :global(.strapline .brand-green) { color: #000; background: #87bd25; padding-inline: 0.15em; border-radius: 0.15em; }
 </style>
