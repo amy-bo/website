@@ -8,6 +8,9 @@ const { data } = Astro.locals.starlightRoute.entry;
 const { title = data.title, tagline, actions = [] } = data.hero || {};
 
 const forestBackground = await getImage({ src: forestImage });
+
+// The strapline as the branding guide sets it: "Sustainable Protein for" in blue, "All" in green.
+const isStrapline = /^sustainable protein for all$/i.test(title.trim());
 ---
 
 <div
@@ -16,7 +19,13 @@ const forestBackground = await getImage({ src: forestImage });
 >
 	<div class="sl-flex stack p-10">
 		<div class="sl-flex copy">
-			<h1 id={PAGE_TITLE_ID} data-page-title set:html={title} />
+			{isStrapline ? (
+				<h1 id={PAGE_TITLE_ID} data-page-title class="strapline-hero">
+					<span class="strap-blue">Sustainable Protein for</span> <span class="strap-green">All</span>
+				</h1>
+			) : (
+				<h1 id={PAGE_TITLE_ID} data-page-title set:html={title} />
+			)}
 			{tagline && <div class="tagline" set:html={tagline} />}
 		</div>
 		{

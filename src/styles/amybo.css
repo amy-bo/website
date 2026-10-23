@@ -84,3 +84,9 @@
 
 /* Events&I's own buttons, in the brand blue (white text on #007CBB is 4.6:1). */
 .submit, .big, .primary:not(.sl-link-button) { background: #007cbb !important; color: #fff !important; }
+
+/* The homepage strapline over the forest photo, in the brand colours. A dark halo keeps blue and green readable
+   over the canopy. */
+.hero h1.strapline-hero { text-shadow: 0 0 6px #000, 0 0 18px #000, 0 2px 4px #000; }
+.hero h1.strapline-hero .strap-blue { color: #007cbb; }
+.hero h1.strapline-hero .strap-green { color: #87bd25; }
