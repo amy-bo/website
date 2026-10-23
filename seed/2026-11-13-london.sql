@@ -147,3 +147,45 @@ UPDATE instructions SET body_md = replace(body_md, 'To change or cancel your reg
 
 To change or cancel your registration, use your personal link below.')
   WHERE event_id = '2026-11-13-london' AND version = 4 AND body_md NOT LIKE '%:::extras%';
+
+-- 23 October 2026: dinner booked at The Hawk's Nest (10 people, 17:30 to 20:30), and the venue is the I-HUB. Direct SQL,
+-- so nobody is emailed; calendars catch up with each person's next email. Each runs once (only while the old value is there).
+UPDATE sessions SET label = 'Dinner', starts_at = '2026-11-13T17:30:00Z', ends_at = '2026-11-13T20:30:00Z',
+  location = 'The Hawk''s Nest, Goldhawk Road, Shepherd''s Bush Market, London W12 8DF (pay on the night)'
+  WHERE id = '2026-11-13-london-pub' AND location LIKE '%Broadcaster%';
+UPDATE events SET location = 'I-HUB, Imperial College White City campus, 84 Wood Lane, London W12 0BZ'
+  WHERE id = '2026-11-13-london' AND location LIKE '%Bezos Centre%';
+
+-- Joining instructions version 5 (23 October): I-HUB entrance and reception; dinner 17:30 at The Hawk's Nest. Insert-only.
+-- Sent automatically only to people who confirm from now on; existing registrants get it when a message includes it.
+INSERT OR IGNORE INTO instructions (event_id, version, subject, body_md, change_note, created_at, created_by) VALUES
+  ('2026-11-13-london', 5, 'Joining instructions: AMYBO Event, 13 November 2026',
+':::in-person
+**Where:** Room 516, the I-HUB, Imperial College White City campus, 84 Wood Lane, London W12 0BZ. The entrance is at what3words [///violin.edge.walks](https://w3w.co/violin.edge.walks). Please sign in at reception, then come up to Room 516.
+
+**Getting there:** Wood Lane station (Hammersmith & City and Circle lines) is a few minutes'' walk away, and White City station (Central line) is also close.
+
+**Schedule (UK time):**
+
+- 10:30 First optional lab tour
+- 11:15 Second optional lab tour, and networking
+- 12:00 Welcome and talks
+- 13:30 Lunch
+- 14:30 Talks and discussion
+- 16:30 Close
+- 17:30 Dinner at The Hawk''s Nest, for those who signed up
+
+Closed shoes are needed in the labs.
+
+**Food:** attendance is free, and snacks and soft drinks are provided. Unless a sponsor comes forward, please buy or bring your own meals. The Works (Sir Michael Uren Hub, on campus) serves hot food at lunchtime. For dinner, we have booked tables from 17:30 at The Hawk''s Nest, a pizza and cocktail bar under the railway arches at Shepherd''s Bush Market (Goldhawk Road, W12 8DF), about 30 minutes'' walk or two stops on the Hammersmith & City line from Wood Lane to Goldhawk Road. They currently have a £14.50 Margherita pizza + Margarita cocktail offer on until 19:00. Pay for your own on the night, and please tell us as soon as you can if you can''t make it.
+:::
+
+:::remote
+**Joining remotely:** the talks are on Google Meet from 12:00 to 13:30 and from 14:30 to 16:30 (UK time), and they are recorded. The links will be in your calendar entries.
+:::
+
+:::extras
+**Dinner:** 17:30 at The Hawk''s Nest, Goldhawk Road, Shepherd''s Bush Market, London W12 8DF, a pizza and cocktail bar under the railway arches by Goldhawk Road station (Hammersmith & City and Circle lines). They currently have a £14.50 Margherita pizza + Margarita cocktail offer on until 19:00. Pay for your own on the night, and please tell us as soon as you can if you can''t make it.
+:::
+
+To change or cancel your registration, use your personal link below.', 'I-HUB entrance and reception; dinner 17:30 at The Hawk''s Nest', strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'setup');
