@@ -9,7 +9,7 @@ sidebar:
 
 Plants are a far more sustainable source of protein than meat, and a cornerstone of any sustainable diet. Only a fraction of the protein livestock eat ends up in the meat we eat. Per 100 g of protein, beef from beef herds uses about 164 m² of land, peas about 3.4 m² and tofu about 2.2 m² ([Our World in Data, from Poore & Nemecek 2018](https://ourworldindata.org/grapher/land-use-protein-poore?tab=table)). In measured UK diets, vegans' food has about a quarter of the greenhouse gas emissions and land use of high meat-eaters' ([Scarborough et al., 2023](https://doi.org/10.1038/s43016-023-00795-w)).
 
-Crops do still need farmland, and they depend on weather and season. There are already populated places where crops are hard or impossible to grow, which is where other forms of sustainable protein can add to what plants provide.
+Crops do still need farmland, often with fertilisers, pesticides and herbicides, some of which run off into rivers. They also depend on weather and season. There are already populated places where crops are hard or impossible to grow, which is where other forms of sustainable protein can add to what plants provide.
 
 Farming keeps improving. [The Land Institute](https://landinstitute.org/our-work/perennial-crops/) is developing perennial grain crops, and many farmers and growers are raising yields while cutting their environmental impact.
 
