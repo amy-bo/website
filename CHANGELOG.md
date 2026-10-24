@@ -2,6 +2,10 @@
 
 Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
+## 2026-10-24
+
+- [x] **Event page: Westfield fallback removed** — the "Fallback: Westfield London" food line dated from the large-table plan at The Broadcaster; with a table booked at The Hawk's Nest it no longer applies.
+
 ## 2026-10-23
 
 - [x] **Events&I ready to go public** — the copy in `eventsandeye/` matches andeyePro/eventsandeye: a step-by-step setup guide in its README (Events&I Plus stays on the roadmap), `examples/` (config, function wrappers, and a seed that is AMYBO's 13 November event, pointing to amy.bo/event), an AGENTS.md orientation file, and the CLA Assistant check on pull requests (upstream only). The e2e test keeps running on AMYBO's event, and its talk-time check now reads the seeded times, so it also passes with the example seed. e2e: 229 passed with either seed.
