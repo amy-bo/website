@@ -189,3 +189,9 @@ Closed shoes are needed in the labs.
 :::
 
 To change or cancel your registration, use your personal link below.', 'I-HUB entrance and reception; dinner 17:30 at The Hawk''s Nest', strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'setup');
+
+-- 24 October 2026: the talk times on a fresh database match the page and joining instructions v5 (12:00 to 13:30 and
+-- 14:30 to 16:30). Direct SQL, so these save and email nothing by themselves; calendar entries catch up with each
+-- person's next email. Each runs once (only while the old value is there).
+UPDATE sessions SET ends_at = '2026-11-13T13:30:00Z' WHERE id = '2026-11-13-london-talks-am' AND ends_at = '2026-11-13T13:00:00Z';
+UPDATE sessions SET starts_at = '2026-11-13T14:30:00Z' WHERE id = '2026-11-13-london-talks-pm' AND starts_at = '2026-11-13T14:00:00Z';

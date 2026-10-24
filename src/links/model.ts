@@ -1,4 +1,5 @@
 // Link pages (amy.bo/~name): data model shared by the page renderer, the editor and the API.
+import type { D1Database } from '@cloudflare/workers-types';
 
 export type NodeKind = 'group' | 'link' | 'text' | 'diary' | 'support';
 

@@ -1,5 +1,5 @@
 {
   "extends": "astro/tsconfigs/strict",
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist", "functions", "workers", "scripts", "eventsandeye/src", "eventsandeye/worker", "eventsandeye/tests", "eventsandeye/examples", ".vss", ".wrangler"]
+  "exclude": ["dist", "functions", "workers", "scripts", "src/links/api.ts", "src/links/auth.ts", "src/links/server.ts", "eventsandeye/src", "eventsandeye/worker", "eventsandeye/tests", "eventsandeye/examples", ".vss", ".wrangler"]
 }

@@ -16,6 +16,9 @@ export const notAPerson = (req: Request) =>
 	/bot|crawl|spider|preview|slurp|facebookexternalhit|embedly|whatsapp|telegram|discord|curl|wget|python|headless|lighthouse/i.test(req.headers.get('user-agent') ?? '') ||
 	/prefetch|prerender/i.test(req.headers.get('sec-purpose') ?? req.headers.get('purpose') ?? '');
 
+// TODO: one row per view grows without bound. Move to one row per (page, slug, day) with an upserted counter; that
+// needs a db/links migration (a count column and a unique key) and the stats queries in api.ts and
+// functions/admin/links/index.ts summing it.
 const count = (ctx: Ctx, page: string, slug: string) => {
 	if (!ctx.env.DB || notAPerson(ctx.request)) return;
 	ctx.waitUntil(

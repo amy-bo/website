@@ -13,7 +13,7 @@ export default defineConfig({
 	image: { layout: 'constrained' },
 	integrations: [
 		// Listed before Starlight so it uses this one: keeps the registration-only pages out of the sitemap.
-		sitemap({ filter: (page) => !/\/events\/(confirm|manage)\/|\/admin\//.test(page) }),
+		sitemap({ filter: (page) => !/\/events\/(confirm|manage|check-email)\/|\/admin\/|\/links\/edit\//.test(page) }),
 		starlight({
 			title: 'AMYBO',
 			locales: { root: { label: 'English', lang: 'en-GB' } },
@@ -40,6 +40,7 @@ export default defineConfig({
 				{ tag: 'meta', attrs: { property: 'og:image:alt', content: 'AMYBO: sustainable protein for all' } },
 				{ tag: 'meta', attrs: { name: 'twitter:image', content: 'https://amybo.org/og.png' } },
 				{ tag: 'meta', attrs: { name: 'theme-color', content: '#175a00' } },
+				{ tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' } },
 				{ tag: 'script', attrs: { type: 'application/ld+json' }, content: JSON.stringify({ '@context': 'https://schema.org', '@type': 'Organization', name: 'AMYBO', alternateName: 'AMYBO.org', url: 'https://amybo.org/', logo: 'https://amybo.org/logo.png', legalName: 'andeye Ltd', description: 'A non-profit open source protein fermentation community: sustainable protein for all.', sameAs: ['https://github.com/amy-bo', 'https://forum.amybo.org/', 'https://www.youtube.com/@AMYBO'] }) },
 			],
 			sidebar: [

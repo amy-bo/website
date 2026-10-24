@@ -1,6 +1,6 @@
 ---
-// A short looping header film for an event page: muted, no controls, and still for anyone who prefers reduced
-// motion or is saving data (they see the poster frame). About 250 KB; nothing loads until the page does.
+// A short looping header film for an event page: muted, with a small pause/play button (WCAG 2.2.2), and only started
+// by the script, so anyone who prefers reduced motion or is saving data sees the poster frame. About 250 KB.
 interface Props {
 	/** Folder under public/ holding event-header.webm, event-header.mp4 and event-header-poster.jpg. */
 	base: string;
@@ -10,26 +10,37 @@ interface Props {
 const { base, ratio = '3 / 1' } = Astro.props;
 ---
 
-<figure class="event-header" style={`aspect-ratio:${ratio}`} aria-hidden="true">
-	<video autoplay muted loop playsinline preload="metadata" poster={`${base}/event-header-poster.jpg`} disablepictureinpicture>
+<figure class="event-header" style={`aspect-ratio:${ratio}`}>
+	<video muted loop playsinline preload="metadata" poster={`${base}/event-header-poster.jpg`} disablepictureinpicture aria-hidden="true">
 		<source src={`${base}/event-header.webm`} type="video/webm" />
 		<source src={`${base}/event-header.mp4`} type="video/mp4" />
 	</video>
+	<button type="button" class="event-header-toggle" aria-label="Play video" hidden>
+		<svg class="icon-pause" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M4 2h3v12H4zM9 2h3v12H9z" fill="currentColor" /></svg>
+		<svg class="icon-play" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M4 2l10 6-10 6z" fill="currentColor" /></svg>
+	</button>
 </figure>
 
 <script>
 	const still = matchMedia('(prefers-reduced-motion: reduce)').matches || (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
-	if (still) {
-		for (const v of document.querySelectorAll<HTMLVideoElement>('.event-header video')) {
-			v.removeAttribute('autoplay');
-			v.preload = 'none';
-			v.pause();
-		}
+	for (const fig of document.querySelectorAll<HTMLElement>('.event-header')) {
+		const v = fig.querySelector('video');
+		const btn = fig.querySelector<HTMLButtonElement>('.event-header-toggle');
+		if (!v || !btn) continue;
+		const sync = () => { btn.setAttribute('aria-label', v.paused ? 'Play video' : 'Pause video'); };
+		v.addEventListener('play', sync);
+		v.addEventListener('pause', sync);
+		btn.addEventListener('click', () => { v.paused ? v.play() : v.pause(); });
+		btn.hidden = false;
+		if (still) v.preload = 'none';
+		// play() rejects if the browser blocks autoplay; the button then still offers Play.
+		else v.play().catch(sync);
 	}
 </script>
 
 <style>
 	.event-header {
+		position: relative;
 		margin: 0 0 1.5rem;
 		border-radius: 0.75rem;
 		overflow: hidden;
@@ -40,5 +51,34 @@ const { base, ratio = '3 / 1' } = Astro.props;
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+	}
+	.event-header-toggle {
+		position: absolute;
+		right: 0.6rem;
+		bottom: 0.6rem;
+		display: grid;
+		place-items: center;
+		width: 2rem;
+		height: 2rem;
+		padding: 0;
+		border: 0;
+		border-radius: 50%;
+		background: rgb(0 0 0 / 0.55);
+		color: #fff;
+		cursor: pointer;
+	}
+	.event-header-toggle[hidden] {
+		display: none;
+	}
+	.event-header-toggle:hover {
+		background: rgb(0 0 0 / 0.75);
+	}
+	.event-header-toggle:focus-visible {
+		outline: 2px solid #fff;
+		outline-offset: 2px;
+	}
+	.event-header-toggle[aria-label='Pause video'] .icon-play,
+	.event-header-toggle[aria-label='Play video'] .icon-pause {
+		display: none;
 	}
 </style>

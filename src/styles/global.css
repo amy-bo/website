@@ -13,7 +13,8 @@
 --color-accent-200: #aad7a0;
 --color-accent-600: #175a00;
 --color-accent-900: #0d3e00;
---color-accent-950: #87BD25;
+/* Starlight's dark theme uses 950 for accent-low and text-invert (text on accent backgrounds), so it must be dark. */
+--color-accent-950: #0a2a00;
 /* Generated gray color palettes. */
 --color-gray-100: #e6ffde;
 --color-gray-200: #ccffbb;

@@ -166,6 +166,7 @@ try {
 		const row = /<tr><td>Patreon<\/td><td>(\d+)<\/td><td>(\d+)<\/td><td>(\d+)<\/td><td>7<\/td><td><b>(\d+)<\/b>/.exec(s.text);
 		check('the click was counted, on top of the Linktree seed', row && row[3] === '1' && row[4] === '8', row?.[0]);
 		check('a bot click was not counted', /<tr><td>MM7MMU on QRZ.com<\/td><td>0<\/td>/.test(s.text));
+		check('admin stats page cannot be framed', s.headers.get('x-frame-options') === 'DENY' && s.headers.get('referrer-policy') === 'no-referrer', s.headers.get('x-frame-options'));
 		check('admin page refuses without Access', (await req('GET', '/admin/links/')).status === 401);
 	}
 
@@ -342,6 +343,9 @@ try {
 		const media = await fetch(`${BASE}${up.data.url}`);
 		check('and are served with a long cache', media.status === 200 && /immutable/.test(media.headers.get('cache-control') || ''), media.status);
 		check('uploads refuse other types', (await fetch(`${BASE}/api/links/upload`, { method: 'POST', headers: { ...C, 'content-type': 'text/html' }, body: '<p>' })).status === 415);
+		const post = (type, body) => fetch(`${BASE}/api/links/upload`, { method: 'POST', headers: { ...C, 'user-agent': UA, 'content-type': type }, body });
+		check('uploads refuse files that are not the type they claim', (await post('image/jpeg', png)).status === 415);
+		check('uploads over 1.5 MB are refused by their length', (await post('image/png', new Uint8Array(1_600_000))).status === 413);
 		await req('PUT', '/api/links/profile', { name: 'Vee', photo: up.data.value }, C);
 		check('a page can use its upload as its photo', (await req('GET', '/~vee')).text.includes(up.data.url));
 		await req('PUT', '/api/links/profile', { name: 'Vee', photo: '' }, C);
@@ -355,6 +359,8 @@ try {
 		check('suggestions refuse private addresses', pr.status === 400, pr.status);
 		const pm = await req('GET', `/api/links/propose?url=${encodeURIComponent('mailto:vee@example.org')}`, undefined, { cookie: `lp_s=${cookie}` });
 		check('suggestions handle email links', pm.data.icon === 'mail');
+		const px = await req('GET', `/api/links/propose?url=${encodeURIComponent('https://example.org/')}`, undefined, { cookie: `lp_s=${cookie}`, 'sec-fetch-site': 'cross-site' });
+		check('suggestions only for the editor itself', px.status === 403, px.status);
 		const ri = await req('GET', `/api/links/remote-image?url=${encodeURIComponent('https://example.org/x.png')}`, undefined, { cookie: `lp_s=${cookie}`, 'sec-fetch-site': 'cross-site' });
 		check('remote images only for the editor itself', ri.status === 403, ri.status);
 		const foreign = await req('PUT', '/api/links/nodes', { nodes: [{ key: 'i', parent: null, kind: 'link', label: 'x', url: 'https://x.org', image: 'r2:vee/../martin/a.webp' }] }, C);

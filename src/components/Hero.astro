@@ -8,16 +8,12 @@ const { data } = Astro.locals.starlightRoute.entry;
 const { title = data.title, tagline, actions = [] } = data.hero || {};
 
 const forestBackground = await getImage({ src: forestImage });
-
-let rawHtml: string | undefined;
 ---
 
 <div
-	class="hero width-full pl-6 pr-6"
+	class="hero pl-6 pr-6"
 	style={`background-image:url(${forestBackground.src});`}
-	aria-label="Stock image of aerial view of a forest."
 >
-	{rawHtml && <div class="hero-html sl-flex" set:html={rawHtml} />}
 	<div class="sl-flex stack p-10">
 		<div class="sl-flex copy">
 			<h1 id={PAGE_TITLE_ID} data-page-title set:html={title} />
@@ -58,47 +54,23 @@ let rawHtml: string | undefined;
 	@layer starlight.core {
 		.hero {
 			width: 100vw; /* Full viewport width */
-			height: 100vh;
+			min-height: 100vh;
+			min-height: 100svh;
 			left: 50%;
 			right: 50%;
 			margin-left: -50vw;
 			margin-right: -50vw;
-			position: relative;
 			display: grid;
 			align-items: center;
 			gap: 1rem;
 			padding-bottom: 1rem;
 			position: relative;
-			overflow: hidden;
+			/* Forest-dark fallback so the white heading stays readable if the photo fails to load. */
+			background-color: #0e3000;
 			/* The photo is set inline on .hero itself: cover it once, never tile it. */
 			background-size: cover;
 			background-position: center;
 			background-repeat: no-repeat;
-		}
-
-		.hero-bg {
-			position: absolute;
-			inset: 0;
-			width: 100%;
-			height: 100%;
-			background-size: cover;
-			background-position: center;
-			background-repeat: no-repeat;
-			z-index: 0;
-			pointer-events: none;
-		}
-
-		.hero > *:not(.hero-bg) {
-			position: relative;
-			z-index: 1;
-		}
-
-		.hero > img,
-		.hero > .hero-html {
-			object-fit: contain;
-			width: min(70%, 20rem);
-			height: auto;
-			margin-inline: auto;
 		}
 
 		.stack {
@@ -148,12 +120,6 @@ let rawHtml: string | undefined;
 				grid-template-columns: 7fr 4fr;
 				gap: 3%;
 				padding-block: clamp(2.5rem, calc(1rem + 10vmin), 10rem);
-			}
-
-			.hero > img,
-			.hero > .hero-html {
-				order: 2;
-				width: min(100%, 25rem);
 			}
 
 			.stack {

@@ -10,7 +10,7 @@ Every page carries `source:` in its frontmatter:
 
 `provenance:` explains pages that mix sources. To see exactly what changed on a Hugo page, compare it with the Hugo original in git history of [amy-bo/pages](https://github.com/amy-bo/pages).
 
-Totals: 10 amy, 17 new, 28 hugo.
+Totals: 9 amy, 22 new, 22 hugo.
 
 ## Pages
 
@@ -18,14 +18,7 @@ Totals: 10 amy, 17 new, 28 hugo.
 | --- | --- | --- | --- | --- |
 | [`/`](/) | SUSTAINABLE PROTEIN FOR ALL | amy | `/` | Hero, tagline and the first three cards by Amy (her one-line description rewritten for search results) (forest photo by Ozark Drones on Unsplash). The event banner, the electroPioreactor card and the 'What we are doing now' section are new. Below that, 'We need your help' and 'Let's democratise food' are the Hugo homepage's words; its 2023 lines about fortnightly videos and editable pages were rewritten. |
 | [`/404/`](/404/) | Page not found | new | – |  |
-| [`/about/`](/about/) | About AMYBO | hugo | `/about/` | Verbatim from Hugo, except for these relaunch changes. Removed: a stray lead line, the 'all pages are editable' line, the 2023 note about fortnightly videos, an empty closing heading, Amanda Lake's line (at Martin's request, 25 September 2026) and the paragraph about the Docsy porridge photo (not used on this site). Corrected: a typo and Cam Davidson-Pilon's name. Added: the 'Get involved' heading so headings nest. Moved: the origin story into a History section at the end (Why AMYBO links to it). |
-| [`/background/`](/background/) | Background | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
-| [`/background/overview/`](/background/overview/) | Overview (2023) | hugo | `/docs/overview/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/background/plan-2023/`](/background/plan-2023/) | Next steps (2023 plan) | hugo | `/docs/overview/plan/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/background/proteins/`](/background/proteins/) | Proteins | hugo | `/docs/proteins/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. Presentation: the 'closed source' note promoted from h3 to h2 so headings nest, and three absolute links to the old /docs/ URLs made relative to their new pages. |
-| [`/background/proteins/cultivated-meat/`](/background/proteins/cultivated-meat/) | Cultivated Meat | hugo | `/docs/proteins/cultivated-meat/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/background/proteins/precision-fermentation/`](/background/proteins/precision-fermentation/) | Precision Fermentation | hugo | `/docs/proteins/precision-fermentation/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/background/proteins/single-cell-protein/`](/background/proteins/single-cell-protein/) | Single-Cell Protein | hugo | `/docs/proteins/single-cell-protein/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/about/`](/about/) | About AMYBO | hugo | `/about/` | Verbatim from Hugo, except for these relaunch changes. Removed: a stray lead line, the 'all pages are editable' line, the 2023 note about fortnightly videos, an empty closing heading, Amanda Lake's line (at Martin's request, 25 September 2026) and the paragraph about the Docsy porridge photo (not used on this site). Corrected: a typo and Cam Davidson-Pilon's name. Added: the 'Get involved' heading so headings nest. Moved: the origin story into a History section at the end, with the first video under it. Merged in Why AMYBO (6 October 2026): Martin's mission statement and its three points at the top, the hydrogen-oxidising bacteria paragraph, How we work and Where we are. Reworked 23 October 2026: a sustainable protein lead before the mission statement, and a sourced point for each part of it, linked to its words on hover. |
 | [`/collaborate/brand/`](/collaborate/brand/) | Our name & Logo | hugo | `/docs/contribution-guidelines/brand/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/collaborate/contribute/`](/collaborate/contribute/) | Contribute to this site | hugo | `/docs/contribution-guidelines/` | 'Reach out to us' and 'Editing AMYBO.org' are verbatim from Hugo (email addresses replaced by the contact form). 'Web stack' onwards is new, replacing the Hugo, Docsy and Netlify instructions for the Astro site. Moved from the old Docs section in the 2026 relaunch. |
 | [`/collaborate/fund_us/`](/collaborate/fund_us/) | Fund us | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch. |
@@ -36,14 +29,14 @@ Totals: 10 amy, 17 new, 28 hugo.
 | [`/collaborate/volunteer/`](/collaborate/volunteer/) | Get involved | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch; the list of skills is from the Hugo homepage. |
 | [`/contact/`](/contact/) | Contact AMYBO | amy | – | Title by Amy (capitalised as AMYBO); her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch; the legal details are from Companies House. |
 | [`/events/`](/events/) | Events | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
-| [`/events/2026-11-13-london/`](/events/2026-11-13-london/) | AMYBO get-together, London – Friday 13 November 2026 | new | – |  |
+| [`/events/2026-11-13-london/`](/events/2026-11-13-london/) | AMYBO Event, London – Friday 13 November 2026 | new | – |  |
+| [`/events/check-email/`](/events/check-email/) | Nearly there: check your email | new | – |  |
 | [`/events/confirm/`](/events/confirm/) | Complete your registration | new | – |  |
 | [`/events/manage/`](/events/manage/) | Manage your registration | new | – |  |
 | [`/experiments/community_experiments/`](/experiments/community_experiments/) | Community Experiments | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch, linking the migrated Hugo experiment pages. |
 | [`/experiments/hardware/`](/experiments/hardware/) | Hardware | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch, linking the migrated Hugo pages. |
 | [`/experiments/protocols/`](/experiments/protocols/) | Experimental protocols | amy | – | Title corrected from Amy's 'Experiments Protocols'; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch. |
 | [`/experiments/submit/`](/experiments/submit/) | Submit an Experiment | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch. |
-| [`/mission/`](/mission/) | Why AMYBO | amy | – | Title by Amy (capitalised as AMYBO). Body written by Martin Currie with Claude for the 2026 relaunch, drawing on the Hugo Overview and About pages. |
 | [`/privacy/`](/privacy/) | Privacy notice | new | – |  |
 | [`/projects/`](/projects/) | Projects | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
 | [`/projects/carma-hub/`](/projects/carma-hub/) | CARMA Hub project | new | – | Written by Martin Currie with Claude for the 2026 relaunch, from the repository's AsepticElectroPioreactor README and results. |
@@ -71,6 +64,11 @@ Totals: 10 amy, 17 new, 28 hugo.
 | [`/projects/past/experiments/spirulina-batch/`](/projects/past/experiments/spirulina-batch/) | Spirulina Batch | hugo | `/docs/experiments/spirulina-batch/` | Moved from the old Docs section in the 2026 relaunch; text unchanged apart from first person singular made impersonal, plus a link to the raw data of the later turbidostat run. Presentation: an absolute link to the old /docs/ URL made relative to its new page. |
 | [`/projects/pioflo/`](/projects/pioflo/) | PioFlo | hugo | `/docs/pioflo/` | Moved from the old Docs section in the 2026 relaunch; text unchanged apart from one typo. |
 | [`/projects/pioflo/pioflo-v0-01/`](/projects/pioflo/pioflo-v0-01/) | Pioflo v0.01 | hugo | `/docs/pioflo/pioflo-v0.01/` | Moved from the old Docs section in the 2026 relaunch; text unchanged apart from first person singular made impersonal, plus a link to the trial's raw data. |
+| [`/sustainable-protein/`](/sustainable-protein/) | What is sustainable protein? | new | – | Written by Martin Currie with Claude in October 2026, replacing the 2023 Proteins page (its plants, plant-based meat and closed-source points are carried over). Facts checked against the sources linked, October 2026. |
+| [`/sustainable-protein/cultivated-meat/`](/sustainable-protein/cultivated-meat/) | Cultivated meat | new | – | Rewritten by Martin Currie with Claude in October 2026 from the 2023 Cultivated Meat page, updated and sourced. |
+| [`/sustainable-protein/plants/`](/sustainable-protein/plants/) | Plants | new | – | Written by Martin Currie with Claude in October 2026 from the 2023 Proteins page's Meat & Plant Protein and Plant Based Meat sections, updated and sourced. |
+| [`/sustainable-protein/precision-fermentation/`](/sustainable-protein/precision-fermentation/) | Precision fermentation | new | – | Rewritten by Martin Currie with Claude in October 2026 from the 2023 Precision Fermentation page, updated and sourced. |
+| [`/sustainable-protein/single-cell-protein/`](/sustainable-protein/single-cell-protein/) | Single-cell protein | new | – | Rewritten by Martin Currie with Claude in October 2026 from the 2023 Single-Cell Protein page, updated and sourced. |
 
 ## Every old Hugo page and its counterpart
 
@@ -97,14 +95,14 @@ All old Hugo URLs resolve on the new site.
 | `/docs/legal/` | `src/content/docs/collaborate/safety-and-legal/index.md` | Redirects to `/collaborate/safety-and-legal/` | In-body H1 'DO NOT TRY THIS AT HOME' demoted to H2. |
 | `/docs/legal/disclaimer/` | `src/content/docs/collaborate/safety-and-legal/disclaimer.md` | Redirects to `/collaborate/safety-and-legal/disclaimer/` |  |
 | `/docs/openvalve/` | `src/content/docs/projects/other-hardware/openvalve.md` | Redirects to `/projects/other-hardware/openvalve/` |  |
-| `/docs/overview/plan/` | `src/content/docs/background/plan-2023.md` | Redirects to `/background/plan-2023/` |  |
-| `/docs/overview/` | `src/content/docs/background/overview.md` | Redirects to `/background/overview/` | Docsy button flattened to plain markdown link. |
+| `/docs/overview/plan/` | `src/content/docs/background/plan-2023.md` | Redirects to `/sustainable-protein/` |  |
+| `/docs/overview/` | `src/content/docs/background/overview.md` | Redirects to `/sustainable-protein/` | Docsy button flattened to plain markdown link. |
 | `/docs/pioflo/pioflo-v0.01/` | `src/content/docs/projects/pioflo/pioflo-v0-01.md` | Redirects to `/projects/pioflo/pioflo-v0-01/` | Added slug frontmatter (docs/pioflo/pioflo-v0.01) because Astro's slugger strips dots; absolute image paths (/docs/Pioflo/...) converted to relative page-bundle-style refs. |
 | `/docs/pioflo/` | `src/content/docs/projects/pioflo/index.md` | Redirects to `/projects/pioflo/` |  |
-| `/docs/proteins/cultivated-meat/` | `src/content/docs/background/proteins/cultivated-meat.md` | Redirects to `/background/proteins/cultivated-meat/` |  |
-| `/docs/proteins/precision-fermentation/` | `src/content/docs/background/proteins/precision-fermentation.md` | Redirects to `/background/proteins/precision-fermentation/` |  |
-| `/docs/proteins/single-cell-protein/` | `src/content/docs/background/proteins/single-cell-protein.md` | Redirects to `/background/proteins/single-cell-protein/` |  |
-| `/docs/proteins/` | `src/content/docs/background/proteins/index.md` | Redirects to `/background/proteins/` |  |
+| `/docs/proteins/cultivated-meat/` | `src/content/docs/background/proteins/cultivated-meat.md` | Redirects to `/sustainable-protein/cultivated-meat/` |  |
+| `/docs/proteins/precision-fermentation/` | `src/content/docs/background/proteins/precision-fermentation.md` | Redirects to `/sustainable-protein/precision-fermentation/` |  |
+| `/docs/proteins/single-cell-protein/` | `src/content/docs/background/proteins/single-cell-protein.md` | Redirects to `/sustainable-protein/single-cell-protein/` |  |
+| `/docs/proteins/` | `src/content/docs/background/proteins/index.md` | Redirects to `/sustainable-protein/` |  |
 | `/docs/risk-assessments/` | `src/content/docs/collaborate/safety-and-legal/risk-management.md` | Redirects to `/collaborate/safety-and-legal/risk-management/` |  |
 | `/docs/` | `src/content/docs/docs/index.md` | Redirects to `/projects/` | Docsy button flattened to plain markdown link; no Hugo description field existed so none added. |
 | `/docs/electropioreactor/` | `src/content/docs/projects/past/electropioreactor-2024.md` | Redirects to `/projects/electropioreactor/` |  |

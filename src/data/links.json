@@ -86,6 +86,10 @@
         "link": "/projects/",
         "sub": [
             {
+                "text": "All projects",
+                "link": "/projects/"
+            },
+            {
                 "text": "electroPioreactor",
                 "link": "/projects/electropioreactor/"
             },

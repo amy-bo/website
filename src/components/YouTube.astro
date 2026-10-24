@@ -1,8 +1,7 @@
 ---
 /**
- * Click-to-play YouTube embed. Nothing is loaded from YouTube until the visitor presses play,
- * which keeps pages fast and avoids third-party requests for people who never watch.
- * The poster comes from YouTube's image host; the player uses youtube-nocookie.com.
+ * Click-to-play YouTube embed. Only the poster image (lazy, from YouTube's image host i.ytimg.com) loads before
+ * the visitor presses play; the player itself, from youtube-nocookie.com, loads only then, which keeps pages fast.
  */
 interface Props {
 	id: string;
@@ -30,6 +29,8 @@ const poster = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 			iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
 			iframe.setAttribute('allowfullscreen', '');
 			box.replaceChildren(iframe);
+			// The play button just vanished: move focus to the player rather than dropping it to <body>.
+			iframe.focus();
 			box.classList.add('playing');
 		});
 	});

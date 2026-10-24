@@ -25,8 +25,9 @@ const shouldRenderSearch =
     </div>
     <div class="right-group sl-flex print:hidden items-center">
         <!-- Hamburger menu button, visible below lg (64rem): the four labelled menus plus search, social icons and the theme switch do not fit a narrower header -->
+        <!-- Labelled "Site" so it is not mistaken for Starlight's identical sidebar hamburger beside it below 50rem -->
         <button
-            class="lg:hidden p-2 rounded"
+            class="site-menu-toggle lg:hidden p-2 rounded"
             @click="open = !open"
             aria-label="Site links menu"
             aria-controls="mobile-site-links"
@@ -46,10 +47,11 @@ const shouldRenderSearch =
                     stroke-linejoin="round"
                     d="M4 6h16M4 12h16M4 18h16"></path>
             </svg>
+            <span aria-hidden="true">Site</span>
         </button>
 
         <!-- Site links: hidden below lg, flex on lg+ -->
-        <div class="site_links hidden lg:flex">
+        <nav aria-label="Site links" class="site_links hidden lg:flex">
             {
                 links.map((link, idx) =>
                     link.sub ? (
@@ -58,12 +60,14 @@ const shouldRenderSearch =
                             x-data={`{ open${idx}: false }`}
                             @pointerenter={`if ($event.pointerType === 'mouse') open${idx} = true`}
                             @pointerleave={`if ($event.pointerType === 'mouse') open${idx} = false`}
+                            @keydown.escape={`if (open${idx}) { open${idx} = false; $refs.btn${idx}.focus() }`}
+                            @focusout={`if (!$el.contains($event.relatedTarget)) open${idx} = false`}
                         >
                             <button
                                 type="button"
                                 class="site_link"
+                                x-ref={`btn${idx}`}
                                 @click={`open${idx} = !open${idx}`}
-                                aria-haspopup="true"
                                 aria-expanded="false"
                                 {...{ ':aria-expanded': `open${idx}.toString()` }}
                             >
@@ -81,7 +85,6 @@ const shouldRenderSearch =
                                         <a
                                             href={sublink.link}
                                             class="block px-4 py-2 text-sm"
-                                            tabindex="0"
                                         >
                                             {sublink.text}
                                         </a>
@@ -96,7 +99,7 @@ const shouldRenderSearch =
                     ),
                 )
             }
-        </div>
+        </nav>
         <!-- Dropdown menu for mobile -->
         <nav
             id="mobile-site-links"
@@ -171,7 +174,7 @@ const shouldRenderSearch =
         }
         .site_link a:hover,
         .site_link button:hover {
-            color: var(--sl-color-accent);
+            color: var(--sl-color-text-accent);
             text-decoration: underline;
         }
 
@@ -182,6 +185,17 @@ const shouldRenderSearch =
         }
         .dropdown-menu a:hover {
             background-color: var(--sl-color-gray-6);
+        }
+        /* In dark mode gray-6 is the nav background itself, so the hover row would not show. */
+        :global([data-theme="dark"]) .dropdown-menu a:hover {
+            background-color: var(--sl-color-gray-5);
+        }
+        .site-menu-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            color: var(--sl-color-text);
+            font-size: var(--sl-text-sm);
         }
         .mobile-menu {
             padding-block: 0.5rem;

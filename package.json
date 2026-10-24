@@ -29,19 +29,20 @@
   },
   "dependencies": {
     "@astrojs/alpinejs": "^0.4.8",
+    "@astrojs/sitemap": "^3.7.4",
     "@astrojs/starlight": "^0.34.3",
     "@astrojs/starlight-tailwind": "^4.0.1",
     "@tailwindcss/vite": "^4.1.10",
-    "@types/alpinejs": "^3.13.11",
     "alpinejs": "^3.14.9",
     "astro": "^5.6.1",
-    "sharp": "^0.32.5",
+    "sharp": "^0.34.5",
     "simple-icons": "^16.33.0",
     "tailwindcss": "^4.1.10"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "@cloudflare/workers-types": "^5.20260924.1",
+    "@types/alpinejs": "^3.13.11",
     "axe-core": "^4.13.0",
     "jsdom": "^29.1.1",
     "node": "^22.23.3",

@@ -561,11 +561,6 @@ const shortDay = (d: string) => {
 	return d.length === 4 ? `${m} ${y}` : `${Number(d.slice(4, 6))} ${m} ${y}`;
 };
 
-const fmtDay = (d: string) => {
-	const t = new Date(`${d}T12:00:00Z`);
-	return Number.isNaN(+t) ? d : t.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
-};
-
 export function renderDiary(data: PageData, entries: LinkNode[], view: 'all' | 'highlights', opts: RenderOptions = {}): string {
 	const p = data.person;
 	const base = pagePath(p.handle);

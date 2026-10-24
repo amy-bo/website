@@ -5,7 +5,8 @@ import { guessIcon, ICON_KEYS } from './icons';
 import { HANDLE_RE, NODE_SELECT, PERSON_SELECT, type NodeKind } from './model';
 import type { Ctx, Env } from './server';
 
-const RESERVED = new Set(['amybo', 'links', 'admin', 'api', 'edit', 'www', 'go', 'media', 'diary', 'events', 'help', 'about']);
+// gerrit: the amy.bo Worker (workers/amy-bo/index.js) redirects /~gerrit elsewhere, so a page there would be unreachable.
+const RESERVED = new Set(['amybo', 'links', 'admin', 'api', 'edit', 'www', 'go', 'media', 'diary', 'events', 'help', 'about', 'gerrit']);
 const KINDS: NodeKind[] = ['group', 'link', 'text', 'diary', 'support'];
 const TINT_RE = /^(|mono|#[0-9a-f]{6})$/i;
 const HEX_OR_NONE = /^(|#[0-9a-f]{6})$/i;
@@ -327,6 +328,42 @@ export async function saveNodes(ctx: Ctx): Promise<Response> {
 
 // ---- images ----
 
+const UPLOAD_LIMIT = 1_500_000;
+
+/** The body, or null once it passes `limit` bytes (a missing or false content-length can't make it buffer more). */
+async function readLimited(req: Request, limit: number): Promise<Uint8Array | null> {
+	if (!req.body) return new Uint8Array();
+	const reader = req.body.getReader();
+	const chunks: Uint8Array[] = [];
+	let size = 0;
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		size += value.byteLength;
+		if (size > limit) {
+			reader.cancel();
+			return null;
+		}
+		chunks.push(value);
+	}
+	const out = new Uint8Array(size);
+	let o = 0;
+	for (const c of chunks) {
+		out.set(c, o);
+		o += c.byteLength;
+	}
+	return out;
+}
+
+/** The first bytes of each allowed type, so a file can't claim to be an image it isn't. */
+const startsWith = (b: Uint8Array, sig: number[], at = 0) => b.length >= at + sig.length && sig.every((x, i) => b[at + i] === x);
+const MAGIC: Record<string, (b: Uint8Array) => boolean> = {
+	'image/png': (b) => startsWith(b, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+	'image/jpeg': (b) => startsWith(b, [0xff, 0xd8, 0xff]),
+	'image/gif': (b) => startsWith(b, [0x47, 0x49, 0x46, 0x38]),
+	'image/webp': (b) => startsWith(b, [0x52, 0x49, 0x46, 0x46]) && startsWith(b, [0x57, 0x45, 0x42, 0x50], 8),
+};
+
 export async function upload(ctx: Ctx): Promise<Response> {
 	const bad = checkOrigin(ctx, { allowImage: true });
 	if (bad) return bad;
@@ -334,10 +371,13 @@ export async function upload(ctx: Ctx): Promise<Response> {
 	if (!p) return fail('Please sign in again', 401);
 	if (!ctx.env.LINKS_BUCKET) return fail("Image uploads aren't switched on yet; pick an icon for now", 503);
 	const type = (ctx.request.headers.get('content-type') ?? '').split(';')[0].trim();
-	const bytes = await ctx.request.arrayBuffer();
-	if (bytes.byteLength > 1_500_000) return fail('That image is too large (1.5 MB at most)', 413);
 	const ext = { 'image/webp': 'webp', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif' }[type];
 	if (!ext) return fail('Use a JPEG, PNG, WebP or GIF image', 415);
+	const tooLarge = () => fail('That image is too large (1.5 MB at most)', 413);
+	if (Number(ctx.request.headers.get('content-length')) > UPLOAD_LIMIT) return tooLarge();
+	const bytes = await readLimited(ctx.request, UPLOAD_LIMIT);
+	if (!bytes) return tooLarge();
+	if (!MAGIC[type](bytes)) return fail("That file isn't the kind of image it says it is", 415);
 	const mine = await ctx.env.LINKS_BUCKET.list({ prefix: `${p.handle}/`, limit: 400 });
 	if (mine.objects.length >= 300) return fail('You have uploaded 300 pictures, the most a page can have', 429);
 	const id = crypto.getRandomValues(new Uint8Array(12));
@@ -361,7 +401,7 @@ function publicUrl(raw: string | null): URL | null {
 	return u;
 }
 
-async function fetchLimited(url: URL, accept: string, limit: number): Promise<{ res: Response; bytes: Uint8Array; final: string } | null> {
+async function fetchLimited(url: URL, accept: string, limit: number): Promise<{ res: Response; bytes: Uint8Array<ArrayBuffer>; final: string } | null> {
 	let current = url;
 	for (let hop = 0; hop < 5; hop++) {
 		const res = await fetch(current.toString(), {
@@ -418,6 +458,8 @@ const decodeEntities = (s: string) =>
 export async function propose(ctx: Ctx): Promise<Response> {
 	const p = await personFromSession(ctx.env, ctx.request);
 	if (!p) return fail('Not signed in', 401);
+	const from = ctx.request.headers.get('sec-fetch-site');
+	if (from && from !== 'same-origin') return fail('Only for the editor', 403);
 	const raw = new URL(ctx.request.url).searchParams.get('url') ?? '';
 	if (/^mailto:/i.test(raw)) return json({ url: raw, title: 'Email', icon: 'mail', image: '' });
 	const u = publicUrl(raw);

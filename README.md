@@ -21,11 +21,13 @@ npm install
 npm run dev          # http://localhost:4321
 npm run build        # static site into dist/ (needs PUBLIC_TURNSTILE_SITE_KEY)
 npm run build:test   # same, with Cloudflare's Turnstile test key, for local testing
-npm run check        # astro check + type-check of the functions and cron worker
+npm run check        # astro check + type-check of the Workers code: functions/ (and src/links/ through it), eventsandeye/src and eventsandeye/worker
 npm run review       # regenerate REVIEW.md (after a build)
 npm run test:a11y    # axe-core accessibility scan of dist/ (after a build)
 npm run test:e2e     # full registration flow against a local D1 database (after build:test)
 npm run test:forum   # the build-time forum feed (src/lib/forum.mjs): live path with a fixture, fallback paths
+npm run test:unit    # unit tests: the forum feed, Events&I markdown, and the amy.bo Worker
+npm run test:links   # link pages end to end against a local D1 database (after build:test)
 node scripts/og.mjs  # regenerate the Open Graph images after changing the logo or event title
 ```
 
@@ -33,9 +35,10 @@ Pages live in `src/content/docs/`; the file path is the URL. Images go next to t
 
 ```
 src/content/docs/        pages: Amy's section pages, projects/ (electroPioreactor, CARMA Hub, PioFlo, other hardware,
-                         past projects), background/, collaborate/, events/, privacy, 404
+                         past projects), sustainable-protein/, experiments/, collaborate/, events/, about, contact, privacy, 404
 src/content/talks/       talks for event pages (one markdown file per talk)
 src/components/          Amy's Hero and Header overrides, footer, click-to-play YouTube embed, talks list, forum feed
+src/links/               link pages (amy.bo/~name): model, renderer, icons, API, editor
 src/lib/forum.mjs        fetches forum.amybo.org/latest.json at build time; FORUM_FEED=off skips it, FORUM_FIXTURE=<file> stands in for the forum
 src/assets/photos/       AMYBO photos from amy-bo/electroPioreactor (CC BY-SA 4.0), resized by Astro at build time
 scripts/                 og.mjs (Open Graph images), review.mjs (REVIEW.md), a11y.mjs (axe-core scan)
@@ -44,7 +47,10 @@ eventsandeye/            Events&I registration system (AGPL-3.0): server code, a
 functions/               one-line Cloudflare Pages Functions wrappers that route to Events&I
 seed/                    the 13 November 2026 event, its sessions and first joining instructions
 workers/cron/            wrangler config for the Events&I cron worker
-public/_redirects        every old Hugo /docs/ URL, redirected to its new home under /projects/, /background/ or /collaborate/
+workers/amy-bo/          the amy.bo Worker: short links, and /~name and /links from the Pages project
+db/links/                link-page D1 schema and seeds, run on every deploy
+tests/                   forum feed unit tests and the link-page end-to-end test
+public/_redirects        every old Hugo /docs/ URL, redirected to its new home under /projects/, /sustainable-protein/, /collaborate/ or /about/
 migration/hugo-map.json  every Hugo file and where it went
 ```
 
@@ -57,7 +63,7 @@ The 13 November 2026 get-together page is `src/content/docs/events/2026-11-13-lo
 **How registration works** is described in the [Events&I README](eventsandeye/README.md): double opt-in, holds, waiting lists that only move when an admin clicks **Promote**, self-service changes, calendar invitations and host lists. For this event:
 
 - **Places:** 20 in person (remote unlimited), and 10 on each lab tour. The main registration deadline is 6 November, 12 noon; each tour can be booked or changed until it starts, while places remain. Change any of these on the admin page.
-- **Sessions:** 10:30 and 11:15 lab tours (optional, booked separately), 12:00 and 14:00 talks (in person and on Google Meet), 17:00 pub. Add the two Meet links, hosts and final times on the admin page under **Sessions**; people whose calendar entries change get an update automatically, and nobody else is emailed.
+- **Sessions:** 10:30 and 11:15 lab tours (optional, booked separately), 12:00 and 14:30 talks (in person and on Google Meet), 17:30 dinner (opt-in, 10 places, then a waiting list). Add the two Meet links, hosts and final times on the admin page under **Sessions**; people whose calendar entries change get an update automatically, and nobody else is emailed.
 - **Calendars:** in-person attendees get one entry for their day, remote attendees one per online talk session, each with reminders and add-to-calendar links.
 - **Hosts:** a session with a host email gets the attendee list whenever it changes (names, plus emails of people who opted in to share them).
 
@@ -94,13 +100,13 @@ Link-in-bio pages for AMYBO volunteers and supporters, and AMYBO's own at amy.bo
 
 - **build** has no secrets at all: it installs, builds the site and hands it on as an artifact.
 - **dev** runs on every push to any branch, with no approval. It deploys the static pages to the Pages branch `dev`, served at **dev.amybo.org** with a `noindex` header, with no Functions and no database binding, so dev code can never reach live registrations (the registration form does not work there). The last push wins.
-- **production** runs only for pushes to `main`, after dev, in the `production` GitHub Environment, so it waits for your approval. It installs without running package scripts before it touches the Cloudflare token, creates the D1 database in the **EU jurisdiction** if it is missing (`amybo-rsvp-eu`), applies the migrations and the insert-only seed, sets the secrets, deploys the site with its Functions and deploys the cron Worker.
+- **production** runs only for pushes to `main`, after dev, in the `production` GitHub Environment, so it waits for your approval. It installs without running package scripts before it touches the Cloudflare token, creates the D1 database in the **EU jurisdiction** if it is missing (`amybo-rsvp-eu`), applies the migrations and the insert-only seed, runs the link-page SQL in `db/links/*.sql`, binds the R2 bucket `amybo-links` as `LINKS_BUCKET` if it exists, sets the secrets, deploys the site with its Functions, deploys the amy.bo Worker (only when the repository variable `DEPLOY_AMYBO_WORKER` is `true`) and deploys the cron Worker.
 
 So the routine is: push, check dev.amybo.org, and when `main` is right, approve the waiting production job.
 
 One-off set-up:
 
-1. **Cloudflare API token** (My Profile → API Tokens → Create Token → Custom): *Account: Cloudflare Pages: Edit*, *Account: D1: Edit*, *Account: Workers Scripts: Edit*, for this account only. Copy it and the **Account ID**.
+1. **Cloudflare API token** (My Profile → API Tokens → Create Token → Custom): *Account: Cloudflare Pages: Edit*, *Account: D1: Edit*, *Account: Workers Scripts: Edit*, *Zone: Workers Routes: Edit* (on amy.bo, for the amy.bo Worker's routes) and *Account: Workers R2 Storage: Read* (the deploy checks the image bucket), for this account only. Copy it and the **Account ID**.
 2. **Turnstile** (dashboard → Turnstile → Add widget): hostnames `amybo.org`, `www.amybo.org` and `amybo-4p1.pages.dev` (the project's own pages.dev address; `amybo.pages.dev` belongs to someone else), managed mode.
 3. **Resend**: add the domain `amybo.org` in the EU region, add the DNS records it shows (proxy off), verify, create an API key with sending access only.
 4. **GitHub** (repository → Settings → Secrets and variables → Actions). Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `TOKEN_SECRET` (`openssl rand -hex 32`; never paste it anywhere else), `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`. Variables: `PUBLIC_TURNSTILE_SITE_KEY`; `SITE_URL` (the address emails link to: `https://amybo-4p1.pages.dev` until amybo.org is attached, then `https://amybo.org`); `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` once step 6 below is done.
