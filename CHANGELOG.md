@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-10-25
 
+- [x] **Mission statement: no product names** — the Delicious and Wholesome bullets no longer name Solein; they say "one" and "the other" of the two tasted HOB proteins and "the first HOB protein on the market". Facts and citations unchanged.
 - [x] **Strapline: option D for "All" on white** — on the light theme the about page's strapline shows "All" in the dark green #5C8119 (4.6:1 on white) in place of black on a green highlight; the dark theme and the hero over the forest photo keep the brand green #87BD25. Chosen from the six variants on /brand-test/. #5C8119 is not yet in the branding repository (github.com/amy-bo/branding); the brand guide needs a line for green text on white. Pushed to brand-guide and main, so dev.amybo.org and brand-guide.amybo-4p1.pages.dev show the same site.
 
 ## 2026-10-24
