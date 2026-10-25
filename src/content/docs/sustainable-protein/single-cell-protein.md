@@ -7,7 +7,7 @@ sidebar:
   order: 4
 ---
 
-Single-cell protein (SCP), or microbial protein, is made by growing microbes and eating the whole cell, usually dried. This is called biomass fermentation. Because the whole microbe is the product, processing is simpler than [precision fermentation](/sustainable-protein/precision-fermentation/), which is why we think it is the best route for open source protein.
+Single-cell protein (SCP), or microbial protein, is made by growing microbes and eating the whole cell, usually dried. This is called biomass fermentation. Because the whole microbe is the product, processing is simpler than [precision fermentation](/sustainable-protein/precision-fermentation/), which is why we think it is the most promising route to sustainable protein for all.
 
 Replacing a fifth of the world's ruminant meat with microbial protein by 2050 could halve deforestation, according to one model ([Humpenöder et al., 2022](https://doi.org/10.1038/s41586-022-04629-w)).
 

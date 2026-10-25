@@ -33,7 +33,7 @@ await write('public/og.png', `<svg xmlns="http://www.w3.org/2000/svg" width="120
   ${logoAt(90, 120, 420, 290)}
   <text x="540" y="250" font-family="${FONT}" font-size="52" font-weight="700" fill="#007CBB">Sustainable Protein</text>
   <text x="540" y="322" font-family="${FONT}" font-size="52" font-weight="700" fill="#007CBB">for <tspan fill="#87BD25">All</tspan></text>
-  <text x="540" y="400" font-family="${FONT}" font-size="28" fill="#ffffff">Open source protein fermentation</text>
+  <text x="540" y="400" font-family="${FONT}" font-size="28" fill="#ffffff">Not-for-profit. Open source bioreactors.</text>
   <text x="540" y="442" font-family="${FONT}" font-size="28" fill="#ffffff">amybo.org</text>
 </svg>`);
 

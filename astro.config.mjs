@@ -17,7 +17,7 @@ export default defineConfig({
 		starlight({
 			title: 'AMYBO',
 			locales: { root: { label: 'English', lang: 'en-GB' } },
-			description: 'AMYBO: a non-profit open source protein fermentation community. Sustainable protein for all.',
+			description: 'Sustainable Protein for All. AMYBO is a not-for-profit community, making protein from air with hydrogen-oxidising bacteria and open source bioreactors.',
 			logo: {
 				light: './src/assets/amybo.svg',
 				dark: './src/assets/amybo_dark.svg',
@@ -41,7 +41,7 @@ export default defineConfig({
 				{ tag: 'meta', attrs: { name: 'twitter:image', content: 'https://amybo.org/og.png' } },
 				{ tag: 'meta', attrs: { name: 'theme-color', content: '#175a00' } },
 				{ tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' } },
-				{ tag: 'script', attrs: { type: 'application/ld+json' }, content: JSON.stringify({ '@context': 'https://schema.org', '@type': 'Organization', name: 'AMYBO', alternateName: 'AMYBO.org', url: 'https://amybo.org/', logo: 'https://amybo.org/logo.png', legalName: 'andeye Ltd', description: 'A non-profit open source protein fermentation community: sustainable protein for all.', sameAs: ['https://github.com/amy-bo', 'https://forum.amybo.org/', 'https://www.youtube.com/@AMYBO'] }) },
+				{ tag: 'script', attrs: { type: 'application/ld+json' }, content: JSON.stringify({ '@context': 'https://schema.org', '@type': 'Organization', name: 'AMYBO', alternateName: 'AMYBO.org', url: 'https://amybo.org/', logo: 'https://amybo.org/logo.png', legalName: 'andeye Ltd', description: 'Sustainable Protein for All. AMYBO is a not-for-profit community, making protein from air with hydrogen-oxidising bacteria and open source bioreactors.', sameAs: ['https://github.com/amy-bo', 'https://forum.amybo.org/', 'https://www.youtube.com/@AMYBO'] }) },
 			],
 			sidebar: [
 				{

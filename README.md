@@ -1,6 +1,6 @@
 # amybo.org
 
-The website of [AMYBO](https://amybo.org), a non-profit open source protein fermentation community: sustainable protein for all.
+The website of [AMYBO](https://amybo.org), a not-for-profit community making protein from air with hydrogen-oxidising bacteria and open source bioreactors: Sustainable Protein for All.
 
 Built with [Astro](https://astro.build) and [Starlight](https://starlight.astro.build), hosted on [Cloudflare Pages](https://pages.cloudflare.com). Event registration uses [Events&I](https://github.com/andeyePro/eventsandeye) (beta), andeye's open source registration system on Pages Functions and D1; a copy lives in `eventsandeye/`.
 
