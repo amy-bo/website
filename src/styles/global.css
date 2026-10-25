@@ -9,7 +9,8 @@
   --font-sans: Arial, sans-serif;
   /* Your preferred code font. Starlight uses system monospace fonts by default. */
   --font-mono: 'IBM Plex Mono';
-/* AMYBO brand colours (github.com/amy-bo/branding): blue #007CBB, green #87BD25, black #000, white #FFF.
+/* AMYBO brand colours (github.com/amy-bo/branding): blue #007CBB, green #87BD25, black #000, white #FFF. Green text
+   on white uses the dark green #5C8119 (4.6:1), as the brand green is 1.9:1 there; see Mission.astro.
    Starlight takes its accents from 200 (dark theme text), 600 (both) and 900 (light theme text), and 950 (dark theme
    low accent, used as text on the accent), so all three are the brand blue and 950 is black. The greys are neutral
    tints of black for borders and secondary text only; 900 is black, so the dark theme's background is brand black. */
