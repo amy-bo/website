@@ -24,9 +24,10 @@
 </script>
 <style>
 	.mission :global([data-term]) { text-decoration: underline dotted var(--sl-color-accent); text-underline-offset: 0.2em; border-radius: 0.2rem; cursor: default; }
-	.mission :global(li) { border-radius: 0.3rem; padding-inline: 0.3rem; margin-inline-start: -0.3rem; transition: background-color 0.15s; }
-	/* Brand green highlight with black text (and black links), as the branding guide allows, in either theme. */
-	.mission :global(.lit), .mission :global(.lit a), .mission :global(.lit strong) { background-color: #87bd25; color: #000 !important; }
+	.mission :global(li) { border-radius: 0.3rem; padding-inline: 0.3rem; margin-inline-start: -0.3rem; }
+	/* Hovering a term or its bullet outlines both in brand green. An outline, not a background: a green background
+	   swallowed the green "All" and hid the blue of the links. */
+	.mission :global(.lit) { outline: 2px solid #87bd25; outline-offset: 2px; }
 	/* The strapline in the brand colours: "Sustainable Protein for" in blue #007CBB (4.5:1 on white and black; large text, so it also passes
 	   on the dark theme); "All" in green #87BD25 on the dark theme, and in the dark green #5C8119 on light (4.6:1 on
 	   white), since the brand green itself is 1.9:1 on white and would be illegible as text. */
