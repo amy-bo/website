@@ -3,14 +3,14 @@ title: "electroPioreactor (2024 notes)"
 description: Affordable electrobioreactor
 source: hugo
 hugoPath: /docs/electropioreactor/
-provenance: Verbatim from Hugo, plus a note at the top pointing to the current project page. Moved from the old Docs section in the 2026 relaunch; text unchanged.
+provenance: Verbatim from Hugo, plus a note at the top pointing to the current project page and electropioreactor.org. Moved from the old Docs section in the 2026 relaunch; text unchanged.
 sidebar:
   order: 2
   label: electroPioreactor (2024 notes)
 ---
 
 :::note[This page is from 2024]
-Current designs, build guides, the plugin and results are on the [electroPioreactor project page](/projects/electropioreactor/).
+Current designs, build guides, the plugin and results are on the [electroPioreactor project page](/projects/electropioreactor/), and the current version is in 3D at [electropioreactor.org](https://electropioreactor.org/).
 :::
 
 ## Affordable electrobioreactor

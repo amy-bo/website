@@ -2,6 +2,10 @@
 
 Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
+## 2026-11-06
+
+- [x] **Links to electropioreactor.org** — the AEP 0.2 landing page (interactive 3D model, with a button to the assembly video guide) is now linked from the homepage's "Build an electroPioreactor" and "Aseptic electroPioreactor 0.2" cards, the electroPioreactor overview, AEP and MEP pages, both 2024 pages (a note at the top; v0.02 gains the same note as the 2024 notes page) and the Hardware page.
+
 ## 2026-10-25
 
 - [x] **Mission hover: outline, not background** — hovering a mission term or its bullet now draws a green outline round both. The green background it replaces hid the green "All" of the strapline on the dark theme and the blue of links.

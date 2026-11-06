@@ -6,8 +6,12 @@ hugoPath: /docs/electropioreactor/electropioreactor-v0.02/
 sidebar:
   order: 3
   label: electroPioreactor v0.02 (2024)
-provenance: "Title had a stray '.md' on the Hugo site; corrected. Moved from the old Docs section in the 2026 relaunch; text unchanged apart from first person singular made impersonal."
+provenance: "Title had a stray '.md' on the Hugo site; corrected. Moved from the old Docs section in the 2026 relaunch; text unchanged apart from first person singular made impersonal, plus a note at the top pointing to the current project page and electropioreactor.org."
 ---
+
+:::note[This page is from 2024]
+Current designs, build guides, the plugin and results are on the [electroPioreactor project page](/projects/electropioreactor/), and the current version is in 3D at [electropioreactor.org](https://electropioreactor.org/).
+:::
 
 ## Bill of Materials
 
