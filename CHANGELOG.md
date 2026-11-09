@@ -2,6 +2,10 @@
 
 Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
+## 2026-11-09
+
+- [x] **Events&I 0.3.0-beta upgrade finished** — the vendored copy came in with 10806d8; this adds the four new function wrappers it needs (`functions/api/admin/events.ts` for event set-up, `functions/api/admin/polls.ts` and `functions/api/rsvp/poll.ts` for polls, `functions/api/dev/inbound.ts` for the email-reply test, which answers only with `DEV_MODE=true`), `ADMIN_EMAILS` on the cron Worker as on the site, and excludes `eventsandeye/site` (Events&I's own website, a separate Astro project) from the type check, which otherwise failed with 483 errors. Migrations 0006 to 0010 and the cron Worker redeploy happen in the production deploy. Checked: type check, unit, accessibility and the end-to-end test against the London seed (392 passed).
+
 ## 2026-11-06
 
 - [x] **Links to electropioreactor.org** — the AEP 0.2 landing page (interactive 3D model, with a button to the assembly video guide) is now linked from the homepage's "Build an electroPioreactor" and "Aseptic electroPioreactor 0.2" cards, the electroPioreactor overview, AEP and MEP pages, both 2024 pages (a note at the top; v0.02 gains the same note as the 2024 notes page) and the Hardware page.
