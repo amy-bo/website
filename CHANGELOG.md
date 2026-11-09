@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-11-09
 
+- [x] **Homepage tagline matches the mission statement** — "Let's end world hunger, poverty, and the biodiversity and climate crises by making delicious, wholesome, sustainable protein universally accessible." The 25 October rewrite changed About but left the homepage on the old wording.
 - [x] **Events&I 0.3.0-beta upgrade finished** — the vendored copy came in with 10806d8; this adds the four new function wrappers it needs (`functions/api/admin/events.ts` for event set-up, `functions/api/admin/polls.ts` and `functions/api/rsvp/poll.ts` for polls, `functions/api/dev/inbound.ts` for the email-reply test, which answers only with `DEV_MODE=true`), `ADMIN_EMAILS` on the cron Worker as on the site, and excludes `eventsandeye/site` (Events&I's own website, a separate Astro project) from the type check, which otherwise failed with 483 errors. Migrations 0006 to 0010 and the cron Worker redeploy happen in the production deploy. Checked: type check, unit, accessibility and the end-to-end test against the London seed (392 passed).
 
 ## 2026-11-06
