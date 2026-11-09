@@ -11,20 +11,27 @@ interface Props {
 	sourceUrl?: string;
 	/** The page shown after a successful registration. */
 	next?: string;
-	/** Label for the in-person attendance choice, e.g. "In person at White City". */
+	/** Label for the in-person attendance choice, e.g. "In person at White City". Overrides the event's in_person_label. */
 	inPersonLabel?: string;
 	/** Label for the remote attendance choice. */
 	remoteLabel?: string;
 	/** Legend for the tour choices, shown only when the event has tours. */
 	tourLegend?: string;
 }
-const { event, controller, contactHref, privacyHref = '/privacy/', sourceUrl = 'https://github.com/andeyePro/eventsandeye', next = '/events/check-email/', inPersonLabel = 'In person', remoteLabel = 'Remotely (online sessions only)', tourLegend = 'Optional tour (in person only)' } = Astro.props;
-const siteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || (import.meta.env.DEV || import.meta.env.PUBLIC_TURNSTILE_ALLOW_TEST_KEY === 'true' ? '1x00000000000000000000AA' : undefined);
+const { event, controller, contactHref, privacyHref = '/privacy/', sourceUrl = 'https://github.com/andeyePro/eventsandeye', next = '/events/check-email/', inPersonLabel, remoteLabel, tourLegend } = Astro.props;
+// A test build takes the test key even when the real one is set (in .env.production, say): the real widget refuses to
+// run on localhost.
+const TEST_KEY = '1x00000000000000000000AA';
+// Cloudflare Pages sets CF_PAGES on its builds: a test build there would ship a key the live server refuses.
+if (import.meta.env.PUBLIC_TURNSTILE_ALLOW_TEST_KEY === 'true' && typeof process !== 'undefined' && process.env.CF_PAGES === '1') throw new Error('PUBLIC_TURNSTILE_ALLOW_TEST_KEY is for local test builds only: remove it from this Cloudflare Pages build.');
+const siteKey = import.meta.env.PUBLIC_TURNSTILE_ALLOW_TEST_KEY === 'true' ? TEST_KEY : import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || (import.meta.env.DEV ? TEST_KEY : undefined);
 // A production build without a real site key would ship Cloudflare's always-pass test key and every registration would fail.
 if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production builds (or PUBLIC_TURNSTILE_ALLOW_TEST_KEY=true for local test builds).');
 ---
 <form class="rsvp not-content" id="rsvp-form" data-event={event} data-contact={contactHref} data-next={next} method="post" novalidate>
-	<p class="status-line" id="rsvp-availability" aria-live="polite">Checking availability…</p>
+	<noscript><p class="help">Registering needs JavaScript. Please turn it on, or <a href={contactHref}>contact us</a> to register.</p></noscript>
+	<!-- Filled in by the script: without it, "checking availability" would never end. -->
+	<p class="status-line" id="rsvp-availability" aria-live="polite"></p>
 
 	<div class="field">
 		<label for="rsvp-name">Name <span aria-hidden="true">*</span></label>
@@ -37,13 +44,13 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 
 	<fieldset class="field">
 		<legend>How will you attend? <span aria-hidden="true">*</span></legend>
-		<label class="choice"><input type="radio" name="attendance" value="in_person" required /> {inPersonLabel}</label>
-		<label class="choice"><input type="radio" name="attendance" value="remote" /> {remoteLabel}</label>
+		<label class="choice"><input type="radio" name="attendance" value="in_person" required /> <span id="rsvp-in-person-label" data-fixed={inPersonLabel ? "1" : undefined}>{inPersonLabel ?? "In person"}</span></label>
+		<label class="choice"><input type="radio" name="attendance" value="remote" /> <span id="rsvp-remote-label" data-fixed={remoteLabel ? "1" : undefined}>{remoteLabel ?? "Remotely (online sessions only)"}</span></label>
 		<label class="choice" id="rsvp-extras-choice" hidden><input type="radio" name="attendance" value="extras" /> <span id="rsvp-extras-label">Just the optional sessions</span></label>
 	</fieldset>
 
 	<fieldset class="field" id="rsvp-tour-fieldset" hidden>
-		<legend>{tourLegend}</legend>
+		<legend id="rsvp-tour-legend" data-fixed={tourLegend ? "1" : undefined}>{tourLegend ?? "Optional tour (in person only)"}</legend>
 		<label class="choice"><input type="radio" name="tour_id" value="none" checked /> No tour, thanks</label>
 		<div id="rsvp-tours"></div>
 	</fieldset>
@@ -66,6 +73,7 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 		<textarea id="rsvp-extra" name="extra_answer" rows="2" maxlength="500"></textarea>
 	</div>
 
+	<div id="rsvp-polls" hidden></div>
 	<div class="hp" aria-hidden="true">
 		<label for="rsvp-website">Leave this field empty</label>
 		<input id="rsvp-website" name="website" type="text" tabindex="-1" autocomplete="off" />
@@ -82,132 +90,25 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 		</label>
 	</div>
 
-	<div class="cf-turnstile" data-sitekey={siteKey} data-response-field-name="cf-turnstile-response"></div>
+	<div class="cf-turnstile" data-sitekey={siteKey} data-action="eventsandeye-register" data-response-field-name="cf-turnstile-response"></div>
 
 	<p class="help"><span aria-hidden="true">*</span> Required</p>
 	<!-- Disabled until the script runs: without it the form would post personal data to this page and go nowhere. -->
 	<button type="submit" class="submit" disabled>Register</button>
-	<noscript><p class="help">Registering needs JavaScript. Please turn it on, or <a href={contactHref}>contact us</a> to register.</p></noscript>
-	<div id="rsvp-result" role="status" aria-live="polite"></div>
+	<div id="rsvp-result" role="status" aria-live="polite" tabindex="-1"></div>
 	<p class="help beta">Registrations via <a href={sourceUrl}>Events&amp;I</a> (beta): <a href={contactHref}>feedback welcome</a>.</p>
 </form>
 
 <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script>
-	const form = document.getElementById('rsvp-form') as HTMLFormElement;
-	const event = form.dataset.event!;
-	const result = document.getElementById('rsvp-result')!;
-	const avail = document.getElementById('rsvp-availability')!;
-	const toursBox = document.getElementById('rsvp-tours')!;
-	const tourFs = document.getElementById('rsvp-tour-fieldset') as HTMLFieldSetElement;
-	const optFs = document.getElementById('rsvp-optins-fieldset') as HTMLFieldSetElement;
-	const btn = form.querySelector('button[type=submit]') as HTMLButtonElement;
-	btn.disabled = false;
-	const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
-
-	interface Status {
-		ok: boolean;
-		error?: string;
-		event: { open: boolean; deadline: string; extra_question?: string | null };
-		tours: { id: string; label: string; available: boolean; open: boolean }[];
-		optins?: { id: string; label: string; starts_at: string; location: string | null; available?: boolean }[];
-	}
-
-	function syncTour() {
-		const mode = (form.elements.namedItem('attendance') as RadioNodeList).value;
-		const inPerson = mode === 'in_person', extras = mode === 'extras';
-		tourFs.disabled = !inPerson;
-		optFs.disabled = !inPerson && !extras;
-		document.getElementById('rsvp-optins-legend')!.textContent = extras ? 'Joining us for' : 'Also joining us for (in person only)';
-		const boxes = [...optFs.querySelectorAll('input')] as HTMLInputElement[];
-		if (!inPerson && !extras) boxes.forEach((el) => (el.checked = false));
-		// Just the dinner (say): with only one optional session there's nothing to choose, so tick it.
-		if (extras && boxes.length === 1) boxes[0].checked = true;
-		if (!inPerson) (form.querySelector('input[name=tour_id][value=none]') as HTMLInputElement).checked = true;
-	}
-	form.addEventListener('change', syncTour);
-	syncTour();
-
-	fetch(`/api/rsvp/status?event=${encodeURIComponent(event)}`)
-		.then((r) => r.json() as Promise<Status>)
-		.then((s) => {
-			if (!s.ok) throw new Error(s.error);
-			if (!s.event.open) {
-				avail.textContent = 'Registration for this event has closed.';
-				form.querySelectorAll('input,textarea,button').forEach((el) => ((el as HTMLInputElement).disabled = true));
-				return;
-			}
-			if (s.event.extra_question) {
-				(document.getElementById('rsvp-extra-label') as HTMLElement).textContent = `${s.event.extra_question} (optional)`;
-				(document.getElementById('rsvp-extra-field') as HTMLElement).hidden = false;
-			}
-			const deadline = new Date(s.event.deadline).toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/London' });
-			// Only the deadline: saying places are full would put people off registering, and the waiting list is how
-			// demand beyond the room shows up.
-			avail.textContent = `Registration closes ${deadline} (UK time).`;
-			tourFs.hidden = !s.tours.length;
-			for (const t of s.tours) {
-				const label = document.createElement('label');
-				label.className = 'choice';
-				const input = document.createElement('input');
-				input.type = 'radio';
-				input.name = 'tour_id';
-				input.value = t.id;
-				input.disabled = !t.open;
-				label.replaceChildren(input, ` ${t.label}${!t.open ? ' (booking closed)' : t.available ? '' : ' (full: waiting list)'}`);
-				toursBox.appendChild(label);
-			}
-			for (const o of s.optins ?? []) {
-				const label = document.createElement('label');
-				label.className = 'choice';
-				const input = document.createElement('input');
-				input.type = 'checkbox';
-				input.name = 'optins';
-				input.value = o.id;
-				const time = new Date(o.starts_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
-				label.replaceChildren(input, ` ${o.label}, ${time}${o.location ? `, ${o.location}` : ''}${o.available === false ? ' (full: waiting list)' : ''}`);
-				(document.getElementById('rsvp-optins') as HTMLElement).appendChild(label);
-			}
-			optFs.hidden = !(s.optins ?? []).length;
-			if ((s.optins ?? []).length) {
-				document.getElementById('rsvp-extras-label')!.textContent = `Just the ${(s.optins ?? []).map((o) => lowerFirst(o.label)).join(' and ')}`;
-				document.getElementById('rsvp-extras-choice')!.hidden = false;
-			}
-			syncTour();
-		})
-		.catch(() => {
-			avail.textContent = `Could not check availability. You can still try to register, or contact us using the link below.`;
-		});
-
-	form.addEventListener('submit', async (e) => {
-		e.preventDefault();
-		result.textContent = '';
-		if (!form.reportValidity()) return;
-		const fd = new FormData(form);
-		const body: Record<string, unknown> = Object.fromEntries(fd.entries());
-		body.event = event;
-		body.consent = (document.getElementById('rsvp-consent') as HTMLInputElement).checked;
-		body.share_contact = (document.getElementById('rsvp-share') as HTMLInputElement).checked;
-		body.optins = fd.getAll('optins').map(String);
-		btn.disabled = true;
-		try {
-			const res = await fetch('/api/rsvp/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-			const data = (await res.json()) as { ok: boolean; error?: string };
-			if (!data.ok) throw new Error(data.error || 'Registration failed.');
-			// A page of its own, so the "check your email" step can't be missed below the form.
-			try { sessionStorage.setItem('rsvp-email', String(fd.get('email'))); } catch {}
-			location.href = form.dataset.next || '/events/check-email/';
-		} catch (err) {
-			result.textContent = (err as Error).message;
-			(window as unknown as { turnstile?: { reset: () => void } }).turnstile?.reset();
-			// Only on failure: after success the Turnstile token is spent, so a second click must not resend it.
-			btn.disabled = false;
-		}
-	});
+	import './rsvp-form';
 </script>
 
 <style>
 	.rsvp { display: grid; gap: 1rem; max-width: 40rem; margin-block: 1.5rem; }
+	/* The display rules below would otherwise beat the hidden attribute, and show parts the event does not use. */
+	.rsvp :global([hidden]) { display: none !important; }
+	#rsvp-result.error { color: #b3261e; color: light-dark(#b3261e, #ff8a80); font-weight: 600; }
 	.field { display: grid; gap: 0.35rem; border: 0; padding: 0; margin: 0; }
 	.field label:not(.choice), legend { font-weight: 600; }
 	/* :global because tour and opt-in choices are added by the script after the page loads, and Astro's scoped
@@ -215,13 +116,31 @@ if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production buil
 	.rsvp :global(.choice) { display: flex; gap: 0.5rem; align-items: flex-start; font-weight: normal; }
 	.rsvp :global(.choice input) { margin-top: 0.3rem; }
 	#rsvp-tours, #rsvp-optins { display: grid; gap: 0.35rem; }
+	#rsvp-polls { display: grid; gap: 1rem; }
+	/* The poll fieldsets are made by the script, so the scoped .field, legend and .help rules above do not reach them. */
+	#rsvp-polls :global(.field) { display: grid; gap: 0.35rem; border: 0; padding: 0; margin: 0; }
+	#rsvp-polls :global(legend) { font-weight: 600; }
+	#rsvp-polls :global(.help) { font-size: var(--sl-text-sm, 0.875rem); color: #4b5563; color: light-dark(#4b5563, #b0b5bd); margin: 0; }
+	:global([data-theme]) #rsvp-polls :global(.help) { color: var(--sl-color-gray-2); }
+	#rsvp-polls :global(.rank) { list-style: decimal; padding-left: 1.75rem; margin: 0; display: grid; gap: 0.35rem; }
+	#rsvp-polls :global(.rank li) { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.4rem 0.6rem; border: 1px solid var(--sl-color-gray-4, #c7cad1); border-radius: 0.3rem; background: var(--sl-color-bg, Canvas); color: var(--sl-color-text, CanvasText); }
+	#rsvp-polls :global(.rank li[draggable='true']) { cursor: grab; }
+	#rsvp-polls :global(.rank li.dragging) { opacity: 0.5; }
+	#rsvp-polls :global(.rank li.bar) { list-style: none; margin-left: -1.75rem; border: 0; border-top: 3px dashed #b3261e; border-top-color: light-dark(#b3261e, #ff8a80); border-radius: 0; font-weight: 700; color: #b3261e; color: light-dark(#b3261e, #ff8a80); background: transparent; }
+	/* Starlight's dark theme may not set color-scheme, so light-dark() alone could keep the light red. */
+	:global([data-theme='dark']) #rsvp-polls :global(.rank li.bar) { color: #ff8a80; border-top-color: #ff8a80; }
+	#rsvp-polls :global(.moves) { display: flex; gap: 0.25rem; flex-shrink: 0; }
+	#rsvp-polls :global(.moves button) { min-width: 2.25rem; min-height: 2.25rem; border: 1px solid var(--sl-color-gray-3, #8b8f98); border-radius: 0.3rem; background: transparent; color: inherit; cursor: pointer; }
+	#rsvp-polls :global(.moves button:disabled) { opacity: 0.35; cursor: default; }
 	input[type='text'], input[type='email'], textarea {
-		padding: 0.5rem; border: 1px solid var(--sl-color-gray-3, #8b8f98); border-radius: 0.3rem; background: var(--sl-color-bg, #fff); color: var(--sl-color-text, inherit); font: inherit;
+		padding: 0.5rem; border: 1px solid var(--sl-color-gray-3, #8b8f98); border-radius: 0.3rem; background: var(--sl-color-bg, Canvas); color: var(--sl-color-text, CanvasText); font: inherit;
 	}
 	fieldset:disabled { opacity: 0.6; }
-	.help { font-size: var(--sl-text-sm, 0.875rem); color: var(--sl-color-gray-2, #4b5563); margin: 0; }
+	.help { font-size: var(--sl-text-sm, 0.875rem); color: #4b5563; color: light-dark(#4b5563, #b0b5bd); margin: 0; }
+	/* Starlight's own grey where it is used; elsewhere the plain colours above (var() with light-dark() inside has no fallback in older browsers). */
+	:global([data-theme]) .help { color: var(--sl-color-gray-2); }
 	.hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
-	.submit { justify-self: start; background: var(--sl-color-accent-high, #0069a0); color: var(--sl-color-black, #fff); border: 0; border-radius: 999px; padding: 0.7rem 1.6rem; font-weight: 700; font-size: var(--sl-text-base, 1rem); cursor: pointer; }
+	.submit { justify-self: start; background: var(--sl-color-accent-high, #0069a0); color: var(--sl-color-black, #fff); border: 2px solid transparent; border-radius: 999px; padding: 0.7rem 1.6rem; font-weight: 700; font-size: var(--sl-text-base, 1rem); cursor: pointer; }
 	:global([data-theme='light']) .submit { background: #0069a0; color: #fff; }
 	.submit:disabled { opacity: 0.6; cursor: wait; }
 	.status-line { font-weight: 600; }

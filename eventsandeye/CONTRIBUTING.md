@@ -5,12 +5,7 @@ Thanks for looking. Agents and humans alike: [AGENTS.md](AGENTS.md) is the short
 ## The short version
 
 - Open an issue before a large change, so nobody builds the same thing twice.
-- Run the unit tests (`npm install`, then `npm test`) and the end-to-end test before you open a pull request. From a site that hosts Events&I (see the README):
-
-  ```sh
-  PUBLIC_TURNSTILE_ALLOW_TEST_KEY=true npm run build
-  E2E_DB=events E2E_SEED=eventsandeye/examples/seed.example.sql E2E_NOTIFY=<your NOTIFY_EMAIL> node eventsandeye/tests/e2e.mjs
-  ```
+- Run the unit tests (`npm install`, then `npm test`) and the end-to-end test before you open a pull request. The end-to-end test needs no site of your own: `sh scripts/starter-e2e.sh` builds a throwaway copy of the starter site in `examples/starter/` around your working tree and runs it (set `STARTER_DIR` to keep the copy and skip `npm install` next time). If you change a component, the admin page or anything else people click, also run the browser tests: `npx playwright-core install chromium`, then `sh scripts/browser-tests.sh` (or name the files in `tests/browser/` to run only those). GitHub Actions runs all three on every pull request. To run it from a site that hosts Events&I instead, see the README.
 
 - Add a check to `tests/e2e.mjs` for every behaviour you add or change.
 - Sign the CLA when the bot asks on your first pull request, and add your name to `CONTRIBUTORS.md` in your own commit.
@@ -26,7 +21,8 @@ Thanks for looking. Agents and humans alike: [AGENTS.md](AGENTS.md) is the short
 
 - `src/` – server logic (`rsvp.ts` flows, `calendar.ts` and `ics.ts` invitations, `hosts.ts` host lists, `templates.ts` emails) and `routes/` handlers.
 - `migrations/` – D1 schema. Add a new numbered migration; never edit one that has shipped.
-- `worker/` – the cron Worker. `astro/` – booking, confirm and manage components. `examples/` – config, seed and function wrappers for a new site. `site/` – events.andeye.com, not used by host sites.
+- `worker/` – the cron Worker. `astro/` – booking, confirm and manage components (each script in its own module, shared with the plain HTML versions in `html/`, which `scripts/build-html.mjs` generates: rerun it after changing a component's markup; `npm test` checks it is up to date). `examples/` – config, seed and function wrappers for a new site. `site/` – events.andeye.com, not used by host sites.
+- Sending goes in pieces small enough for the Workers free plan (50 D1 queries a request) and is finished by the cron: keep new send paths within that, and test failures with the dev outbox's `fail-send` and `fail-500` addresses.
 - Code comments explain why, not what. User-facing text is plain, short and in British English.
 
 ## Licensing — what you are agreeing to

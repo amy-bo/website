@@ -2,6 +2,7 @@
 import { isLocalRequest } from '../access';
 import { isDev } from '../env';
 import { handle } from '../http';
+import { binaryString, handleInbound } from '../inbound';
 import { runScheduled } from '../rsvp';
 import { json } from '../util';
 
@@ -24,7 +25,7 @@ export const outbox = handle(async ({ env, request }) => {
 	});
 	const html = `<!doctype html><html lang="en-GB"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Dev outbox (${emails.length})</title>
 <style>body{font-family:Arial,sans-serif;max-width:52rem;margin:2rem auto;padding:0 1rem;color:#111}article{border:1px solid #ccc;border-radius:.5rem;padding:1rem 1.25rem;margin:1rem 0}h1{font-size:1.4rem}h2{font-size:1.1rem;margin:0 0 .25rem}.meta,.att{color:#555;font-size:.9rem;margin:.25rem 0}pre{white-space:pre-wrap;font:inherit;background:#f6f6f6;padding:.75rem;border-radius:.4rem}a{color:#175a00}</style>
-<h1>Dev outbox: ${emails.length} email${emails.length === 1 ? '' : 's'} that would have been sent</h1><p class="meta">Local development only. Newest first. Reload after each action.</p>${items.join('') || '<p>No emails yet.</p>'}`;
+<main><h1>Dev outbox: ${emails.length} email${emails.length === 1 ? '' : 's'} that would have been sent</h1><p class="meta">Local development only. Newest first. Reload after each action.</p>${items.join('') || '<p>No emails yet.</p>'}</main>`;
 	return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 });
 
@@ -33,4 +34,13 @@ export const cron = handle(async ({ env, request }) => {
 	if (!isDev(env) || !isLocalRequest(request)) return new Response('Not found', { status: 404 });
 	const at = new URL(request.url).searchParams.get('at');
 	return { ok: true, report: await runScheduled(env, at ? Date.parse(at) : Date.now()) };
+});
+
+/** Local development only (DEV_MODE and a localhost request): hand a raw email (the request body) to the inbound handler,
+ * as Cloudflare Email Routing would hand it to the cron Worker. */
+export const inbound = handle(async ({ env, request }) => {
+	if (!isDev(env) || !isLocalRequest(request)) return new Response('Not found', { status: 404 });
+	let rejected: string | null = null;
+	const result = await handleInbound(env, binaryString(new Uint8Array(await request.arrayBuffer())), (reason) => (rejected = reason));
+	return { ok: true, result, rejected };
 });

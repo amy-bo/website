@@ -3,7 +3,7 @@ import { type Mode, modeOf } from './mode';
 import type { Attachment, OutgoingEmail } from './email';
 import { type CalEntry, addLinks } from './ics';
 import { mdToHtml, mdToText } from './markdown';
-import { escapeHtml, ukDate, ukDateTime } from './util';
+import { escapeHtml, ukDate, ukDates, ukDateTime } from './util';
 
 export interface EventRow {
 	id: string;
@@ -18,6 +18,12 @@ export interface EventRow {
 	page_path: string;
 	/** Optional free-text question shown on the booking form (null = none). */
 	extra_question?: string | null;
+	/** At most one host list per session every this many minutes; 0 sends every change. */
+	host_list_minutes?: number;
+	/** The event's wording for attending in person, remotely, and the tours' legend (null = plain defaults). */
+	in_person_label?: string | null;
+	remote_label?: string | null;
+	tour_legend?: string | null;
 }
 
 export interface SessionRow {
@@ -55,6 +61,8 @@ export interface RegistrationRow {
 	optins_waiting?: string | null;
 	/** How many times an unconfirmed registration for this address has been replaced (each sends a fresh confirm email). */
 	resends?: number;
+	/** A calendar update is queued for this person (1, plus one per failed try). */
+	calendar_dirty?: number;
 	optins_waitlist_since?: string | null;
 	share_contact: number;
 	status: 'pending' | 'confirmed';
@@ -94,7 +102,7 @@ const poweredBy = (b: Brand) =>
 const poweredByText = (b: Brand) => `Registrations via Events&I (beta) – all feedback hugely welcome: ${b.notify}`;
 
 function layout(b: Brand, title: string, bodyHtml: string, extraFooter = ''): string {
-	return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escapeHtml(title)}</title></head>
+	return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escapeHtml(title)}</title></head>
 <body style="margin:0;background:#f4f7f2;font-family:Arial,Helvetica,sans-serif;color:#111;line-height:1.5">
 <div style="max-width:600px;margin:0 auto;padding:24px">
 <p style="font-size:20px;font-weight:bold;margin:0 0 16px;color:${BLUE}">${escapeHtml(b.org)}</p>
@@ -150,6 +158,11 @@ export const onlyWaiting = (reg: Pick<RegistrationRow, 'attendance' | 'place' | 
 export const waitingForPlace = (reg: Pick<RegistrationRow, 'attendance' | 'place' | 'optins' | 'optins_waiting'>, sessions: SessionRow[]) =>
 	(reg.attendance === 'in_person' && reg.place === 'waitlist') || onlyWaiting(reg, sessions);
 
+/** The start, with its time, for a one-day event; the dates for one over several days. */
+const when = (ev: EventRow) => {
+	const dates = ukDates(ev.starts_at, ev.ends_at, ev.timezone);
+	return dates === ukDate(ev.starts_at, ev.timezone) ? ukDateTime(ev.starts_at, ev.timezone) : dates;
+};
 const lower = (s: SessionRow) => s.label.charAt(0).toLowerCase() + s.label.slice(1);
 const waitingLines = (reg: RegistrationRow, sessions: SessionRow[]) =>
 	optedIn(reg, sessions).filter((s) => optinWaiting(reg, s.id)).map((s) => `You are on the waiting list for ${lower(s)}. We will email you if a place becomes available.`);
@@ -161,7 +174,7 @@ export function statusLines(reg: RegistrationRow, sessions: SessionRow[]): strin
 		const what = optedIn(reg, sessions).map(lower).join(' and ') || 'the optional sessions';
 		return [`You are joining us for ${what} only.`, ...waitingLines(reg, sessions)];
 	}
-	if (reg.attendance === 'remote') lines.push('You are registered to join the talks remotely.');
+	if (reg.attendance === 'remote') lines.push('You are registered to join remotely.');
 	else if (reg.place === 'waitlist') lines.push('You are on the waiting list for an in-person place. We will email you if a place becomes available.');
 	else lines.push('You have an in-person place.');
 	if (reg.attendance === 'in_person' && reg.tour_id) {
@@ -195,31 +208,32 @@ function calendarText(cal: CalendarBlock | undefined, tz: string): string {
  * The double opt-in email. It goes to an address nobody has verified yet, so it carries no manage link, does not
  * repeat the name typed into the form, and lists only the choices the recipient is about to confirm.
  */
-export function confirmEmail(b: Brand, ev: EventRow, reg: RegistrationRow, sessions: SessionRow[], confirmUrl: string): OutgoingEmail {
+export function confirmEmail(b: Brand, ev: EventRow, reg: RegistrationRow, sessions: SessionRow[], confirmUrl: string, opts: { unheld?: boolean } = {}): OutgoingEmail {
 	const subject = `Complete your registration: ${ev.title}`;
 	const choices = [
-		...statusLines(reg, sessions).map((l) => l.replace('You have an in-person place.', 'An in-person place is held for you.').replace('You are booked on', 'A place is held for you on').replace('You are on the waiting list for an in-person place. We will email you if a place becomes available.', 'You are joining the waiting list for an in-person place.').replace(/^You are on the waiting list for (.*)\. We will email you if a place becomes available\.$/, 'You are joining the waiting list for $1.')),
+		...statusLines(reg, sessions).map((l) => l.replace('You have an in-person place.', 'An in-person place is held for you.').replace(/^You have a place at (.*)\.$/, 'A place at $1 is held for you.')
+			.replace('You are on the waiting list for an in-person place. We will email you if a place becomes available.', opts.unheld ? 'An in-person place: places are filling up, so one can be held only once you confirm. If one is free then, it is yours; if not, you join the waiting list.' : '$&').replace(/^You are on the waiting list for (.*?)\.( We will email you if a place becomes available\.)?$/, opts.unheld ? 'For $1, a place if one is free when you confirm; if not, its waiting list.' : '$&').replace('You are booked on', 'A place is held for you on').replace('You are on the waiting list for an in-person place. We will email you if a place becomes available.', 'You are joining the waiting list for an in-person place.').replace(/^You are on the waiting list for (.*)\. We will email you if a place becomes available\.$/, 'You are joining the waiting list for $1.')),
 		reg.share_contact ? 'You chose to share your email address with the hosts of the sessions you attend.' : 'Session hosts will see only your name and whether you have a place.',
 	];
 	const waiting = waitingForPlace(reg, sessions);
 	const held = modeOf(reg) === 'in_person' && !waiting ? 'your place will be released' : 'it will be deleted';
 	// On the waiting list there's no place to lose: the point of confirming is to stay on the list.
-	const why = !waiting ? '' : reg.place === 'waitlist' ? ' and join the waiting list: we will email you if a place comes up, for example if we can book a bigger room' : ' and join the waiting list: we will email you if a place comes up';
+	const why = !waiting ? '' : opts.unheld ? ' and take a place if one is still free' : reg.place === 'waitlist' ? ' and join the waiting list: we will email you if a place comes up, for example if we can book a bigger room' : ' and join the waiting list: we will email you if a place comes up';
 	const notMeUrl = `${confirmUrl}${confirmUrl.includes('?') ? '&' : '?'}not-me=1`;
 	const holdUntil = ukDateTime(reg.hold_expires_at ?? ev.deadline, ev.timezone);
 	const html = layout(b, subject, `
 <h1 style="font-size:22px;margin-top:0">Please complete your registration</h1>
 <p>Hello,</p>
-<p>Someone, hopefully you, registered this address for the <strong>${escapeHtml(ev.title)}</strong>, on ${escapeHtml(ukDateTime(ev.starts_at, ev.timezone))}.</p>
+<p>Someone, hopefully you, registered this address for the <strong>${escapeHtml(ev.title)}</strong>, on ${escapeHtml(when(ev))}.</p>
 <p><strong>Your registration is not complete yet.</strong> Please click the button below now to confirm your email address${why}. If you don't complete your registration, ${held} on ${escapeHtml(holdUntil)}.</p>
 <p>You are confirming:</p><ul>${choices.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}</ul>
 ${button(confirmUrl, 'Complete registration')}
-<p style="font-size:14px">If the button does not work, copy this link into your browser:<br><a href="${escapeHtml(confirmUrl)}">${escapeHtml(confirmUrl)}</a></p>
+<p style="font-size:14px;overflow-wrap:anywhere;word-break:break-all">If the button does not work, copy this link into your browser:<br><a href="${escapeHtml(confirmUrl)}">${escapeHtml(confirmUrl)}</a></p>
 <p style="font-size:14px">To change anything, register again with the same address: the newest registration replaces this one. Once you have confirmed, every email has a link to view, change or cancel your registration.</p>
 <p style="font-size:14px">If you did not register, please <a href="${escapeHtml(notMeUrl)}">click here to delete the registration</a>.</p>`);
 	const text = `Hello,
 
-Someone, hopefully you, registered this address for the ${ev.title}, on ${ukDateTime(ev.starts_at, ev.timezone)}.
+Someone, hopefully you, registered this address for the ${ev.title}, on ${when(ev)}.
 
 YOUR REGISTRATION IS NOT COMPLETE YET. Please open this link now and click "Complete registration" to confirm your email address${why}:
 ${confirmUrl}
@@ -238,10 +252,12 @@ ${notMeUrl}${textFooter(b)}`;
 
 export function instructionsEmail(
 	b: Brand, ev: EventRow, reg: RegistrationRow, sessions: SessionRow[], instr: { subject: string; body_md: string }, manageUrl: string,
-	cal?: CalendarBlock, attachments?: Attachment[], intro?: { html: string; text: string },
+	cal?: CalendarBlock, attachments?: Attachment[], intro?: { html: string; text: string }, polls: string[] = [],
 ): OutgoingEmail {
 	const st = statusLines(reg, sessions);
-	const thanks = `Thank you for registering for the ${ev.title}, on ${ukDate(ev.starts_at, ev.timezone)}.`;
+	// Open polls this person has not answered: one line in an email they get anyway, never an email of its own.
+	const ask = polls.length ? `Have your say: ${polls.map((q) => `"${q}"`).join(' and ')}. Put the options in order on your registration page.` : '';
+	const thanks = `Thank you for registering for the ${ev.title}, on ${ukDates(ev.starts_at, ev.ends_at, ev.timezone)}.`;
 	const body = forAudience(instr.body_md, modeOf(reg));
 	const html = layout(b, instr.subject, `
 <p>Hello ${escapeHtml(reg.name)},</p>
@@ -250,8 +266,9 @@ ${intro?.html ?? ''}
 ${st.map((l) => `<p><strong>${escapeHtml(l)}</strong></p>`).join('')}
 ${mdToHtml(body)}
 ${calendarHtml(cal, ev.timezone)}
-${button(manageUrl, 'Manage my registration')}`);
-	const text = `Hello ${reg.name},\n\n${intro ? `${intro.text}\n\n` : ''}${thanks}\n\n${st.join('\n')}\n\n${mdToText(body)}${calendarText(cal, ev.timezone)}\n\nView, change or cancel your registration: ${manageUrl}${textFooter(b)}`;
+${ask ? `<p><strong>${escapeHtml(ask)}</strong></p>` : ''}
+${button(manageUrl, ask ? 'Manage my registration and answer' : 'Manage my registration')}`);
+	const text = `Hello ${reg.name},\n\n${intro ? `${intro.text}\n\n` : ''}${thanks}\n\n${st.join('\n')}\n\n${mdToText(body)}${calendarText(cal, ev.timezone)}${ask ? `\n\n${ask}` : ''}\n\nView, change or cancel your registration: ${manageUrl}${textFooter(b)}`;
 	return { to: reg.email, subject: instr.subject, html, text, attachments };
 }
 
@@ -266,8 +283,16 @@ export function alreadyRegisteredIntro(ev: EventRow, reg: RegistrationRow) {
 	return { html: lines.map((l) => `<p>${escapeHtml(l)}</p>`).join(''), text: lines.join('\n') };
 }
 
-export function waitlistReminderEmail(b: Brand, ev: EventRow, reg: RegistrationRow, sessions: SessionRow[], manageUrl: string, justConfirmed = false): OutgoingEmail {
-	const intro = justConfirmed
+/** Opens the email someone gets when the organiser confirms their registration for them, so the unused confirm link in
+ * the earlier email does not leave them wondering whether they still need to press it. */
+export function organiserConfirmedIntro(ev: EventRow) {
+	const line = `We have confirmed your registration for the ${ev.title} for you, so there is no need to use the link in our earlier email.`;
+	return { html: `<p><strong>${escapeHtml(line)}</strong></p>`, text: line };
+}
+
+export function waitlistReminderEmail(b: Brand, ev: EventRow, reg: RegistrationRow, sessions: SessionRow[], manageUrl: string, justConfirmed = false, confirmedIntro?: { html: string; text: string }): OutgoingEmail {
+	const intro = confirmedIntro ? { html: `${confirmedIntro.html}<p>Your latest joining instructions follow.</p>`, text: `${confirmedIntro.text}\nYour latest joining instructions follow.` }
+		: justConfirmed
 		? { html: `<p>Thank you for confirming your registration for the ${escapeHtml(ev.title)}.</p><p>Your latest joining instructions follow.</p>`, text: `Thank you for confirming your registration for the ${ev.title}.\nYour latest joining instructions follow.` }
 		: alreadyRegisteredIntro(ev, reg);
 	const st = statusLines(reg, sessions);
@@ -344,6 +369,18 @@ export interface HostLine {
 }
 
 /** Attendee list for a session host, with additions in bold and removals struck through. */
+/** To a session's previous host, once the session has a new host or none: the lists they were sent are no longer theirs. */
+export function hostReleasedEmail(b: Brand, ev: EventRow, s: SessionRow): OutgoingEmail {
+	const subject = `You are no longer hosting: ${s.label}, ${ev.title}`;
+	const lines = [
+		`Hello${s.host_name ? ` ${s.host_name}` : ''},`,
+		`You are no longer down as the host of ${s.label} (${ukDateTime(s.starts_at, ev.timezone)}), so you will get no more attendee lists for it.`,
+		'Please delete the lists we sent you for this session, including any email addresses in them.',
+		`If this is a mistake, please tell the organisers at ${b.notify}.`,
+	];
+	return { to: s.host_email!, subject, text: lines.join('\n\n') + textFooter(b), html: layout(b, subject, lines.map((l) => `<p>${escapeHtml(l)}</p>`).join('')) };
+}
+
 export function hostListEmail(b: Brand, ev: EventRow, s: SessionRow, current: HostLine[], added: Set<string>, removed: HostLine[], changedDetail: Set<string>): OutgoingEmail {
 	const subject = `Attendee list changed: ${s.label}, ${ev.title}`;
 	const row = (l: HostLine) => {
@@ -366,4 +403,40 @@ ${removed.length ? `<p>Removed:</p><ul>${removed.map((l) => `<li><s>${escapeHtml
 
 export function notification(b: Brand, subject: string, lines: string[]): OutgoingEmail {
 	return { to: b.notify, subject: `[${b.org}] ${subject}`, text: lines.join('\n'), html: layout(b, subject, lines.map((l) => `<p>${escapeHtml(l)}</p>`).join('')) };
+}
+
+export interface SuggestionEmailInput {
+	who: string;
+	label: string;
+	question: string;
+	eventTitle: string;
+	ref: string;
+	adminUrl: string;
+	/** POLL_REPLY_EMAIL: when set, the organiser can decide by replying. */
+	replyTo?: string;
+}
+
+/** To the organiser: a registrant suggested a poll option. The reference in the subject lets a reply decide it. */
+export function suggestionEmail(b: Brand, s: SuggestionEmailInput): OutgoingEmail {
+	const subject = `[${b.org}] Poll suggestion: ${s.label} (ref ${s.ref})`;
+	const intro = `${s.who} suggested an option for "${s.question}" (${s.eventTitle}):`;
+	const how = s.replyTo
+		? [
+			'Reply to this email with one of these on the first line:',
+			'yes: add it for everyone, as written',
+			'no: do not add it',
+			'use <your wording>: add it in your own words, for example "use Paddleboarding on the Thames". If your wording is an existing option, their vote counts for that one.',
+		]
+		: [];
+	const after = 'Nobody is emailed about your decision: the suggester sees it when they next open their registration.';
+	const text = [intro, '', `    ${s.label}`, '', ...how, ...(how.length ? [''] : []), `${how.length ? 'Or decide' : 'Decide'} on the admin page: ${s.adminUrl}`, '', after, '', `(ref ${s.ref})`].join('\n');
+	const html = layout(b, 'Poll suggestion', `<p>${escapeHtml(intro)}</p><p style="font-size:20px;font-weight:bold">${escapeHtml(s.label)}</p>`
+		+ (how.length ? `<p>${escapeHtml(how[0])}</p><ul>${how.slice(1).map((l) => { const [k, ...v] = l.split(': '); return `<li><strong>${escapeHtml(k)}</strong>: ${escapeHtml(v.join(': '))}</li>`; }).join('')}</ul>` : '')
+		+ button(s.adminUrl, how.length ? 'Or decide on the admin page' : 'Decide on the admin page') + `<p style="font-size:14px">${escapeHtml(after)}</p><p style="font-size:12px;color:#555">(ref ${escapeHtml(s.ref)})</p>`);
+	return { to: b.notify, subject, text, html, ...(s.replyTo ? { replyTo: s.replyTo } : {}) };
+}
+
+/** To the organiser who replied to a suggestion email: what their reply did (or why it did nothing). */
+export function suggestionReplyEmail(b: Brand, to: string, subject: string, lines: string[]): OutgoingEmail {
+	return { to, subject: `[${b.org}] ${subject}`, text: lines.join('\n'), html: layout(b, subject, lines.map((l) => `<p>${escapeHtml(l)}</p>`).join('')), headers: { 'Auto-Submitted': 'auto-replied' } };
 }

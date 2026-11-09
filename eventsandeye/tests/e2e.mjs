@@ -3,7 +3,8 @@
 /**
  * End-to-end test of Events&I against a local D1 database with `wrangler pages dev ./dist`.
  * Emails go to the dev outbox (DEV_MODE), Turnstile uses Cloudflare's always-pass test secret, and the admin
- * tests mint their own Access JWTs with a throwaway RSA key.
+ * tests mint their own Access JWTs with a throwaway RSA key. Replies to poll suggestions go through /api/dev/inbound, as
+ * Cloudflare Email Routing would hand them to the cron Worker.
  *
  * Configure with environment variables (defaults suit the amybo.org site):
  *   E2E_DB      D1 database name in wrangler.toml          (amybo-rsvp-eu)
@@ -53,6 +54,9 @@ writeFileSync('.dev.vars', [
 	`NOTIFY_EMAIL=${NOTIFY}`,
 	// Check the token's own methods here (the live site relies on the Access application's MFA instead).
 	'ACCESS_MFA=claim',
+	'POLL_REPLY_EMAIL=polls@example.org',
+	// Registrations are answered no sooner than this (1.5 s on a live site), so timing cannot tell who is registered.
+	'REGISTER_MIN_MS=200',
 	`ACCESS_JWKS_JSON=${JSON.stringify({ keys: [jwk] })}`,
 	'',
 ].join('\n'));
@@ -159,7 +163,8 @@ try {
 	{
 		const r = await req('GET', '/events/next');
 		const loc = r.headers.get('location') || '';
-		check('/events/next redirects to the next event page', r.status === 302 && /\/events\/[^/]+\/$/.test(new URL(loc, BASE).pathname) && !new URL(loc, BASE).pathname.endsWith('/events/next/'), `${r.status} ${loc}`);
+		const to = new URL(loc, BASE).pathname;
+		check('/events/next redirects to the next event\'s page, which exists', r.status === 302 && to !== '/events/next/' && to.endsWith('/') && (await req('GET', to)).status === 200, `${r.status} ${loc}`);
 	}
 
 	console.log('\nAdmin protection (Cloudflare Access JWT)');
@@ -178,9 +183,31 @@ try {
 		check(`${p} with valid JWT → 200`, (await req('GET', p, undefined, ADMIN)).status === 200);
 	}
 	{ const refused = await req('GET', '/admin/rsvps/', undefined, { 'cf-access-jwt-assertion': jwt({ iat: Math.floor(Date.now() / 1000) - 13 * 3600 }) });
-	  check('a refused admin page explains why and links to sign in again', refused.status === 401 && /sign-in too old/.test(refused.data) && /\/cdn-cgi\/access\/logout/.test(refused.data), String(refused.data).slice(0, 200)); }
+	  check('a refused admin page explains why, in a sentence, and links to sign in again', refused.status === 401 && /<p>Sign-in too old/.test(refused.data) && /\/cdn-cgi\/access\/logout/.test(refused.data) && /<main>/.test(refused.data), String(refused.data).slice(0, 200)); }
+	{ const wrongApp = await req('GET', '/admin/rsvps/', undefined, { 'cf-access-jwt-assertion': jwt({ aud: 'someone-else' }) });
+	  check('a token for another Access application names ACCESS_AUD as the thing to check', /ACCESS_AUD/.test(wrongApp.data), String(wrongApp.data).slice(0, 300));
+	  const none = await req('GET', '/admin/rsvps/');
+	  check('no token at all says the Access application may not cover this address', /no Access token reached the site/.test(none.data), String(none.data).slice(0, 300)); }
 	const page = await req('GET', '/admin/rsvps/', undefined, ADMIN);
+	check('the admin page cannot be framed by another site, and sends no referrer', /frame-ancestors 'none'/.test(page.headers.get('content-security-policy') || '') && page.headers.get('x-frame-options') === 'DENY' && page.headers.get('referrer-policy') === 'no-referrer');
 	check('admin page is HTML with the sessions editor', typeof page.data === 'string' && /id="sessions-form"/.test(page.data) && /Events&amp;I/.test(page.data));
+	check('the quiet save says it is attendees who are not emailed (hosts still get their lists)', /Save without emailing attendees/.test(page.data) && /hosts are still sent/.test(page.data) && !/without emailing anyone/.test(page.data));
+	{
+		const setup = async () => (await req('GET', '/api/admin/events', undefined, ADMIN)).data.setup;
+		let f = await setup();
+		check('set-up check: before the cron has run, the admin page says to deploy it', f.some((x) => x.level === 'error' && /cron Worker has not run yet/.test(x.text)), JSON.stringify(f));
+		check('set-up check: no complaint about migrations when all are applied', !f.some((x) => /migrations/.test(x.text)), JSON.stringify(f));
+		await cron();
+		f = await setup();
+		check('…and after a cron run, nothing about the cron', !f.some((x) => /cron Worker/.test(x.text)), JSON.stringify(f));
+		const real = JSON.parse(sql(`SELECT value FROM status WHERE key = 'cron'`, true))[0].results[0].value;
+		const v = JSON.parse(real);
+		sql(`UPDATE status SET value = '${JSON.stringify({ ...v, secret: 'something-else', site: 'https://elsewhere.example', at: new Date(Date.now() - 3600_000).toISOString() })}' WHERE key = 'cron'`);
+		f = await setup();
+		check('a cron Worker with another TOKEN_SECRET or SITE_URL, or not run for an hour, is named on the admin page', f.some((x) => x.level === 'error' && /TOKEN_SECRET is not the same/.test(x.text)) && f.some((x) => x.level === 'error' && /SITE_URL \(https:\/\/elsewhere\.example\)/.test(x.text)) && f.some((x) => x.level === 'warning' && /last ran 60 minutes ago/.test(x.text)), JSON.stringify(f));
+		check('the summary carries the same check', Array.isArray((await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN)).data.setup));
+		await cron();
+	}
 	check('admin POST without JWT → 401', (await req('POST', '/api/admin/settings', { event: EVENT, in_person_max: 999 })).status === 401);
 	check('admin POST from another origin → 403', (await req('POST', '/api/admin/settings', { event: EVENT }, { ...ADMIN, origin: 'https://evil.example' })).status === 403);
 	check('admin POST with neither Origin nor Sec-Fetch-Site → 403', (await req('POST', '/api/admin/settings', { event: EVENT }, { 'cf-access-jwt-assertion': jwt() })).status === 403);
@@ -197,6 +224,10 @@ try {
 	const DINNER = seeded.sessions.find((x) => x.optin)?.id;
 	const YEAR = seeded.event.starts_at.slice(0, 4);
 	check('seeded in-person maximum and tour capacities', seeded.event.in_person_max === 20 && tours.every((t) => t.capacity === 10), JSON.stringify({ max: seeded.event.in_person_max, tours: tours.map((t) => t.capacity) }));
+	sql(`UPDATE events SET remote_label = 'Remotely, on Meet' WHERE id = '${EVENT}'`);
+	check('the form gets the event\'s own wording for attending', (await req('GET', `/api/rsvp/status?event=${EVENT}`)).data.event.remote_label === 'Remotely, on Meet');
+	sql(`UPDATE events SET remote_label = NULL WHERE id = '${EVENT}'`);
+	check('the form and the admin page get the event\'s time zone', (await req('GET', `/api/rsvp/status?event=${EVENT}`)).data.event.timezone === 'Europe/London' && seeded.event.timezone === 'Europe/London' && /class="tzl"/.test(page.data));
 	check('summary without an event id falls back to the latest event', (await req('GET', '/api/admin/summary', undefined, ADMIN)).data.event?.id === EVENT);
 	r = await req('POST', '/api/admin/settings', { event: EVENT, in_person_max: 1 }, ADMIN);
 	check('in-person maximum set to 1', r.data.ok, JSON.stringify(r.data));
@@ -212,13 +243,21 @@ try {
 
 	console.log('\nValidation and spam protection');
 	const before = (await outbox()).length;
-	check('missing consent → 400', (await register({ consent: false })).status === 400);
-	check('bad email → 400', (await register({ email: 'not-an-email' })).status === 400);
+	r = await register({ consent: false });
+	check('missing consent → 400, naming the consent box so the form can mark it', r.status === 400 && r.data.field === 'consent', JSON.stringify(r.data));
+	r = await register({ email: 'not-an-email' });
+	check('bad email → 400, naming the email field', r.status === 400 && r.data.field === 'email', JSON.stringify(r.data));
+	r = await register({ name: '   ' });
+	check('a name of spaces → 400, naming the name field', r.status === 400 && r.data.field === 'name', JSON.stringify(r.data));
 	check('missing Turnstile token → 403', (await register({ 'cf-turnstile-response': '' })).status === 403);
+	const honeyStart = Date.now();
 	r = await register({ website: 'http://spam.example', email: 'bot@example.org' });
-	check('honeypot → fake success', r.status === 200 && r.data.ok);
+	check('honeypot → fake success, in the usual time (so a bot cannot tell it was caught)', r.status === 200 && r.data.ok && Date.now() - honeyStart >= 200, Date.now() - honeyStart);
 	check('honeypot and rejects send no email', (await outbox()).length === before);
 	check('non-JSON body → 415', (await fetch(`${BASE}/api/rsvp/register`, { method: 'POST', body: 'name=x' })).status === 415);
+
+	{ const big = await fetch(`${BASE}/api/rsvp/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ event: EVENT, name: 'x'.repeat(60_000) }) });
+	  check('a request body over 50 KB is refused → 413', big.status === 413); }
 
 	console.log('\nConfirm → place, joining instructions and calendar invitation');
 	const alice = 'alice@example.org', bob = 'bob@example.org', carol = 'carol@example.org';
@@ -233,6 +272,9 @@ try {
 	const aliceConfirm = tokenFrom(mails[0].text_body, 'confirm');
 	check('confirm link present; no manage link before the address is confirmed', !!aliceConfirm && !tokenFrom(mails[0].text_body, 'manage'));
 	check('confirm email lists the choices being confirmed, without repeating the typed name', /You are confirming:/.test(mails[0].text_body) && /10:30 lab tour/.test(mails[0].text_body) && /share your email address with the hosts/.test(mails[0].text_body) && !/Alice/.test(mails[0].text_body));
+	check('confirm email words the dinner as held, not already had', /A place at dinner is held for you\./i.test(mails[0].text_body) && !/You have a place at/.test(mails[0].text_body), mails[0].text_body.slice(0, 900));
+	// The link is one long word: unbroken, it widens the email past a phone screen.
+	check('the confirm email\'s copy-this-link fallback wraps on a phone', /<p style="[^"]*word-break:break-all">If the button does not work/.test(mails[0].html_body));
 	check('confirm email offers a link to delete a registration the recipient did not make', /not-me=1/.test(mails[0].text_body) && /click here to delete the registration/.test(mails[0].html_body));
 
 	console.log('\nJust the dinner');
@@ -365,14 +407,31 @@ try {
 	  check('dinner host list has Alice, signed up, and not Bob (in person, no dinner)', !!dh && /Alice[^\n]*signed up/.test(dh.text_body) && !/Bob/.test(dh.text_body), dh?.text_body); }
 
 	console.log('\nRegistering again with a confirmed address');
+	let t0 = Date.now();
 	r = await register({ name: 'Alice again', email: alice });
 	check('duplicate returns the same generic success', r.status === 200 && r.data.ok);
+	check('…no sooner than a new registration would (REGISTER_MIN_MS), so timing does not reveal it', Date.now() - t0 >= 200, Date.now() - t0);
 	m = await last(alice);
 	check('reminder confirms name, event, email and when registered, then the joining instructions', (await mailsTo(alice)).length === 3 && /already registered/.test(m.text_body) && /Name: Alice\. Email: alice@example\.org\. Registered: /.test(m.text_body) && /Schedule \(UK time\)/.test(m.text_body));
 	check('reminder re-attaches the current calendar invitations (same sequence)', m.att.length === 2 && m.att.every((a) => /SEQUENCE:0/.test(a.content)));
 	await register({ name: 'Bob', email: bob });
 	m = await last(bob);
 	check('waitlisted duplicate gets a reminder of their status, no instructions or calendar', (await mailsTo(bob)).length === 3 && /already registered/.test(m.text_body) && /waiting list/.test(m.text_body) && !/Schedule \(UK time\)/.test(m.text_body) && m.att.length === 0);
+
+	{
+		const aliceId = JSON.parse(sql(`SELECT id FROM registrations WHERE email = '${alice}'`, true))[0].results[0].id;
+		const ago = (h) => new Date(Date.now() - h * 3600_000).toISOString();
+		// The reminder above is moved out of the ten-minute cooldown; with two more today, that makes three.
+		sql(`UPDATE deliveries SET sent_at = '${ago(1)}' WHERE registration_id = '${aliceId}' AND kind = 'already_registered'`);
+		sql(`INSERT INTO deliveries (registration_id, kind, sent_at, provider_id) VALUES ('${aliceId}', 'already_registered', '${ago(2)}', 'x'), ('${aliceId}', 'already_registered', '${ago(30)}', 'x')`);
+		let n = (await mailsTo(alice)).length;
+		await register({ name: 'Alice', email: alice });
+		check('after the cooldown, a confirmed address registering again gets another reminder', (await mailsTo(alice)).length === n + 1);
+		sql(`UPDATE deliveries SET sent_at = '${ago(3)}' WHERE registration_id = '${aliceId}' AND kind = 'already_registered' AND sent_at > '${ago(0.5)}'`);
+		n = (await mailsTo(alice)).length;
+		await register({ name: 'Alice', email: alice });
+		check('…but no more than three a day, however the form is used', (await mailsTo(alice)).length === n);
+	}
 
 	console.log('\nRegistering again before confirming');
 	const frank = 'frank@example.org';
@@ -399,6 +458,9 @@ try {
 	const dl = await fetch(r.data.calendar[0].url);
 	const dlText = await dl.text();
 	check('.ics download works (METHOD:PUBLISH, text/calendar, with the organiser)', dl.status === 200 && /text\/calendar/.test(dl.headers.get('content-type')) && /METHOD:PUBLISH/.test(dlText) && /BEGIN:VALARM/.test(dlText) && /ORGANIZER;CN="AMYBO"/.test(unfold(dlText)));
+	const dlName = (h) => /filename="([^"]*)"/.exec(h.get('content-disposition'))?.[1];
+	const dlDinner = await fetch(r.data.calendar[1].url);
+	check('.ics downloads are named from the event and the entry, so the day and the dinner differ', /^[\w.-]+\.ics$/.test(dlName(dl.headers) ?? '') && dlName(dl.headers).includes(EVENT) && dlName(dl.headers) !== dlName(dlDinner.headers) && dlName(dlDinner.headers).includes(r.data.calendar[1].key), `${dlName(dl.headers)} ${dlName(dlDinner.headers)}`);
 	let n = (await mailsTo(alice)).length;
 	r = await req('POST', '/api/rsvp/manage', { t: aliceManage, name: 'Alice', attendance: 'in_person', tour_id: TOUR1, affiliation: 'Lab A', needs: 'Vegan, step-free access', share_contact: true });
 	check('changing only dietary needs sends no calendar email', r.data.ok && (await mailsTo(alice)).length === n);
@@ -462,7 +524,9 @@ try {
 	r = await req('POST', '/api/admin/promote-all', { event: EVENT }, ADMIN);
 	check('promote all does nothing while the maximum is reached', r.data.ok && r.data.promoted === 0 && r.data.still_waiting === 1, JSON.stringify(r.data));
 	await req('POST', '/api/admin/settings', { event: EVENT, in_person_max: 2 }, ADMIN);
+	const hostsBefore = (await outbox()).filter((x) => /Attendee list changed/.test(x.subject)).length;
 	r = await req('POST', '/api/admin/promote-all', { event: EVENT }, ADMIN);
+	check('promote all sends each host at most one list', (await outbox()).filter((x) => /Attendee list changed/.test(x.subject)).length - hostsBefore <= 3);
 	check('raising the maximum then promote all gives the waiting list places, in order', r.data.ok && r.data.promoted === 1 && r.data.still_waiting === 0, JSON.stringify(r.data));
 	await req('POST', '/api/admin/settings', { event: EVENT, in_person_max: 1 }, ADMIN);
 	check('promote all needs Access', (await req('POST', '/api/admin/promote-all', { event: EVENT })).status === 401);
@@ -485,8 +549,23 @@ try {
 	check('with "include the latest joining instructions", the message opens a full copy of them under its own subject', m.subject === 'Room confirmed' && /Room \*\*G01\*\*|Room G01/.test(m.text_body) && /Bring ID/.test(m.text_body) && /What's changed/.test(m.text_body), m.subject + ' | ' + m.text_body.slice(0, 300));
 	check('…and carries calendar changes saved quietly earlier (the new dinner location)', m.att.some((x) => /METHOD:REQUEST/.test(x.content) && /provisionally at The Broadcaster/.test(x.content.replace(/\r\n /g, ''))), m.att.map((x) => (/LOCATION:[^\r\n]*/.exec(x.content) || [''])[0]).join(' | '));
 	check('recipients now recorded as having the new version', (await req('POST', '/api/admin/messages', { event: EVENT, dry_run: true, audience: { below_version: V } }, ADMIN)).data.count === 0);
+	{
+		const regs = (await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN)).data.registrations.filter((x) => x.status === 'confirmed');
+		const has = (list, id) => (list || '').split(',').includes(id);
+		const count = async (audience) => (await req('POST', '/api/admin/messages', { event: EVENT, dry_run: true, audience }, ADMIN)).data.count;
+		const dinner = regs.filter((x) => x.attendance === 'in_person' && has(x.optins, DINNER) && !has(x.optins_waiting, DINNER) && x.place !== 'waitlist').length;
+		const dinnerAll = regs.filter((x) => x.attendance === 'in_person' && has(x.optins, DINNER)).length;
+		const extras = regs.filter((x) => x.attendance === 'in_person' && !x.place && !(x.optins || '').split(',').filter(Boolean).every((o) => has(x.optins_waiting, o))).length;
+		const day = regs.filter((x) => x.attendance === 'in_person' && x.place === 'place').length;
+		check('filter by opt-in session: just the people with a dinner place', dinner > 0 && (await count({ optin: DINNER })) === dinner, `${dinner} vs ${await count({ optin: DINNER })}`);
+		check('…and with the waiting list ticked, those waiting for it too', (await count({ optin: DINNER, include_waitlist: true })) === dinnerAll, `${dinnerAll}`);
+		check('"in person for the day" and "only coming to opt-in sessions" split "in person"', (await count({ attendance: 'extras' })) === extras && (await count({ attendance: 'day' })) === day && (await count({ attendance: 'in_person' })) === extras + day, `${extras} ${day}`);
+	}
 	check('filter by tour: 11:15 → 1 person', (await req('POST', '/api/admin/messages', { event: EVENT, dry_run: true, audience: { tour_id: TOUR2 } }, ADMIN)).data.count === 1);
 	check('HTML in messages is escaped', !/<script>/.test((await req('POST', '/api/admin/preview', { body_md: '<script>alert(1)</script>' }, ADMIN)).data.html));
+	{ const before = (await outbox()).length;
+	  const past = await req('POST', '/api/admin/messages', { event: EVENT, subject: 'Too late', body_md: 'x', audience: {}, scheduled_at: new Date(Date.now() - 3600_000).toISOString() }, ADMIN);
+	  check('a message scheduled for a time already gone is refused, not sent at once', past.status === 400 && /That time has passed/.test(past.data.error) && (await outbox()).length === before, JSON.stringify(past.data)); }
 	const inAnHour = new Date(Date.now() + 3600_000).toISOString();
 	r = await req('POST', '/api/admin/messages', { event: EVENT, subject: 'Reminder', body_md: 'See you soon', audience: { attendance: 'in_person' }, scheduled_at: inAnHour }, ADMIN);
 	const schedId = r.data.message.id;
@@ -529,11 +608,13 @@ try {
 	console.log('\nUnconfirmed holds');
 	const eve = 'eve@example.org';
 	await register({ name: 'Eve', email: eve, attendance: 'remote' });
+	await register({ name: 'Evan', email: 'evan@example.org', attendance: 'remote' });
 	const created = Date.now();
 	await cron(created + 23 * 3600_000);
 	check('before half the hold: no warning', !(await mailsTo(NOTIFY)).some((x) => /Eve/.test(x.text_body)));
 	await cron(created + 25 * 3600_000);
 	check('after half the hold: organiser warned once', (await mailsTo(NOTIFY)).filter((x) => /half way/.test(x.subject) && /Eve/.test(x.text_body)).length === 1);
+	check('…in one email for all the holds half way through, not one each', (await mailsTo(NOTIFY)).some((x) => /\d+ unconfirmed registrations half way/.test(x.subject) && /Eve registered/.test(x.text_body) && /Evan registered/.test(x.text_body)));
 	await cron(created + 26 * 3600_000);
 	check('warning not repeated', (await mailsTo(NOTIFY)).filter((x) => /half way/.test(x.subject) && /Eve/.test(x.text_body)).length === 1);
 	await cron(created + 49 * 3600_000);
@@ -555,6 +636,434 @@ try {
 	check('a new registration ticking the closed dinner → 409', (await register({ email: `${randomUUID()}@example.org`, optins: [DINNER] })).status === 409);
 	check('ticking the closed dinner on the manage page → 409', (await req('POST', '/api/rsvp/manage', { t: bobManage, name: 'Bob', attendance: 'in_person', optins: [DINNER] })).status === 409);
 	await req('POST', '/api/admin/sessions', { event: EVENT, quiet: true, sessions: [{ id: DINNER, booking_deadline: null }] }, ADMIN);
+	console.log('\nPolls');
+	{
+		const POLLS = '/api/admin/polls';
+		check('polls API without JWT → 401', (await req('GET', `${POLLS}?event=${EVENT}`)).status === 401);
+		check('a poll needs a question', (await req('POST', POLLS, { action: 'create', event: EVENT, question: '', options: 'Skiing' }, ADMIN)).status === 400);
+		let before = (await outbox()).length;
+		r = await req('POST', POLLS, { action: 'create', event: EVENT, question: 'What shall we do on Saturday?', options: 'Skiing\nCamping\nHiking\n skiing \nFootball\nRugby' }, ADMIN);
+		const POLL = r.data.id;
+		let ap = (await req('GET', `${POLLS}?event=${EVENT}`, undefined, ADMIN)).data.polls.find((p) => p.id === POLL);
+		check('organiser creates a poll; a repeated option is dropped; nobody is emailed', r.data.ok && ap.options.map((o) => o.label).join() === 'Skiing,Camping,Hiking,Football,Rugby' && (await outbox()).length === before, JSON.stringify(r.data));
+		const opt = (label, p = ap) => p.options.find((o) => o.label === label)?.id;
+		const [SKI, CAMP, HIKE, FOOT, RUGBY] = ['Skiing', 'Camping', 'Hiking', 'Football', 'Rugby'].map((l) => opt(l));
+		const pat = await registerAndConfirm({ name: 'Pat', email: 'pat@example.org', attendance: 'remote' });
+		const quinn = await registerAndConfirm({ name: 'Quinn', email: 'quinn@example.org', attendance: 'remote' });
+		const view = async (who) => (await req('GET', `/api/rsvp/manage?t=${encodeURIComponent(who.manage)}`)).data.polls.find((p) => p.id === POLL);
+		const patMail = (await mailsTo('pat@example.org')).at(-1);
+		check('joining instructions invite someone who has not answered an open poll, in the same email', /Joining instructions/.test(patMail.subject) && /Have your say: "What shall we do on Saturday\?"\. Put the options in order on your registration page\./.test(patMail.text_body) && /Manage my registration and answer/.test(patMail.html_body), patMail.text_body.slice(-700));
+		let pv = await view(pat);
+		check('the manage view lists the poll, unanswered, with no results yet', pv && pv.open && pv.options.length === 5 && pv.ballot === null && pv.results === null, JSON.stringify(pv));
+		const vote = (who, ranking, bar) => req('POST', '/api/rsvp/poll', { t: who.manage, poll: POLL, ranking, bar });
+		r = await vote(pat, [SKI, CAMP, HIKE, FOOT, RUGBY], 3);
+		check('Pat ranks skiing, camping, hiking, then the line, then football and rugby', r.data.ok && r.data.polls.find((p) => p.id === POLL).ballot.bar === 3 && r.data.polls.find((p) => p.id === POLL).ballot.ranking[0] === SKI && r.data.polls.find((p) => p.id === POLL).results.find((x) => x.label === 'Skiing').willing === 1, JSON.stringify(r.data));
+		check('an unknown option → 409', (await vote(pat, [SKI, 'nope'], 1)).status === 409);
+		check('an option twice → 409', (await vote(pat, [SKI, SKI], 1)).status === 409);
+		check('the line beyond the end → 400', (await vote(pat, [SKI], 2)).status === 400);
+		check('a ranking without a valid manage link → 404', (await req('POST', '/api/rsvp/poll', { t: 'x.y.z', poll: POLL, ranking: [SKI], bar: 1 })).status === 404);
+		r = await vote(quinn, [HIKE, CAMP, SKI, FOOT, RUGBY], 2);
+		await register({ name: 'Quinn', email: 'quinn@example.org', attendance: 'remote' });
+		const qm = await last('quinn@example.org');
+		check('once answered, the reminder of their registration has no poll line', !/Have your say/.test(qm.text_body), qm.subject);
+		ap = (await req('GET', `${POLLS}?event=${EVENT}`, undefined, ADMIN)).data.polls.find((p) => p.id === POLL);
+		const row = (label) => ap.tally.results.find((x) => x.label === label);
+		check('tally: who would join, who would stay at home, first choices, preference', ap.tally.voters === 2 && row('Camping').willing === 2 && row('Hiking').willing === 2 && row('Skiing').willing === 1 && row('Skiing').out === 1 && row('Football').out === 2 && row('Skiing').first === 1 && row('Camping').score === 3 && row('Hiking').score === 3, JSON.stringify(ap.tally));
+		check('tally sorted by who would join, and the organiser sees names', ['Camping', 'Hiking'].includes(ap.tally.results[0].label) && ap.tally.results.at(-1).willing === 0 && row('Camping').names.join() === 'Pat,Quinn', JSON.stringify(ap.tally.results.map((x) => x.label)));
+
+		r = await req('GET', `/api/rsvp/status?event=${EVENT}`);
+		const sp = (r.data.polls || []).find((p) => p.id === POLL);
+		check('the booking form gets the open poll and its options', sp && sp.options.map((o) => o.label).join() === 'Skiing,Camping,Hiking,Football,Rugby', JSON.stringify(r.data.polls));
+		check('malformed booking-form poll answers → 400, and no registration', (await register({ name: 'Rosa', email: 'rosa@example.org', attendance: 'remote', polls: [{ poll: POLL, ranking: [SKI, SKI], bar: 1 }] })).status === 400 && !(await mailsTo('rosa@example.org')).length);
+		const tallyNow = async () => JSON.stringify((await req('GET', `${POLLS}?event=${EVENT}`, undefined, ADMIN)).data.polls.find((p) => p.id === POLL).tally);
+		const t0 = await tallyNow();
+		r = await register({ name: 'Sam', email: 'sam@example.org', attendance: 'remote', polls: [{ poll: POLL, ranking: [RUGBY, 'gone-option'], bar: 2 }, { poll: 'closed-or-gone', ranking: [], bar: 0 }] });
+		check('an out-of-date booking-form ranking is dropped, and the registration still goes through', r.status === 200 && (await mailsTo('sam@example.org')).length === 1, JSON.stringify(r.data));
+		await register({ name: 'Una', email: 'una@example.org', attendance: 'remote', polls: [{ poll: POLL, ranking: [RUGBY, FOOT], bar: 2 }] });
+		check('a ranking from an unconfirmed registration does not count until the address is confirmed', (await tallyNow()) === t0);
+		const rosa = await registerAndConfirm({ name: 'Rosa', email: 'rosa@example.org', attendance: 'remote', polls: [{ poll: POLL, ranking: [RUGBY, FOOT, SKI, CAMP, HIKE], bar: 2 }] });
+		const rv = await view(rosa);
+		const rosaMail = (await mailsTo('rosa@example.org')).at(-1);
+		check('ranking on the booking form is saved with the registration, and the joining instructions do not ask again', rv.ballot && rv.ballot.ranking[0] === RUGBY && rv.ballot.bar === 2 && !/Have your say/.test(rosaMail.text_body), JSON.stringify(rv.ballot));
+		await req('DELETE', '/api/rsvp/manage', { t: rosa.manage });
+
+		console.log('\nPoll suggestions');
+		before = (await mailsTo(NOTIFY)).length;
+		const suggest = (who, label) => req('POST', '/api/rsvp/poll', { t: who.manage, poll: POLL, suggest: label });
+		r = await suggest(pat, 'Paddle boarding');
+		const PADDLE = r.data.option?.id;
+		let note = (await mailsTo(NOTIFY)).slice(before);
+		check('Pat suggests paddle boarding: pending, and the organiser is emailed once', r.data.ok && r.data.option.pending && !r.data.existing && note.length === 1, JSON.stringify(r.data));
+		const sm = note[0];
+		const refOf = (m) => /\(ref ([A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{16})\)/.exec(m.subject)?.[1];
+		check('the suggestion email names Pat and the option, explains yes / no / use, replies go to the poll address, and it carries a reference', /Poll suggestion: Paddle boarding/.test(sm.subject) && !!refOf(sm) && /Pat suggested an option for "What shall we do on Saturday\?"/.test(sm.text_body) && /yes: add it/.test(sm.text_body) && /use <your wording>/.test(sm.text_body) && sm.reply_to === 'polls@example.org' && /\/admin\/rsvps\/\?event=/.test(sm.text_body), sm.subject + ' | ' + sm.reply_to + ' | ' + sm.text_body.slice(0, 600));
+		check('Pat sees the suggestion as theirs, waiting; Quinn does not see it', (await view(pat)).options.some((o) => o.id === PADDLE && o.pending && o.mine) && !(await view(quinn)).options.some((o) => o.id === PADDLE));
+		before = (await mailsTo(NOTIFY)).length;
+		r = await suggest(pat, '  skiing ');
+		check('suggesting an existing option returns it, and emails nobody', r.data.ok && r.data.existing && r.data.option.id === SKI && (await mailsTo(NOTIFY)).length === before, JSON.stringify(r.data));
+		r = await vote(pat, [PADDLE, SKI, CAMP, HIKE, FOOT, RUGBY], 4);
+		check('Pat ranks their own suggestion first', r.data.ok && r.data.polls.find((p) => p.id === POLL).ballot.ranking[0] === PADDLE, JSON.stringify(r.data));
+		check('Quinn cannot rank Pat\'s pending suggestion → 409', (await vote(quinn, [PADDLE, HIKE], 1)).status === 409);
+		check('the organiser sees the pending suggestion and who made it', (await req('GET', `${POLLS}?event=${EVENT}`, undefined, ADMIN)).data.polls.find((p) => p.id === POLL).options.some((o) => o.id === PADDLE && o.status === 'pending' && o.suggested_by_name === 'Pat'));
+
+		console.log('\nReplying to a suggestion by email');
+		const inbound = async (raw) => (await (await fetch(`${BASE}/api/dev/inbound`, { method: 'POST', body: raw })).json());
+		const mail = ({ from = NOTIFY, subject, body, headers = '' }) => `From: Organiser <${from}>\r\nTo: polls@example.org\r\nSubject: ${subject}\r\nMIME-Version: 1.0\r\n${headers}\r\n${body}`;
+		const plain = (o) => mail({ ...o, headers: 'Content-Type: text/plain; charset=utf-8\r\n' });
+		const ref = refOf(sm);
+		before = (await outbox()).length;
+		r = await inbound(plain({ from: 'stranger@example.org', subject: `Re: ${sm.subject}`, body: 'yes\r\n' }));
+		check('a reply from someone who is not an organiser is refused, and changes nothing', r.result.action === 'rejected' && !!r.rejected && (await view(pat)).options.find((o) => o.id === PADDLE).pending && (await outbox()).length === before, JSON.stringify(r));
+		r = await inbound(plain({ subject: `Re: ${sm.subject}`, body: 'yes\r\n' }).replace('From:', 'Authentication-Results: mx.cloudflare.net; dkim=none; spf=fail; dmarc=fail header.from=amybo.org\r\nFrom:'));
+		check('an organiser\'s address that fails DMARC is refused, and nothing is sent', r.result.action === 'rejected' && /DMARC fail/.test(r.rejected) && (await view(pat)).options.find((o) => o.id === PADDLE).pending && (await outbox()).length === before, JSON.stringify(r));
+		r = await inbound(plain({ subject: `Re: ${sm.subject}`, body: 'Maybe\r\n' }).replace('From:', 'Authentication-Results: mx.cloudflare.net; dmarc=pass header.from=amybo.org\r\nAuthentication-Results: evil.example; dmarc=fail\r\nFrom:'));
+		check('a DMARC pass recorded by Cloudflare (topmost) lets the reply through; headers further down are ignored', r.result.action === 'not-understood', JSON.stringify(r));
+		r = await inbound(plain({ subject: `Re: ${sm.subject}`, body: 'Maybe\r\n' }).replace('From:', 'Authentication-Results: mx.cloudflare.net; dmarc=none header.from=amybo.org\r\nFrom:'));
+		check('a domain without a DMARC policy (dmarc=none) is not refused', r.result.action === 'not-understood', JSON.stringify(r));
+		before = (await outbox()).length;
+		r = await inbound(plain({ subject: `Re: [AMYBO] Poll suggestion (ref ${ref.slice(0, 17)}AAAAAAAAAAAAAAAA)`, body: 'yes\r\n' }));
+		check('a reply with a forged reference is refused', r.result.action === 'rejected' && (await outbox()).length === before, JSON.stringify(r));
+		r = await inbound(mail({ subject: `Automatic reply: ${sm.subject}`, headers: 'Content-Type: text/plain\r\nAuto-Submitted: auto-replied\r\n', body: 'No one is in the office until Monday.\r\n' }));
+		check('an out-of-office reply that starts with "No" decides nothing, and is neither answered nor bounced', r.result.action === 'ignored' && !r.rejected && (await view(pat)).options.find((o) => o.id === PADDLE).pending && (await outbox()).length === before, JSON.stringify(r));
+		r = await inbound(mail({ from: 'stranger@example.org', subject: `Re: ${sm.subject}`, body: 'yes\r\n' }).replace(`From: Organiser <stranger@example.org>`, `From: "<${NOTIFY}>" <stranger@example.org>`));
+		check('an organiser\'s address hidden in the display name does not pass for the sender', r.result.action === 'rejected' && (await view(pat)).options.find((o) => o.id === PADDLE).pending, JSON.stringify(r));
+		r = await inbound(plain({ subject: `Re: ${sm.subject}`, body: 'No problem, add it\r\n' }));
+		check('"No problem, add it" is not read as no', r.result.action === 'not-understood' && (await view(pat)).options.find((o) => o.id === PADDLE).pending, JSON.stringify(r));
+		r = await inbound(plain({ subject: `Re: ${sm.subject}`, body: 'maybe, let me think\r\n\r\nOn Fri, someone wrote:\r\n> yes: add it\r\n' }));
+		let back = await last(NOTIFY);
+		check('a reply that is not yes, no or use: nothing changes and the organiser is told', r.result.action === 'not-understood' && /reply not understood/.test(back.subject) && /maybe, let me think/.test(back.text_body) && (await view(pat)).options.find((o) => o.id === PADDLE).pending, JSON.stringify(r));
+		// A typical HTML mail app reply: multipart/alternative, quoted-printable, the answer above the quoted original.
+		const qp = 'use Paddleboarding on the Thames=0D=0A=0D=0AOn Fri, 13 Nov 2026, AMYBO wrote:=0D=0A> Pat suggested an opti=\r\non';
+		r = await inbound(mail({ subject: `=?UTF-8?Q?Re:_[AMYBO]_Poll_suggestion:_Paddle_boarding?= (ref ${ref})`, headers: 'Content-Type: multipart/alternative; boundary="b1"\r\n',
+			body: `--b1\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n${qp}\r\n--b1\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n<div>use Paddleboarding on the Thames</div><blockquote>yes</blockquote>\r\n--b1--\r\n` }));
+		back = await last(NOTIFY);
+		pv = await view(pat);
+		check('"use <wording>" adds the suggestion for everyone in the organiser\'s words', r.result.action === 'decided' && !r.result.already && pv.options.some((o) => o.id === PADDLE && !o.pending && o.label === 'Paddleboarding on the Thames'), JSON.stringify(r));
+		check('the organiser gets a confirmation; Pat is not emailed and sees it on their page', /Done: "Paddle boarding" added as "Paddleboarding on the Thames"/.test(back.text_body) && (await mailsTo('pat@example.org')).every((m) => !/Paddle/.test(m.text_body)) && pv.notes.some((n) => /"Paddle boarding" was added for everyone as "Paddleboarding on the Thames"/.test(n)), back.text_body + JSON.stringify(pv.notes));
+		const qv = await view(quinn);
+		check('Quinn now sees it, as new and not yet in their order', qv.options.some((o) => o.id === PADDLE && !o.pending) && !qv.ballot.ranking.includes(PADDLE), JSON.stringify(qv.ballot));
+		r = await inbound(plain({ subject: `Re: ${sm.subject}`, body: 'no\r\n' }));
+		check('a second answer changes nothing and says it was already decided', r.result.action === 'decided' && r.result.already && (await view(pat)).options.some((o) => o.id === PADDLE && !o.pending) && /already been decided/.test((await last(NOTIFY)).text_body), JSON.stringify(r));
+
+		r = await suggest(quinn, 'Footy');
+		const FOOTY = r.data.option.id;
+		await vote(quinn, [FOOTY, HIKE, CAMP, SKI, FOOT, RUGBY], 3);
+		r = await req('POST', POLLS, { action: 'decide', option: FOOTY, decision: 'use', label: 'football' }, ADMIN);
+		let qb = (await view(quinn));
+		check('on the admin page, "use" with an existing option\'s name merges the suggestion into it, keeping Quinn\'s ranking', r.data.ok && /merged into "Football"/.test(r.data.outcome) && qb.ballot.ranking[0] === FOOT && qb.ballot.bar === 3 && qb.ballot.ranking.filter((x) => x === FOOT).length === 1 && qb.notes.some((n) => /"Footy" is already an option, as "Football"/.test(n)), JSON.stringify([r.data, qb.ballot, qb.notes]));
+		r = await suggest(quinn, 'Darts');
+		const darts = (await mailsTo(NOTIFY)).filter((m) => /Poll suggestion: Darts/.test(m.subject)).at(-1);
+		await vote(quinn, [r.data.option.id, FOOT, HIKE, CAMP, SKI, RUGBY], 4);
+		r = await inbound(mail({ subject: `RE: ${darts.subject}`, headers: 'Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n', body: Buffer.from('No thanks.\r\n\r\n-----Original Message-----\r\nyes\r\n').toString('base64') + '\r\n' }));
+		qb = await view(quinn);
+		check('"no" turns a suggestion down; it leaves Quinn\'s order, the line moving up with it', r.result.action === 'decided' && /not added/.test(r.result.outcome) && qb.ballot.ranking[0] === FOOT && qb.ballot.bar === 3 && qb.notes.some((n) => /"Darts" was not added/.test(n)), JSON.stringify([r, qb.ballot]));
+		before = (await mailsTo(NOTIFY)).length;
+		const burst = await Promise.all(['One', 'Two', 'Three', 'Four', 'Five', 'Six'].map((l) => suggest(pat, `Pat idea ${l}`)));
+		check('six suggestions at once: three wait for the organisers, three are refused, three emails', burst.filter((x) => x.status === 200).length === 3 && burst.filter((x) => x.status === 429).length === 3 && (await mailsTo(NOTIFY)).length === before + 3, burst.map((x) => x.status).join());
+		check('a fourth suggestion waiting at once → 429', (await suggest(pat, 'Pat idea Seven')).status === 429);
+
+		console.log('\nOrganising a poll');
+		pv = await view(pat);
+		const patBar = pv.ballot.bar;
+		r = await req('POST', POLLS, { action: 'remove_option', option: CAMP }, ADMIN);
+		pv = await view(pat);
+		check('removing an option takes it off everyone\'s order; Pat\'s line moves up with it', r.data.ok && !pv.options.some((o) => o.id === CAMP) && !pv.ballot.ranking.includes(CAMP) && pv.ballot.bar === patBar - 1, JSON.stringify(pv.ballot));
+		r = await req('POST', POLLS, { action: 'add_option', poll: POLL, label: 'hiking' }, ADMIN);
+		check('adding an option that exists → 409', r.status === 409);
+		r = await req('POST', POLLS, { action: 'rename_option', option: HIKE, label: 'Hill walking' }, ADMIN);
+		check('renaming an option keeps everyone\'s ranking', r.data.ok && (await view(quinn)).options.find((o) => o.id === HIKE).label === 'Hill walking' && (await view(quinn)).ballot.ranking.includes(HIKE));
+		r = await req('POST', POLLS, { action: 'update', poll: POLL, closes_at: new Date(Date.now() - 1000).toISOString() }, ADMIN);
+		check('closing the poll: no more rankings or suggestions → 409', r.data.ok && (await view(pat)).open === false && (await vote(pat, [SKI], 1)).status === 409 && (await suggest(pat, 'Late idea')).status === 409);
+		const log = (await req('GET', `/api/admin/sent-log?event=${EVENT}`, undefined, ADMIN)).data;
+		check('the sent log has the poll totals, without names', /## Polls/.test(log) && /### What shall we do on Saturday\?/.test(log) && /- Football: 1 would join \(1 first choice\), 1 would stay at home/.test(log) && !/Quinn/.test(log), String(log).split('## Polls')[1]);
+		const page = await req('GET', '/admin/rsvps/', undefined, ADMIN);
+		check('the admin page has a polls section', /id="polls"/.test(page.data) && /id="poll-form"/.test(page.data));
+		r = await req('DELETE', '/api/rsvp/manage', { t: pat.manage });
+		ap = (await req('GET', `${POLLS}?event=${EVENT}`, undefined, ADMIN)).data.polls.find((p) => p.id === POLL);
+		check('cancelling deletes the ballot; Pat\'s suggestions stay, without their name', r.data.ok && ap.tally.voters === 1 && ap.options.find((o) => o.id === PADDLE)?.suggested_by === null && ap.options.find((o) => o.id === PADDLE)?.suggested_by_name === null, JSON.stringify(ap.tally));
+		await req('DELETE', '/api/rsvp/manage', { t: quinn.manage });
+	}
+
+	console.log('\nHost changes');
+	{
+		const sentBefore = (await mailsTo('dinnerhost@example.org')).length;
+		check('the dinner host has been sent a list', sentBefore > 0);
+		await req('POST', '/api/admin/sessions', { event: EVENT, dry_run: true, sessions: [{ id: DINNER, host_email: 'dinner2@example.org' }] }, ADMIN);
+		check('a dry run of a host change emails nobody', (await mailsTo('dinnerhost@example.org')).length === sentBefore && !(await mailsTo('dinner2@example.org')).length);
+		r = await req('POST', '/api/admin/sessions', { event: EVENT, sessions: [{ id: DINNER, host_email: 'dinner2@example.org' }] }, ADMIN);
+		const gone = await last('dinnerhost@example.org');
+		check('a replaced host is asked to delete the lists they were sent', r.data.ok && /You are no longer hosting: Dinner/.test(gone.subject) && /Please delete the lists we sent you/.test(gone.text_body), gone.subject);
+		check('the new host gets the whole list', /Attendee list changed: Dinner/.test((await last('dinner2@example.org'))?.subject ?? ''));
+		const n2 = (await mailsTo('dinner2@example.org')).length;
+		await req('POST', '/api/admin/sessions', { event: EVENT, sessions: [{ id: AM.id, host_email: 'talkhost@example.org' }] }, ADMIN);
+		await req('POST', '/api/admin/sessions', { event: EVENT, sessions: [{ id: DINNER, host_email: 'dinner2@example.org' }] }, ADMIN);
+		check('saving the same host again sends no note', (await mailsTo('dinner2@example.org')).length === n2 && !(await mailsTo('dinner2@example.org')).some((m) => /no longer hosting/.test(m.subject)));
+		r = await req('POST', '/api/admin/settings', { event: EVENT, host_list_minutes: 60 }, ADMIN);
+		check('host lists can be limited to one an hour', r.data.ok && (await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN)).data.event.host_list_minutes === 60);
+		const hostMails = async () => (await mailsTo('talkhost@example.org')).length;
+		const h0 = await hostMails();
+		await registerAndConfirm({ name: 'Vic', email: 'vic@example.org', attendance: 'remote' });
+		await registerAndConfirm({ name: 'Wyn', email: 'wyn@example.org', attendance: 'remote' });
+		check('changes within the hour are held back', (await hostMails()) === h0);
+		await cron(Date.now() + 30 * 60_000);
+		check('…still held half an hour on', (await hostMails()) === h0);
+		await cron(Date.now() + 61 * 60_000);
+		const gathered = await last('talkhost@example.org');
+		check('…and gathered into one list once the hour has passed', (await hostMails()) === h0 + 1 && /\*\*Vic – remote\*\*/.test(gathered.text_body) && /\*\*Wyn – remote\*\*/.test(gathered.text_body), gathered.text_body.slice(0, 400));
+		await registerAndConfirm({ name: 'Xan', email: 'xan@example.org', attendance: 'remote' });
+		const h1 = await hostMails();
+		await req('POST', '/api/admin/settings', { event: EVENT, host_list_minutes: 0 }, ADMIN);
+		check('removing the gap sends a list held back under it at once', (await hostMails()) === h1 + 1 && /\*\*Xan – remote\*\*/.test((await last('talkhost@example.org')).text_body));
+		await req('DELETE', '/api/rsvp/manage', { t: await manageOf('xan@example.org') });
+		check('a negative gap is refused', (await req('POST', '/api/admin/settings', { event: EVENT, host_list_minutes: -1 }, ADMIN)).status === 400);
+		await req('POST', '/api/admin/settings', { event: EVENT, host_list_minutes: 0 }, ADMIN);
+		for (const who of ['vic@example.org', 'wyn@example.org']) await req('DELETE', '/api/rsvp/manage', { t: await manageOf(who) });
+		await req('POST', '/api/admin/sessions', { event: EVENT, sessions: [{ id: AM.id, host_email: '' }] }, ADMIN);
+	}
+
+	console.log('\nEvent set-up');
+	{
+		const EV = '/api/admin/events';
+		const before = (await outbox()).length;
+		const start = new Date(Date.now() + 60 * 86400_000);
+		const at = (h) => new Date(start.getTime() + h * 3600_000).toISOString();
+		const base = { action: 'create', id: 'e2e-new-event', title: 'New Event, Leeds', timezone: 'Europe/London', starts_at: at(0), ends_at: at(6), deadline: at(-48), in_person_max: 12, page_path: '/events/e2e-new-event/', location: 'Leeds' };
+		check('an event id must be a slug', (await req('POST', EV, { ...base, id: 'Bad Id!' }, ADMIN)).status === 400);
+		check('an unknown time zone is refused', (await req('POST', EV, { ...base, timezone: 'Mars/Olympus' }, ADMIN)).status === 400);
+		check('an event must end after it starts', (await req('POST', EV, { ...base, ends_at: at(-1) }, ADMIN)).status === 400);
+		check('an event page with a backslash (read by browsers as another site) is refused', (await req('POST', EV, { ...base, page_path: '/\\evil.example/' }, ADMIN)).status === 400);
+		r = await req('POST', EV, base, ADMIN);
+		check('an organiser creates an event', r.data.ok && r.data.id === 'e2e-new-event', JSON.stringify(r.data));
+		check('the same id twice → 409', (await req('POST', EV, base, ADMIN)).status === 409);
+		check('the event list includes it', (await req('GET', EV, undefined, ADMIN)).data.events.some((x) => x.id === 'e2e-new-event'));
+		r = await req('POST', EV, { action: 'add_session', event: 'e2e-new-event', label: 'Talks', kind: 'talk', mode: 'hybrid', starts_at: at(1), ends_at: at(3) }, ADMIN);
+		const S1 = r.data.id;
+		await req('POST', EV, { action: 'add_session', event: 'e2e-new-event', label: 'Dinner', kind: 'social', mode: 'in_person', optin: true, capacity: 8, starts_at: at(4), ends_at: at(6) }, ADMIN);
+		let sum = (await req('GET', `/api/admin/summary?event=e2e-new-event`, undefined, ADMIN)).data;
+		check('sessions added: a core talk and an opt-in dinner with a capacity', r.data.ok && sum.sessions.length === 2 && sum.sessions.find((x) => x.label === 'Dinner').optin === 1 && sum.sessions.find((x) => x.label === 'Dinner').capacity === 8, JSON.stringify(sum.sessions));
+		r = await req('POST', EV, { action: 'update', event: 'e2e-new-event', title: 'New Event, York', remote_label: 'Online' }, ADMIN);
+		sum = (await req('GET', `/api/admin/summary?event=e2e-new-event`, undefined, ADMIN)).data;
+		check('editing an event changes only what was sent', r.data.ok && sum.event.title === 'New Event, York' && sum.event.remote_label === 'Online' && sum.event.in_person_max === 12 && sum.event.location === 'Leeds', JSON.stringify(sum.event));
+		check('an unused session can be deleted', (await req('POST', EV, { action: 'delete_session', session: S1 }, ADMIN)).data.ok);
+		check('a session people have booked cannot be deleted → 409', (await req('POST', EV, { action: 'delete_session', session: TOUR2 }, ADMIN)).status === 409);
+		const newStart = new Date(Date.parse(seeded.event.starts_at) + 364 * 86400_000).toISOString();
+		r = await req('POST', EV, { action: 'clone', event: EVENT, id: 'e2e-clone', title: 'Next Year', starts_at: newStart, page_path: '/events/e2e-clone/' }, ADMIN);
+		const cl = (await req('GET', `/api/admin/summary?event=e2e-clone`, undefined, ADMIN)).data;
+		const orig = (await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN)).data;
+		const shift = Date.parse(newStart) - Date.parse(orig.event.starts_at);
+		check('cloning copies the programme, moved to the new start, without hosts, links or people', r.data.ok && cl.event.title === 'Next Year' && cl.sessions.length === orig.sessions.length
+			&& cl.sessions.every((x, i) => Date.parse(x.starts_at) - Date.parse(orig.sessions[i].starts_at) === shift && !x.host_email && !x.online_url) && cl.registrations.length === 0, JSON.stringify(cl.sessions.map((x) => x.starts_at)));
+		const clInstr = (await req('GET', `/api/admin/instructions?event=e2e-clone`, undefined, ADMIN)).data.versions;
+		const clPolls = (await req('GET', `/api/admin/polls?event=e2e-clone`, undefined, ADMIN)).data.polls;
+		check('…with the latest joining instructions as version 1, and the polls\' options but no answers or suggestions', clInstr.length === 1 && clInstr[0].version === 1 && clPolls.length >= 1 && clPolls.every((p) => p.tally.voters === 0 && p.options.every((o) => o.status === 'active' && !o.suggested_by)), JSON.stringify(clPolls.map((p) => p.options.length)));
+		check('an offset is not a time zone', (await req('POST', EV, { ...base, id: 'e2e-offset', timezone: '+01:00' }, ADMIN)).status === 400);
+		check('registration must close before the event ends', (await req('POST', EV, { ...base, id: 'e2e-late', deadline: at(7) }, ADMIN)).status === 400);
+		check('a session days away from the event is refused', (await req('POST', EV, { action: 'add_session', event: 'e2e-new-event', label: 'Lost', starts_at: at(24 * 10), ends_at: at(24 * 10 + 1) }, ADMIN)).status === 400);
+		{
+			// Moving an event to another day takes its sessions and registration deadline with it, at the same local times.
+			const was = (await req('GET', `/api/admin/summary?event=e2e-new-event`, undefined, ADMIN)).data;
+			const din = was.sessions.find((x) => x.label === 'Dinner');
+			r = await req('POST', EV, { action: 'update', event: 'e2e-new-event', starts_at: at(24 * 7), ends_at: at(24 * 7 + 6) }, ADMIN);
+			const now = (await req('GET', `/api/admin/summary?event=e2e-new-event`, undefined, ADMIN)).data;
+			const din2 = now.sessions.find((x) => x.label === 'Dinner');
+			const aWeek = (a, b) => Math.abs(Date.parse(b) - Date.parse(a) - 7 * 86400_000) <= 3600_000 && local(a).slice(9) === local(b).slice(9);
+			check('moving an event a week moves its sessions a week, at the same local time', r.data.ok && r.data.sessions_moved === 1 && aWeek(din.starts_at, din2.starts_at) && aWeek(din.ends_at, din2.ends_at), JSON.stringify([r.data, din.starts_at, din2?.starts_at]));
+			check('…and its registration deadline', aWeek(was.event.deadline, now.event.deadline), JSON.stringify([was.event.deadline, now.event.deadline]));
+			// A new start on the same day is a correction of the time, not a move: the sessions stay put.
+			const nudge = +local(now.event.starts_at).slice(9, 11) >= 1 ? -1800_000 : 1800_000;
+			r = await req('POST', EV, { action: 'update', event: 'e2e-new-event', starts_at: new Date(Date.parse(now.event.starts_at) + nudge).toISOString() }, ADMIN);
+			const nudged = (await req('GET', `/api/admin/summary?event=e2e-new-event`, undefined, ADMIN)).data;
+			check('a new start time on the same day leaves the sessions and deadline where they are', r.data.ok && !r.data.sessions_moved && nudged.sessions.find((x) => x.label === 'Dinner').starts_at === din2.starts_at && nudged.event.deadline === now.event.deadline, JSON.stringify(r.data));
+			r = await req('POST', '/api/admin/settings', { event: 'e2e-new-event', deadline: new Date(Date.parse(now.event.ends_at) + 86400_000).toISOString() }, ADMIN);
+			check('settings refuse a registration deadline after the event ends', r.status === 400 && /before the event ends/.test(r.data.error) && (await req('GET', `/api/admin/summary?event=e2e-new-event`, undefined, ADMIN)).data.event.deadline === now.event.deadline, JSON.stringify(r.data));
+			r = await req('POST', '/api/admin/sessions', { event: 'e2e-new-event', sessions: [{ id: din2.id, starts_at: at(24 * 30), ends_at: at(24 * 30 + 2) }] }, ADMIN);
+			check('the sessions editor refuses a session moved days outside the event', r.status === 400 && /during the event/.test(r.data.error), JSON.stringify(r.data));
+			r = await req('POST', EV, { action: 'update', event: 'e2e-new-event', starts_at: was.event.starts_at, ends_at: was.event.ends_at }, ADMIN);
+			const back = (await req('GET', `/api/admin/summary?event=e2e-new-event`, undefined, ADMIN)).data;
+			// To the second: moved times are rebuilt from their wall-clock time, which has no milliseconds.
+			const same = (a, b) => Math.abs(Date.parse(a) - Date.parse(b)) < 1000;
+			check('moving it back brings everything back', same(back.sessions.find((x) => x.label === 'Dinner').starts_at, din.starts_at) && same(back.event.deadline, was.event.deadline), JSON.stringify([back.event.deadline, was.event.deadline]));
+			// The deadline moves with the event, but is set in Settings: a move that would put it in the past or after the new
+			// end is refused with a message saying so, and nothing changes.
+			r = await req('POST', EV, { action: 'update', event: 'e2e-new-event', starts_at: at(-24 * 59), ends_at: at(-24 * 59 + 6) }, ADMIN);
+			check('a move that would put the registration deadline in the past is refused, naming Settings', r.status === 400 && /in the past/.test(r.data.error) && /Settings/.test(r.data.error)
+				&& same((await req('GET', `/api/admin/summary?event=e2e-new-event`, undefined, ADMIN)).data.event.starts_at, was.event.starts_at), JSON.stringify(r.data));
+			await req('POST', '/api/admin/settings', { event: 'e2e-new-event', deadline: at(5) }, ADMIN);
+			r = await req('POST', EV, { action: 'update', event: 'e2e-new-event', starts_at: at(24), ends_at: at(24.5) }, ADMIN);
+			check('a move whose deadline would fall after the new end is refused, naming Settings', r.status === 400 && /after the new end/.test(r.data.error), JSON.stringify(r.data));
+			await req('POST', '/api/admin/settings', { event: 'e2e-new-event', deadline: was.event.deadline }, ADMIN);
+			// Seeded times have no milliseconds; the editor sends them back with. An old session outside the event must still
+			// accept other edits (only a changed time is checked against the event's dates).
+			const far = new Date(Date.parse(at(24 * 30))).toISOString().replace('.000Z', 'Z'), farEnd = new Date(Date.parse(at(24 * 30 + 2))).toISOString().replace('.000Z', 'Z');
+			sql(`UPDATE sessions SET starts_at='${far}', ends_at='${farEnd}' WHERE id='${din.id}'`);
+			r = await req('POST', '/api/admin/sessions', { event: 'e2e-new-event', sessions: [{ id: din.id, starts_at: new Date(far).toISOString(), ends_at: new Date(farEnd).toISOString(), host_name: 'Hazel' }] }, ADMIN);
+			check('an old session outside the event still takes other edits when its times come back unchanged', r.status === 200 && r.data.ok, JSON.stringify(r.data));
+			sql(`UPDATE sessions SET starts_at='${din.starts_at}', ends_at='${din.ends_at}' WHERE id='${din.id}'`);
+		}
+		r = await req('POST', EV, { action: 'update', event: EVENT, ends_at: new Date(Date.now() - 31 * 86400_000).toISOString(), starts_at: new Date(Date.now() - 32 * 86400_000).toISOString(), deadline: new Date(Date.now() - 33 * 86400_000).toISOString() }, ADMIN);
+		check('an event with registrations cannot have its end moved into the past (retention would delete everyone)', r.status === 409 && (await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN)).data.event.ends_at === seeded.event.ends_at, JSON.stringify(r.data));
+		check('an opt-in session someone signed up for cannot be deleted', (await req('POST', EV, { action: 'delete_session', session: DINNER }, ADMIN)).status === 409);
+		check('a core session in invitations already sent cannot be deleted', (await req('POST', EV, { action: 'delete_session', session: AM.id }, ADMIN)).status === 409);
+		check('a clone needs its own page', (await req('POST', EV, { action: 'clone', event: EVENT, id: 'e2e-clone-2', starts_at: newStart, page_path: orig.event.page_path }, ADMIN)).status === 400
+			&& (await req('POST', EV, { action: 'clone', event: EVENT, id: 'e2e-clone-2', starts_at: newStart }, ADMIN)).status === 400);
+		// From November (GMT) to June (BST): every session keeps its London wall-clock time.
+		const june = new Date(Date.parse(orig.event.starts_at) + 210 * 86400_000);
+		const juneStart = new Date(Date.UTC(june.getUTCFullYear(), june.getUTCMonth(), june.getUTCDate(), +local(orig.event.starts_at).slice(9, 11) - 1, +local(orig.event.starts_at).slice(11, 13))).toISOString();
+		r = await req('POST', EV, { action: 'clone', event: EVENT, id: 'e2e-clone-summer', starts_at: juneStart, page_path: '/events/e2e-clone-summer/' }, ADMIN);
+		const summer = (await req('GET', `/api/admin/summary?event=e2e-clone-summer`, undefined, ADMIN)).data;
+		check('a clone across a change to summer time keeps every session at the same local time', r.data.ok && summer.sessions.every((x, i) => local(x.starts_at).slice(9) === local(orig.sessions[i].starts_at).slice(9) && local(x.ends_at).slice(9) === local(orig.sessions[i].ends_at).slice(9)),
+			JSON.stringify(summer.sessions?.map((x) => local(x.starts_at))));
+		check('setting up events emailed nobody', (await outbox()).length === before);
+
+		// A weekend event: one calendar entry per day, and the dates as a range in the emails.
+		const sat = new Date(Date.now() + 40 * 86400_000);
+		sat.setUTCDate(sat.getUTCDate() + ((6 - sat.getUTCDay() + 7) % 7));
+		const on = (dayOffset, h) => new Date(Date.UTC(sat.getUTCFullYear(), sat.getUTCMonth(), sat.getUTCDate() + dayOffset, h)).toISOString();
+		await req('POST', EV, { action: 'create', id: 'e2e-weekend', title: 'Weekend Camp', timezone: 'Europe/London', starts_at: on(0, 10), ends_at: on(1, 16), deadline: on(-2, 12), in_person_max: 10, page_path: '/events/e2e-weekend/', location: 'A field' }, ADMIN);
+		await req('POST', EV, { action: 'add_session', event: 'e2e-weekend', label: 'Saturday walks', starts_at: on(0, 10), ends_at: on(0, 16) }, ADMIN);
+		await req('POST', EV, { action: 'add_session', event: 'e2e-weekend', label: 'Sunday talks', starts_at: on(1, 10), ends_at: on(1, 16) }, ADMIN);
+		await registerAndConfirm({ event: 'e2e-weekend', name: 'Yan', email: 'yan@example.org', attendance: 'in_person', tour_id: 'none' });
+		const ym = await mailsTo('yan@example.org');
+		const satName = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', timeZone: 'Europe/London' }).format(new Date(on(0, 10))).replace(',', '');
+		check('a weekend event\'s emails give its dates as a range', ym.length === 2 && ym.every((m) => new RegExp(`on ${satName} to Sunday \\d+ \\w+ \\d{4}`).test(m.text_body)), ym.map((m) => m.text_body.slice(0, 200)).join(' | '));
+		const days = ym[1].att.filter((a) => /METHOD:REQUEST/.test(a.content));
+		const dt = (a, p) => (new RegExp(`${p};TZID=Europe/London:(\\d{8})T(\\d{6})`).exec(unfold(a.content)) || []).slice(1).join('T');
+		check('…and one calendar entry per day, each within its own day', days.length === 2 && days.every((a) => dt(a, 'DTSTART').slice(0, 8) === dt(a, 'DTEND').slice(0, 8)) && dt(days[0], 'DTSTART').slice(0, 8) !== dt(days[1], 'DTSTART').slice(0, 8)
+			&& days.some((a) => /SUMMARY:Weekend Camp: Saturday/.test(unfold(a.content))) && days.some((a) => /Sunday talks/.test(unfold(a.content).replace(/\\n/g, ' '))), days.map((a) => dt(a, 'DTSTART') + '-' + dt(a, 'DTEND')).join(', '));
+		// An earlier day added: the Saturday entry keeps its place, Friday arrives as a new one.
+		await req('POST', EV, { action: 'add_session', event: 'e2e-weekend', label: 'Friday welcome', starts_at: on(-1, 18), ends_at: on(-1, 20) }, ADMIN);
+		await req('POST', '/api/admin/sessions', { event: 'e2e-weekend', sessions: [] }, ADMIN);
+		let upd = await last('yan@example.org');
+		const reqs = upd.att.filter((a) => /METHOD:REQUEST/.test(a.content));
+		check('adding an earlier day sends just the new day; the existing entries stay put', reqs.length === 1 && /Friday welcome/.test(unfold(reqs[0].content).replace(/\\n/g, ' ')) && /SEQUENCE:0/.test(reqs[0].content) && !upd.att.some((a) => /METHOD:CANCEL/.test(a.content)), upd.att.map((a) => (/SUMMARY:[^\r\n]*/.exec(unfold(a.content)) || [''])[0]).join(' | '));
+		// Sunday's session moved to Saturday afternoon: the Sunday entry is cancelled, Saturday's updated.
+		const wk = (await req('GET', `/api/admin/summary?event=e2e-weekend`, undefined, ADMIN)).data.sessions;
+		await req('POST', '/api/admin/sessions', { event: 'e2e-weekend', sessions: [{ id: wk.find((x) => x.label === 'Sunday talks').id, starts_at: on(0, 16), ends_at: on(0, 17) }] }, ADMIN);
+		upd = await last('yan@example.org');
+		check('folding a day into another cancels its entry and updates the other', upd.att.some((a) => /METHOD:CANCEL/.test(a.content) && /Sunday/.test(unfold(a.content))) && upd.att.some((a) => /METHOD:REQUEST/.test(a.content) && /SEQUENCE:1/.test(a.content) && /Saturday/.test(unfold(a.content))), upd.att.map((a) => (/METHOD:\w+/.exec(a.content) || [''])[0] + ' ' + (/SUMMARY:[^\r\n]*/.exec(unfold(a.content)) || [''])[0]).join(' | '));
+		await req('DELETE', '/api/rsvp/manage', { t: await manageOf('yan@example.org') });
+	}
+
+	console.log('\nSending to a whole event, in pieces');
+	{
+		const EV = '/api/admin/events', B = 'e2e-bulk';
+		const t0 = Date.now() + 50 * 86400_000;
+		const at = (h) => new Date(t0 + h * 3600_000).toISOString();
+		await req('POST', EV, { action: 'create', id: B, title: 'Bulk Day', timezone: 'Europe/London', starts_at: at(0), ends_at: at(8), deadline: at(-24), in_person_max: 50, page_path: '/events/e2e-bulk/', location: 'Hall' }, ADMIN);
+		const S = (await req('POST', EV, { action: 'add_session', event: B, label: 'Talks', mode: 'hybrid', starts_at: at(1), ends_at: at(3) }, ADMIN)).data.id;
+		await req('POST', '/api/admin/instructions', { event: B, subject: 'Bulk Day instructions', body_md: 'Hello all.' }, ADMIN);
+		const people = Array.from({ length: 12 }, (_, i) => `bulk${i}@example.org`);
+		for (const [i, email] of people.entries()) await registerAndConfirm({ event: B, name: `Bulk ${i}`, email, attendance: 'remote' });
+		const count = async (re) => { let n = 0; for (const p of people) n += (await mailsTo(p)).filter((m) => re.test(m.subject)).length; return n; };
+		r = await req('POST', '/api/admin/sessions', { event: B, sessions: [{ id: S, starts_at: at(2), ends_at: at(4) }] }, ADMIN);
+		check('a session change for 12 people: 8 calendar updates now, 4 queued', r.data.calendar_updates === 12 && r.data.calendar_queued === 4 && (await count(/Calendar update/)) === 8, JSON.stringify(r.data));
+		await cron();
+		const updates = []; for (const p of people) updates.push((await mailsTo(p)).filter((m) => /Calendar update/.test(m.subject)).length);
+		check('…and the cron sends the other 4, nobody twice', updates.every((n) => n === 1), JSON.stringify(updates));
+		const V = (await req('GET', `/api/admin/instructions?event=${B}`, undefined, ADMIN)).data.versions[0].version;
+		r = await req('POST', '/api/admin/messages', { event: B, subject: 'Bulk news', body_md: 'News.', audience: {}, marks_instructions_version: V }, ADMIN);
+		let msg = r.data.message;
+		check('a message with joining instructions to 12: the first 3 go at once, the rest are left sending', msg.status === 'sending' && (await count(/Bulk news/)) === 3, JSON.stringify(msg));
+		await cron(); await cron(); await cron();
+		msg = (await req('GET', `/api/admin/messages?event=${B}`, undefined, ADMIN)).data.messages.find((x) => x.id === msg.id);
+		const each = []; for (const p of people) each.push((await mailsTo(p)).filter((m) => /Bulk news/.test(m.subject)).length);
+		check('…the cron finishes it over three runs: everyone has exactly one copy, and the count is right', msg.status === 'sent' && msg.recipients_count === 12 && each.every((n) => n === 1), JSON.stringify([msg.status, msg.recipients_count, each]));
+		r = await req('POST', '/api/admin/messages', { event: B, subject: 'Bulk stop', body_md: 'x', audience: {}, marks_instructions_version: V }, ADMIN);
+		check('a message part sent can be cancelled', (await req('POST', '/api/admin/messages/cancel', { id: r.data.message.id }, ADMIN)).data.ok);
+		await cron();
+		msg = (await req('GET', `/api/admin/messages?event=${B}`, undefined, ADMIN)).data.messages.find((x) => x.id === r.data.message.id);
+		check('…and no more of it goes out', msg.status === 'cancelled' && msg.recipients_count === 3 && (await count(/Bulk stop/)) === 3, JSON.stringify(msg));
+		// One refused address does not stop a message: pieces get smaller until that person is set aside.
+		const fakeReg = (rid, email) => sql(`INSERT INTO registrations (id, event_id, name, email, attendance, status, place, consent_at, created_at, updated_at, confirmed_at) VALUES ('${rid}', '${B}', 'Odd', '${email}', 'remote', 'confirmed', NULL, '${at(-100)}', '${at(-100)}', '${at(-100)}', '${at(-100)}')`);
+		fakeReg('e2e-fail-send-reg', 'fail-send@example.org');
+		r = await req('POST', '/api/admin/messages', { event: B, subject: 'Bulk refused', body_md: 'x', audience: {} }, ADMIN);
+		check('a piece Resend refuses: nobody gets a copy yet, and the message carries on', r.data.message.status === 'sending' && /422/.test(r.data.message.error) && (await count(/Bulk refused/)) === 0, JSON.stringify(r.data.message).slice(0, 300));
+		for (let i = 0; i < 12; i++) await cron(Date.now() + i * 1000);
+		let refused = (await req('GET', `/api/admin/messages?event=${B}`, undefined, ADMIN)).data.messages.find((x) => x.subject === 'Bulk refused');
+		const got = []; for (const p of people) got.push((await mailsTo(p)).filter((m) => /Bulk refused/.test(m.subject)).length);
+		check('…in smaller pieces everyone else gets exactly one copy, and the refused address is left out', refused.status === 'sent' && refused.recipients_count === 12 && got.every((n) => n === 1), JSON.stringify([refused.status, refused.recipients_count, got]));
+		sql(`DELETE FROM registrations WHERE id = 'e2e-fail-send-reg'`);
+		// Refused for everyone it is tried on (a wrong sender, say): it stops with its error rather than setting everyone aside.
+		for (const n of [1, 2]) sql(`INSERT INTO registrations (id, event_id, name, email, attendance, status, consent_at, created_at, updated_at, confirmed_at) VALUES ('e2e-refused-${n}', 'e2e-weekend', 'R', 'fail-send-${n}@example.org', 'remote', 'confirmed', '${at(-100)}', '${at(-100)}', '${at(-100)}', '${at(-100)}')`);
+		r = await req('POST', '/api/admin/messages', { event: 'e2e-weekend', subject: 'All refused', body_md: 'x', audience: {} }, ADMIN);
+		for (let i = 0; i < 4; i++) await cron(Date.now() + i * 1000);
+		const allRefused = (await req('GET', `/api/admin/messages?event=e2e-weekend`, undefined, ADMIN)).data.messages.find((x) => x.subject === 'All refused');
+		check('a message refused for everyone tried is marked failed with its error, not "sent"', allRefused.status === 'failed' && /refused for everyone tried/.test(allRefused.error), JSON.stringify([allRefused.status, allRefused.error]));
+		sql(`DELETE FROM registrations WHERE id IN ('e2e-refused-1', 'e2e-refused-2')`);
+		// A piece that went but was never recorded (the request cut off): the retry sends nobody a second copy.
+		fakeReg('e2e-crash-reg', 'crash-after-send@example.org');
+		r = await req('POST', '/api/admin/messages', { event: B, subject: 'Bulk crash', body_md: 'x', audience: {} }, ADMIN);
+		await cron(Date.now() + 1000);
+		let crash = (await req('GET', `/api/admin/messages?event=${B}`, undefined, ADMIN)).data.messages.find((x) => x.subject === 'Bulk crash');
+		const crashCopies = (await outbox()).filter((m) => m.subject === 'Bulk crash').length;
+		check('a piece cut off after sending is retried without a second copy to anyone', crash.status === 'sent' && crash.recipients_count === 13 && crashCopies === 13 && !crash.uncertain, JSON.stringify([crash.status, crash.recipients_count, crashCopies, crash.uncertain]));
+		// …and when the retry would differ (the person answered a poll meanwhile, so their instructions copy changes), they
+		// are marked as uncertain rather than sent a second copy.
+		sql(`UPDATE registrations SET attendance = 'in_person', place = 'place' WHERE id = 'e2e-crash-reg'`);
+		const BP = (await req('POST', '/api/admin/polls', { action: 'create', event: B, question: 'Lunch?', options: 'Soup\nSalad' }, ADMIN)).data.id;
+		const BV = (await req('GET', `/api/admin/instructions?event=${B}`, undefined, ADMIN)).data.versions[0].version;
+		r = await req('POST', '/api/admin/messages', { event: B, subject: 'Bulk differs', body_md: 'x', audience: { attendance: 'in_person' }, marks_instructions_version: BV }, ADMIN);
+		sql(`INSERT INTO poll_ballots (poll_id, registration_id, ranking, bar, updated_at) VALUES ('${BP}', 'e2e-crash-reg', '[]', 0, '${at(-1)}')`);
+		await cron(Date.now() + 1000);
+		const differs = (await req('GET', `/api/admin/messages?event=${B}`, undefined, ADMIN)).data.messages.find((x) => x.subject === 'Bulk differs');
+		check('a retry that would differ marks the person uncertain instead of sending again', differs.status === 'sent' && differs.uncertain >= 1 && (await outbox()).filter((m) => m.subject === 'Bulk differs' && m.to_addr === 'crash-after-send@example.org').length === 1, JSON.stringify([differs.status, differs.uncertain, differs.recipients_count]));
+		sql(`DELETE FROM registrations WHERE id = 'e2e-crash-reg'`);
+		await req('POST', '/api/admin/polls', { action: 'delete', poll: BP }, ADMIN);
+		sql(`UPDATE registrations SET attendance = 'remote', place = NULL WHERE event_id = '${B}' AND attendance = 'in_person'`);
+		// An outage: the message stops after five tries, others still go, and it can be resumed.
+		fakeReg('e2e-fail-500-reg', 'fail-500@example.org');
+		r = await req('POST', '/api/admin/messages', { event: B, subject: 'Bulk doomed', body_md: 'x', audience: {} }, ADMIN);
+		r = await req('POST', '/api/admin/messages', { event: B, subject: 'Bulk later', body_md: 'x', audience: { attendance: 'in_person' }, scheduled_at: new Date(Date.now() + 120_000).toISOString() }, ADMIN);
+		sql(`UPDATE registrations SET attendance = 'in_person', place = 'place' WHERE id = '${(await req('GET', `/api/admin/summary?event=${B}`, undefined, ADMIN)).data.registrations.find((x) => x.email === people[0]).id}'`);
+		await cron(Date.now() + 180_000);
+		check('…a message falling due meanwhile still goes out', (await count(/Bulk later/)) === 1);
+		for (let i = 0; i < 6; i++) await cron(Date.now() + 240_000 + i * 1000);
+		let doomed = (await req('GET', `/api/admin/messages?event=${B}`, undefined, ADMIN)).data.messages.find((x) => x.subject === 'Bulk doomed');
+		check('…after five failed tries it is marked failed, and nobody had a copy', doomed.status === 'failed' && (await count(/Bulk doomed/)) === 0, JSON.stringify([doomed.status, doomed.attempts, doomed.error]));
+		sql(`DELETE FROM registrations WHERE id = 'e2e-fail-500-reg'`);
+		r = await req('POST', '/api/admin/messages', { event: B, action: 'resume', id: doomed.id }, ADMIN);
+		doomed = (await req('GET', `/api/admin/messages?event=${B}`, undefined, ADMIN)).data.messages.find((x) => x.subject === 'Bulk doomed');
+		const gotD = []; for (const p of people) gotD.push((await mailsTo(p)).filter((m) => /Bulk doomed/.test(m.subject)).length);
+		check('…and resumed once the outage is over, everyone gets one copy', r.data.ok && doomed.status === 'sent' && gotD.every((n) => n === 1), JSON.stringify([doomed.status, gotD]));
+
+		for (const p of people) await req('DELETE', '/api/rsvp/manage', { t: await manageOf(p) });
+	}
+
+	console.log('\nPlaces held for unconfirmed registrations');
+	{
+		const EV = '/api/admin/events', H = 'e2e-holds';
+		const t0 = Date.now() + 40 * 86400_000;
+		const at = (h) => new Date(t0 + h * 3600_000).toISOString();
+		await req('POST', EV, { action: 'create', id: H, title: 'Small Room', timezone: 'Europe/London', starts_at: at(0), ends_at: at(4), deadline: at(-24), in_person_max: 8, page_path: '/events/e2e-holds/', location: 'Room' }, ADMIN);
+		await req('POST', EV, { action: 'add_session', event: H, label: 'Talk', mode: 'in_person', starts_at: at(1), ends_at: at(2) }, ADMIN);
+		const who = Array.from({ length: 9 }, (_, i) => `hold${i}@example.org`);
+		const confirmOf = async (e) => tokenFrom((await mailsTo(e))[0].text_body, 'confirm');
+		for (const e of who.slice(0, 5)) await register({ event: H, name: 'Held', email: e });
+		const status = async () => (await req('GET', `/api/admin/summary?event=${H}`, undefined, ADMIN)).data;
+		check('five unconfirmed registrations (the limit for 8 places) each hold a place', (await mailsTo(who[0]))[0].text_body.includes('An in-person place is held for you'));
+		await register({ event: H, name: 'Sixth', email: who[5] });
+		const sixth = (await mailsTo(who[5]))[0];
+		check('the sixth holds nothing yet: told places are filling up and one is theirs if free when they confirm', /places are filling up/.test(sixth.text_body) && /take a place if one is still free/.test(sixth.text_body) && !/held for you/.test(sixth.text_body), sixth.text_body.slice(0, 900));
+		r = await req('POST', '/api/rsvp/confirm', { t: await confirmOf(who[5]) });
+		check('…and on confirming gets a place, as three were free', r.data.registration?.place === 'place', JSON.stringify(r.data));
+		for (const e of who.slice(6)) await register({ event: H, name: 'Later', email: e });
+		for (const e of who.slice(6, 8)) await req('POST', '/api/rsvp/confirm', { t: await confirmOf(e) });
+		r = await req('POST', '/api/rsvp/confirm', { t: await confirmOf(who[8]) });
+		const sum = await status();
+		check('the first to confirm take the free places; once the five holds and three confirmed fill the room, the next joins the waiting list', r.data.registration?.place === 'waitlist' && sum.capacity.inPerson.confirmed === 3 && sum.capacity.inPerson.held === 8, JSON.stringify([r.data, sum.capacity.inPerson]));
+		for (const e of who.slice(0, 5)) await req('POST', '/api/rsvp/decline', { t: await confirmOf(e) });
+
+		// One place left and two people, neither holding it, confirming at the same moment: exactly one gets it.
+		const H2 = 'e2e-holds-race';
+		await req('POST', EV, { action: 'create', id: H2, title: 'Smaller Room', timezone: 'Europe/London', starts_at: at(24), ends_at: at(28), deadline: at(0), in_person_max: 6, page_path: '/events/e2e-holds-race/', location: 'Room' }, ADMIN);
+		await req('POST', EV, { action: 'add_session', event: H2, label: 'Talk', mode: 'in_person', starts_at: at(25), ends_at: at(26) }, ADMIN);
+		const race = Array.from({ length: 7 }, (_, i) => `race${i}@example.org`);
+		for (const e of race) await register({ event: H2, name: 'Racer', email: e });
+		const [x, y] = await Promise.all(race.slice(5).map(async (e) => (await req('POST', '/api/rsvp/confirm', { t: await confirmOf(e) })).data.registration?.place));
+		check('two people confirming into the last place at once: one gets it, the other the waiting list', [x, y].sort().join() === 'place,waitlist', JSON.stringify([x, y]));
+		for (const e of race.slice(0, 5)) await req('POST', '/api/rsvp/decline', { t: await confirmOf(e) });
+	}
+
 	console.log('\nAdmin removal');
 	const gina = 'gina@example.org', hal = 'hal@example.org';
 	await registerAndConfirm({ name: 'Gina', email: gina, attendance: 'remote' });
@@ -567,6 +1076,50 @@ try {
 	n = (await mailsTo(hal)).length;
 	r = await req('DELETE', '/api/admin/registration', { id: sumR.data.registrations.find((x) => x.email === hal).id }, ADMIN);
 	check('removing an unconfirmed one (spam, typos) sends nothing', r.data.ok && (await mailsTo(hal)).length === n);
+
+	console.log('\nAdmin confirms for someone who said they are coming');
+	const ivy = 'ivy@example.org';
+	const pendingId = async (email) => (await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN)).data.registrations.find((x) => x.email === email)?.id;
+	await register({ name: 'Ivy', email: ivy, attendance: 'remote' });
+	const ivyId = await pendingId(ivy);
+	check('confirming for someone needs Access', (await req('POST', '/api/admin/promote', { id: ivyId, what: 'confirm', email: ivy })).status === 401);
+	n = (await mailsTo(ivy)).length;
+	check('…and the address they gave the organiser', (await req('POST', '/api/admin/promote', { id: ivyId, what: 'confirm' }, ADMIN)).status === 400);
+	r = await req('POST', '/api/admin/promote', { id: ivyId, what: 'confirm', email: ' IVY@example.org ' }, ADMIN);
+	m = await last(ivy);
+	check('the organiser confirms with the matching address (any case): joining instructions, saying it was confirmed for them', r.data.ok && r.data.already === false && r.data.registration.status === 'confirmed'
+		&& (await mailsTo(ivy)).length === n + 1 && /confirmed your registration[^\n]*for you, so there is no need to use the link/.test(m.text_body) && m.att.length > 0, JSON.stringify(r.data) + ' | ' + m?.text_body.slice(0, 300));
+	check('…and shows as confirmed on the admin page', (await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN)).data.registrations.find((x) => x.email === ivy).status === 'confirmed');
+	r = await req('POST', '/api/admin/promote', { id: ivyId, what: 'confirm', email: ivy }, ADMIN);
+	check('confirming again sends nothing more', r.data.ok && r.data.already === true && (await mailsTo(ivy)).length === n + 1, JSON.stringify(r.data));
+	check('confirming a registration that no longer exists → 404', (await req('POST', '/api/admin/promote', { id: 'nope', what: 'confirm', email: ivy }, ADMIN)).status === 404);
+	await req('DELETE', '/api/admin/registration', { id: ivyId }, ADMIN);
+
+	// A typo in the form: one character out.
+	const typo = 'jon@example.org', john = 'john@example.org';
+	await register({ name: 'John', email: typo, attendance: 'remote' });
+	const johnId = await pendingId(typo);
+	r = await req('POST', '/api/admin/promote', { id: johnId, what: 'confirm', email: john }, ADMIN);
+	check('a pasted address that differs is refused until the organiser says theirs was mistyped', r.status === 409 && r.data.field === 'email' && /jon@example\.org/.test(r.data.error) && (await mailsTo(john)).length === 0, JSON.stringify(r.data));
+	r = await req('POST', '/api/admin/promote', { id: johnId, what: 'confirm', email: john, fix_email: true }, ADMIN);
+	m = await last(john);
+	check('one character out: corrected, confirmed, and the joining instructions go to the corrected address only', r.data.ok && r.data.registration.status === 'confirmed' && m && /for you, so there is no need/.test(m.text_body)
+		&& (await mailsTo(typo)).length === 1 && await pendingId(john) === johnId && !(await pendingId(typo)), JSON.stringify(r.data));
+	await req('DELETE', '/api/admin/registration', { id: johnId }, ADMIN);
+
+	// Further out: may be somebody else, so the organiser must have their permission.
+	const far = 'kim.typed@example.org', kim = 'kim@example.net';
+	await register({ name: 'Kim', email: far, attendance: 'remote' });
+	const kimId = await pendingId(far);
+	r = await req('POST', '/api/admin/promote', { id: kimId, what: 'confirm', email: kim, fix_email: true }, ADMIN);
+	check('more than one character out: refused without the owner\'s permission', r.status === 409 && /permission/.test(r.data.error) && (await mailsTo(kim)).length === 0, JSON.stringify(r.data));
+	await register({ name: 'Kim again', email: kim, attendance: 'remote' });
+	r = await req('POST', '/api/admin/promote', { id: kimId, what: 'confirm', email: kim, fix_email: true, permission: true }, ADMIN);
+	check('…and refused when the corrected address already has a registration', r.status === 409 && /already has a registration/.test(r.data.error), JSON.stringify(r.data));
+	await req('DELETE', '/api/admin/registration', { id: await pendingId(kim) }, ADMIN);
+	r = await req('POST', '/api/admin/promote', { id: kimId, what: 'confirm', email: kim, fix_email: true, permission: true }, ADMIN);
+	check('…with permission: corrected and confirmed', r.data.ok && r.data.registration.status === 'confirmed' && /for you, so there is no need/.test((await last(kim)).text_body), JSON.stringify(r.data));
+	await req('DELETE', '/api/admin/registration', { id: kimId }, ADMIN);
 
 	r = await req('POST', '/api/admin/settings', { event: EVENT, deadline: new Date(Date.now() - 60_000).toISOString() }, ADMIN);
 	check('registration deadline moved into the past', r.data.ok);
@@ -586,6 +1139,9 @@ try {
 	check('organiser notified of the cancellation', (await mailsTo(NOTIFY)).some((x) => /Cancellation/.test(x.subject) && /Carol/.test(x.text_body)));
 	r = await req('POST', '/api/rsvp/manage', { t: bobManage, name: 'Bob', attendance: 'remote', tour_id: 'none' });
 	check('switching to remote drops a tour whose booking has closed', r.data.ok && r.data.registration.attendance === 'remote' && r.data.registration.tour_id === null, JSON.stringify(r.data));
+	r = await req('POST', '/api/rsvp/manage', { t: bobManage, name: 'Bob', attendance: 'extras', optins: [DINNER] });
+	check('after the registration deadline, a remote attendee cannot move to just the dinner → 409', r.status === 409 && /closed/.test(r.data.error ?? ''), JSON.stringify(r.data));
+	check('…and stays remote', (await req('GET', `/api/rsvp/manage?t=${encodeURIComponent(bobManage)}`)).data.registration.attendance === 'remote');
 	m = await last(bob);
 	check('switching to remote says so, releases the in-person place, and sends the remote instructions', /You have changed to joining remotely/.test(m.text_body) && /in-person place has been deleted/.test(m.text_body) && /Joining instructions/.test(m.subject), m.subject);
 	check('online calendar entries drop the place from the event name', m.att.some((a) => /METHOD:REQUEST/.test(a.content) && /SUMMARY:[^\r\n]*\(online\)/.test(a.content) && !/SUMMARY:[^\r\n]*, London/.test(a.content)) && m.att.some((a) => /METHOD:CANCEL/.test(a.content)), m.att.map((a) => (/SUMMARY:[^\r\n]*/.exec(a.content) || [''])[0]).join(' | '));
@@ -598,6 +1154,8 @@ try {
 	check('registrations kept until 30 days after the event', (await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN)).data.registrations.length > 0);
 	await cron(Date.parse(seeded.event.ends_at) + 31 * 24 * 3600_000);
 	check('all registrations deleted 30 days after the event', (await req('GET', `/api/admin/summary?event=${EVENT}`, undefined, ADMIN)).data.registrations.length === 0);
+	check('messages deleted 30 days after the event', (await req('GET', `/api/admin/messages?event=${EVENT}`, undefined, ADMIN)).data.messages.length === 0);
+	check('polls deleted 30 days after the event', (await req('GET', `/api/admin/polls?event=${EVENT}`, undefined, ADMIN)).data.polls.length === 0);
 } catch (e) {
 	failures++;
 	console.error(e);

@@ -39,6 +39,14 @@ export interface Env {
 	ACCESS_MAX_AGE_HOURS?: string;
 	/** "true" only in local development: enables the dev outbox endpoints and test keys. Never set in production. */
 	DEV_MODE?: string;
+	/** Address routed by Cloudflare Email Routing to the cron Worker, e.g. polls@example.org. Emails about poll
+	 * suggestions use it as their reply-to, so an organiser can answer "yes", "no" or "use <wording>" by email. Optional:
+	 * without it, suggestions are decided on the admin page. */
+	POLL_REPLY_EMAIL?: string;
+	/** "true" on the Workers paid plan: messages carrying joining instructions go out in bigger pieces. */
+	PAID_PLAN?: string;
+	/** Local development only: the shortest time a registration is answered in (default 1500 ms; see register.ts). */
+	REGISTER_MIN_MS?: string;
 	/** Local development only: JSON Web Key Set used instead of the Access certs URL, for tests. */
 	ACCESS_JWKS_JSON?: string;
 }
@@ -54,5 +62,5 @@ export const privacyUrl = (env: Env) => {
 };
 /** Bare address of the sender, for the calendar ORGANIZER. */
 export const fromAddress = (env: Env) => /<([^>]+)>/.exec(emailFrom(env))?.[1] ?? emailFrom(env);
-export const VERSION = '0.2.0-beta';
+export const VERSION = '0.3.0-beta';
 export const sourceUrl = (env: Env) => env.EVENTSANDEYE_URL || 'https://github.com/andeyePro/eventsandeye';

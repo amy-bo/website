@@ -7,15 +7,19 @@
 -- so INSERT OR IGNORE keeps a rerun from overwriting those edits.
 
 -- The event. in_person_max is the room's capacity; registration closes at deadline; travel_minutes sets the
--- "time to leave" calendar reminder; page_path is the page with the booking form; extra_question is optional.
-INSERT OR IGNORE INTO events (id, title, starts_at, ends_at, timezone, location, in_person_max, deadline, travel_minutes, page_path, extra_question) VALUES
+-- "time to leave" calendar reminder; page_path is the page with the booking form (on the starter site, /event/); extra_question is optional, and so
+-- are the wording of the two ways to attend and of the tour choice on the form and manage page (NULL = plain defaults).
+INSERT OR IGNORE INTO events (id, title, starts_at, ends_at, timezone, location, in_person_max, deadline, travel_minutes, page_path, extra_question,
+  in_person_label, remote_label, tour_legend) VALUES
   ('2026-11-13-london', 'AMYBO Event, London', '2026-11-13T10:30:00Z', '2026-11-13T22:00:00Z', 'Europe/London',
    'I-HUB, Imperial College White City campus, 84 Wood Lane, London W12 0BZ', 20, '2026-11-06T12:00:00Z', 60, '/events/2026-11-13-london/',
-   'Staying on for Saturday 14 November? Tell us if you would like to do something together, and what you fancy.');
+   'Staying on for Saturday 14 November? Tell us if you would like to do something together, and what you fancy.',
+   'In person at White City', 'Remotely, talks only, on Google Meet', 'Optional lab tour (in person only)');
 
 -- Sessions.
 --   Core sessions (no choice_group) make up the day. mode: 'in_person', 'online' or 'hybrid' (remote attendees get
---   calendar entries for online and hybrid sessions).
+--   calendar entries for online and hybrid sessions). Their online links (online_url) are added on the admin page
+--   under Sessions, nearer the day, and appear in remote attendees' calendar entries.
 --   Bookable options share the choice_group 'tour': people pick one, each has its own capacity and waiting list.
 --   Opt-in sessions (optin = 1), such as a dinner, are ticked separately and can have a capacity and waiting list
 --   too; people can also register for just these.
@@ -59,3 +63,11 @@ Closed shoes are needed in the labs.
 :::
 
 To change or cancel your registration, use your personal link below.', 'First version', strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'setup');
+
+-- Optional: a poll, answered on each registrant's manage page (polls are also created on the admin page). People rank
+-- the options and draw a line under the ones they would join; they can suggest more, which you add or turn down.
+-- INSERT OR IGNORE INTO polls (id, event_id, question, allow_suggestions, created_at) VALUES
+--   ('2026-11-13-london-saturday', '2026-11-13-london', 'What shall we do on Saturday 14 November?', 1, strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+-- INSERT OR IGNORE INTO poll_options (id, poll_id, label, status, sort, created_at) VALUES
+--   ('2026-11-13-london-saturday-walk', '2026-11-13-london-saturday', 'A walk by the Thames', 'active', 1, strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+--   ('2026-11-13-london-saturday-museum', '2026-11-13-london-saturday', 'The Science Museum', 'active', 2, strftime('%Y-%m-%dT%H:%M:%fZ','now'));

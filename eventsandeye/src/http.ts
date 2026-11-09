@@ -12,7 +12,7 @@ export function handle(fn: (ctx: Ctx) => Promise<Response | unknown>) {
 			const r = await fn(ctx);
 			return r instanceof Response ? r : json(r);
 		} catch (e) {
-			if (e instanceof UserError) return bad(e.message, e.status);
+			if (e instanceof UserError) return bad(e.message, e.status, e.field);
 			console.error(e);
 			return bad(`Something went wrong. Please try again, or email ${notifyEmail(ctx.env)}.`, 500);
 		}
@@ -21,6 +21,8 @@ export function handle(fn: (ctx: Ctx) => Promise<Response | unknown>) {
 
 export async function readJson(request: Request): Promise<Record<string, unknown>> {
 	if (!(request.headers.get('content-type') || '').includes('application/json')) throw new UserError('Expected JSON.', 415);
+	// Refused before reading when the size is declared, so a huge body is never buffered; checked again after.
+	if (Number(request.headers.get('content-length')) > 50_000) throw new UserError('Request too large.', 413);
 	const text = await request.text();
 	if (text.length > 50_000) throw new UserError('Request too large.', 413);
 	try {

@@ -2,17 +2,18 @@
 // Events&I – Copyright (C) 2026 andeye Ltd. AGPL-3.0, see ../LICENSE.
 /** Self-service view/change/cancel page, driven by the signed token in ?t=. */
 interface Props {
-	/** Label for the in-person attendance choice, e.g. "In person at White City". */
+	/** Label for the in-person attendance choice, e.g. "In person at White City". Overrides the event's in_person_label. */
 	inPersonLabel?: string;
 	/** Label for the remote attendance choice. */
 	remoteLabel?: string;
 	/** Legend for the tour choices, shown only when the event has tours. */
 	tourLegend?: string;
 }
-const { inPersonLabel = 'In person', remoteLabel = 'Remotely (online sessions only)', tourLegend = 'Optional tour (in person only)' } = Astro.props;
+const { inPersonLabel, remoteLabel, tourLegend } = Astro.props;
 ---
 <div class="not-content" id="manage">
-	<p id="manage-loading" role="status">Loading your registration…</p>
+	<!-- Shown by the script: without it, "loading" would never end. -->
+	<p id="manage-loading" role="status" hidden>Loading your registration…</p>
 	<noscript><p>Managing your registration needs JavaScript. Please turn it on, or contact the organisers.</p></noscript>
 	<form id="manage-form" hidden novalidate>
 		<p id="manage-summary" class="summary"></p>
@@ -23,13 +24,13 @@ const { inPersonLabel = 'In person', remoteLabel = 'Remotely (online sessions on
 		<p class="help">Email: <span id="m-email"></span>. To use a different address, cancel and register again.</p>
 		<fieldset class="field">
 			<legend>How will you attend?</legend>
-			<label class="choice"><input type="radio" name="attendance" value="in_person" /> {inPersonLabel}</label>
-			<label class="choice"><input type="radio" name="attendance" value="remote" /> {remoteLabel}</label>
+			<label class="choice"><input type="radio" name="attendance" value="in_person" /> <span id="m-in-person-label" data-fixed={inPersonLabel ? "1" : undefined}>{inPersonLabel ?? "In person"}</span></label>
+			<label class="choice"><input type="radio" name="attendance" value="remote" /> <span id="m-remote-label" data-fixed={remoteLabel ? "1" : undefined}>{remoteLabel ?? "Remotely (online sessions only)"}</span></label>
 			<label class="choice" id="m-extras-choice" hidden><input type="radio" name="attendance" value="extras" /> <span id="m-extras-label">Just the optional sessions</span></label>
 			<p class="help" id="m-closed" hidden>Registration has closed: you can still switch to remote or cancel.</p>
 		</fieldset>
 		<fieldset class="field" id="m-tour-fs" hidden>
-			<legend>{tourLegend}</legend>
+			<legend id="m-tour-legend" data-fixed={tourLegend ? "1" : undefined}>{tourLegend ?? "Optional tour (in person only)"}</legend>
 			<label class="choice"><input type="radio" name="tour_id" value="none" /> No tour, thanks</label>
 			<div id="m-tours"></div>
 		</fieldset>
@@ -56,145 +57,16 @@ const { inPersonLabel = 'In person', remoteLabel = 'Remotely (online sessions on
 			<button type="submit" id="m-save" class="primary">Save changes</button>
 			<button type="button" id="m-cancel" class="danger">Cancel my registration</button>
 		</div>
-		<div id="manage-result" role="status" aria-live="polite"></div>
+		<div id="manage-result" role="status" aria-live="polite" tabindex="-1"></div>
 	</form>
+	<div id="m-polls" hidden></div>
 </div>
 <script>
-	const t = new URLSearchParams(location.search).get('t');
-	// Keep the link out of the address bar and history once read: it is the key to this registration.
-	if (t) history.replaceState(null, '', location.pathname);
-	const form = document.getElementById('manage-form') as HTMLFormElement;
-	const loading = document.getElementById('manage-loading')!;
-	const out = document.getElementById('manage-result')!;
-	const tourFs = document.getElementById('m-tour-fs') as HTMLFieldSetElement;
-	const buttons = [document.getElementById('m-save'), document.getElementById('m-cancel')] as HTMLButtonElement[];
-	const busy = (on: boolean) => buttons.forEach((b) => (b.disabled = on));
-	const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
-
-	type View = { ok: boolean; error?: string; event: { title: string; page_path: string; open: boolean; extra_question?: string | null }; tours: { id: string; label: string; available: boolean; open: boolean }[]; optins?: { id: string; label: string; starts_at: string; location: string | null; available?: boolean }[]; registration: Record<string, string | null | boolean | string[]>; calendar: { key: string; summary: string; start: string; url: string }[] };
-
-	function describe(r: View['registration']) {
-		const parts: string[] = [];
-		parts.push('Confirmed.');
-		if (r.mode === 'extras') parts.push(`Joining us for ${Array.isArray(r.optin_labels) ? r.optin_labels.map(lowerFirst).join(' and ') : 'the optional sessions'} only.`);
-		else if (r.attendance === 'remote') parts.push('Attending remotely.');
-		else parts.push(r.place === 'waitlist' ? 'On the in-person waiting list.' : 'In-person place.');
-		if (r.tour_label) parts.push(r.tour_place === 'waitlist' ? `Waiting list for the ${r.tour_label}.` : `Booked on the ${r.tour_label}.`);
-		const waitingFor = Array.isArray(r.optin_waiting_labels) ? r.optin_waiting_labels : [];
-		const placed = Array.isArray(r.optin_labels) ? r.optin_labels.filter((l) => !waitingFor.includes(l)) : [];
-		if (r.mode !== 'extras' && placed.length) parts.push(`Signed up for: ${placed.join(', ')}.`);
-		if (waitingFor.length) parts.push(`Waiting list for: ${waitingFor.join(', ')}.`);
-		return parts.join(' ');
-	}
-	function syncTour() {
-		const mode = (form.elements.namedItem('attendance') as RadioNodeList).value;
-		const inPerson = mode === 'in_person', extras = mode === 'extras';
-		tourFs.disabled = !inPerson;
-		if (!inPerson) (form.querySelector('input[name=tour_id][value=none]') as HTMLInputElement).checked = true;
-		const optFs = document.getElementById('m-optins-fieldset') as HTMLFieldSetElement;
-		optFs.disabled = !inPerson && !extras;
-		document.getElementById('m-optins-legend')!.textContent = extras ? 'Joining us for' : 'Also joining us for (in person only)';
-		const boxes = [...optFs.querySelectorAll('input')] as HTMLInputElement[];
-		if (!inPerson && !extras) boxes.forEach((el) => (el.checked = false));
-		if (extras && boxes.length === 1) boxes[0].checked = true;
-	}
-	function fill(v: View) {
-		const r = v.registration;
-		document.getElementById('manage-summary')!.textContent = `${v.event.title}: ${describe(r)}`;
-		(form.elements.namedItem('name') as HTMLInputElement).value = String(r.name ?? '');
-		document.getElementById('m-email')!.textContent = String(r.email ?? '');
-		(form.elements.namedItem('affiliation') as HTMLInputElement).value = String(r.affiliation ?? '');
-		(form.elements.namedItem('needs') as HTMLTextAreaElement).value = String(r.needs ?? '');
-		(form.elements.namedItem('extra_answer') as HTMLTextAreaElement).value = String(r.extra_answer ?? '');
-		document.getElementById('m-extra-field')!.hidden = !v.event.extra_question;
-		if (v.event.extra_question) document.getElementById('m-extra-label')!.textContent = `${v.event.extra_question} (optional)`;
-		tourFs.hidden = !v.tours.length;
-		const box = document.getElementById('m-tours')!;
-		box.replaceChildren(...v.tours.map((tour) => {
-			const l = document.createElement('label');
-			l.className = 'choice';
-			const i = document.createElement('input');
-			i.type = 'radio'; i.name = 'tour_id'; i.value = tour.id;
-			i.disabled = !tour.open;
-			l.replaceChildren(i, ` ${tour.label}${!tour.open ? ' (booking closed)' : tour.available || tour.id === r.tour_id ? '' : ' (full: waiting list)'}`);
-			return l;
-		}));
-		const current = r.mode === 'extras' ? 'extras' : String(r.attendance);
-		(form.querySelector(`input[name=attendance][value=${current}]`) as HTMLInputElement).checked = true;
-		// Once registration closes, nobody new may take an in-person or optional-session place, but anyone can step back.
-		for (const mode of ['in_person', 'extras']) (form.querySelector(`input[name=attendance][value=${mode}]`) as HTMLInputElement).disabled = !v.event.open && mode !== current;
-		document.getElementById('m-closed')!.hidden = v.event.open;
-		(form.querySelector(`input[name=tour_id][value="${r.tour_id ?? 'none'}"]`) as HTMLInputElement).checked = true;
-		(document.getElementById('m-share') as HTMLInputElement).checked = !!r.share_contact;
-		const mine = Array.isArray(r.optins) ? r.optins : [];
-		document.getElementById('m-optins')!.replaceChildren(...(v.optins ?? []).map((o) => {
-			const l = document.createElement('label');
-			l.className = 'choice';
-			const i = document.createElement('input');
-			i.type = 'checkbox'; i.name = 'optins'; i.value = o.id; i.checked = mine.includes(o.id);
-			const time = new Date(o.starts_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
-			l.replaceChildren(i, ` ${o.label}, ${time}${o.location ? `, ${o.location}` : ''}${o.available === false && !mine.includes(o.id) ? ' (full: waiting list)' : ''}`);
-			return l;
-		}));
-		(document.getElementById('m-optins-fieldset') as HTMLFieldSetElement).hidden = !(v.optins ?? []).length;
-		if ((v.optins ?? []).length) {
-			document.getElementById('m-extras-label')!.textContent = `Just the ${(v.optins ?? []).map((o) => lowerFirst(o.label)).join(' and ')}`;
-			document.getElementById('m-extras-choice')!.hidden = false;
-		}
-		const cal = document.getElementById('m-calendar')!;
-		cal.replaceChildren();
-		if (v.calendar?.length) {
-			const p = document.createElement('p');
-			p.className = 'help';
-			p.textContent = 'Calendar files for your registration:';
-			const ul = document.createElement('ul');
-			for (const c of v.calendar) {
-				const li = document.createElement('li');
-				const a = document.createElement('a');
-				a.href = c.url;
-				a.textContent = `${c.summary} (.ics)`;
-				li.appendChild(a);
-				ul.appendChild(li);
-			}
-			cal.replaceChildren(p, ul);
-		}
-		syncTour();
-	}
-	async function call(method: string, body?: object) {
-		const res = await fetch(method === 'GET' ? `/api/rsvp/manage?t=${encodeURIComponent(t ?? '')}` : '/api/rsvp/manage', {
-			method, headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify({ t, ...body }) : undefined,
-		});
-		const d = (await res.json()) as View;
-		if (!d.ok) throw new Error(d.error);
-		return d;
-	}
-	form.addEventListener('change', syncTour);
-	call('GET').then((v) => { loading.hidden = true; form.hidden = false; fill(v); }).catch((e) => { loading.textContent = e.message || 'This link is not valid.'; });
-
-	form.addEventListener('submit', async (e) => {
-		e.preventDefault();
-		if (!form.reportValidity()) return;
-		const fd: Record<string, unknown> = Object.fromEntries(new FormData(form).entries());
-		fd.share_contact = (document.getElementById('m-share') as HTMLInputElement).checked;
-		fd.optins = new FormData(form).getAll('optins').map(String);
-		busy(true);
-		try { fill(await call('POST', fd)); out.textContent = 'Your changes have been saved.'; } catch (err) { out.textContent = (err as Error).message; } finally { busy(false); }
-	});
-	document.getElementById('m-cancel')!.addEventListener('click', async () => {
-		if (!confirm('Cancel your registration? Your details will be deleted.')) return;
-		busy(true);
-		try {
-			await call('DELETE', {});
-			const p = document.createElement('p');
-			p.tabIndex = -1;
-			p.textContent = 'Your registration has been cancelled and your details deleted. We have emailed you a confirmation.';
-			form.replaceChildren(p);
-			// The button that had focus is gone; move focus to the outcome so it isn't lost to the page body.
-			p.focus();
-		} catch (err) { out.textContent = (err as Error).message; busy(false); }
-	});
+	import './manage-panel';
 </script>
 <style>
+	/* The display rules below would otherwise beat the hidden attribute, and show parts the registration does not use. */
+	#manage :global([hidden]) { display: none !important; }
 	#manage-form { display: grid; gap: 1rem; max-width: 40rem; margin-block: 1.5rem; }
 	.summary { font-weight: 600; }
 	.field { display: grid; gap: 0.35rem; border: 0; padding: 0; margin: 0; }
@@ -203,11 +75,34 @@ const { inPersonLabel = 'In person', remoteLabel = 'Remotely (online sessions on
 	#manage-form :global(.choice) { display: flex; gap: 0.5rem; align-items: flex-start; }
 	#manage-form :global(.choice input) { margin-top: 0.3rem; }
 	#m-tours, #m-optins { display: grid; gap: 0.35rem; }
-	input[type='text'], textarea { padding: 0.5rem; border: 1px solid var(--sl-color-gray-3, #8b8f98); border-radius: 0.3rem; background: var(--sl-color-bg, #fff); color: var(--sl-color-text, inherit); font: inherit; }
+	input[type='text'], textarea { padding: 0.5rem; border: 1px solid var(--sl-color-gray-3, #8b8f98); border-radius: 0.3rem; background: var(--sl-color-bg, Canvas); color: var(--sl-color-text, CanvasText); font: inherit; }
 	fieldset:disabled { opacity: 0.6; }
-	.help { font-size: var(--sl-text-sm, 0.875rem); color: var(--sl-color-gray-2, #4b5563); margin: 0; }
+	/* :global because the polls are built by the script. */
+	#m-polls { display: grid; gap: 1.5rem; max-width: 40rem; margin-block: 1.5rem; }
+	#m-polls :global(.poll) { display: grid; gap: 0.75rem; }
+	#m-polls :global(h2) { margin: 0; }
+	#m-polls :global(.rank) { list-style: decimal; padding-left: 1.75rem; margin: 0; display: grid; gap: 0.35rem; }
+	#m-polls :global(.rank li) { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.4rem 0.6rem; border: 1px solid var(--sl-color-gray-4, #c7cad1); border-radius: 0.3rem; background: var(--sl-color-bg, Canvas); color: var(--sl-color-text, CanvasText); }
+	#m-polls :global(.rank li[draggable='true']) { cursor: grab; }
+	#m-polls :global(.rank li.dragging) { opacity: 0.5; }
+	#m-polls :global(.rank li.bar) { list-style: none; margin-left: -1.75rem; border: 0; border-top: 3px dashed #b3261e; border-top-color: light-dark(#b3261e, #ff8a80); border-radius: 0; font-weight: 700; color: #b3261e; color: light-dark(#b3261e, #ff8a80); background: transparent; }
+	/* Starlight's dark theme may not set color-scheme, so light-dark() alone could keep the light red. */
+	:global([data-theme='dark']) #m-polls :global(.rank li.bar) { color: #ff8a80; border-top-color: #ff8a80; }
+	#m-polls :global(.tag) { font-size: var(--sl-text-xs, 0.75rem); font-weight: 400; margin-left: 0.5rem; padding: 0.05rem 0.4rem; border-radius: 0.25rem; background: #eef0f3; background: light-dark(#eef0f3, #2a2d33); color: var(--sl-color-text, CanvasText); }
+	:global([data-theme]) #m-polls :global(.tag) { background: var(--sl-color-gray-6); }
+	#m-polls :global(.moves) { display: flex; gap: 0.25rem; flex-shrink: 0; }
+	#m-polls :global(.moves button) { min-width: 2.25rem; min-height: 2.25rem; border: 1px solid var(--sl-color-gray-3, #8b8f98); border-radius: 0.3rem; background: transparent; color: inherit; cursor: pointer; }
+	#m-polls :global(.moves button:disabled) { opacity: 0.35; cursor: default; }
+	#m-polls :global(.suggest) { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+	#m-polls :global(.suggest input) { flex: 1 1 14rem; }
+	#m-polls :global(.secondary) { background: transparent; color: var(--sl-color-text, inherit); border: 2px solid #0069a0; border-radius: 999px; padding: 0.5rem 1.2rem; font-weight: 700; cursor: pointer; }
+	#m-polls :global(table) { border-collapse: collapse; margin-top: 0.5rem; }
+	#m-polls :global(th), #m-polls :global(td) { padding: 0.25rem 0.75rem 0.25rem 0; text-align: left; }
+	.help { font-size: var(--sl-text-sm, 0.875rem); color: #4b5563; color: light-dark(#4b5563, #b0b5bd); margin: 0; }
+	/* Starlight's own grey where it is used; elsewhere the plain colours above (var() with light-dark() inside has no fallback in older browsers). */
+	:global([data-theme]) .help { color: var(--sl-color-gray-2); }
 	.actions { display: flex; gap: 1rem; flex-wrap: wrap; }
 	.actions button:disabled { opacity: 0.6; cursor: wait; }
-	.primary { background: #0069a0; color: #fff; border: 0; border-radius: 999px; padding: 0.6rem 1.4rem; font-weight: 700; cursor: pointer; }
-	.danger { background: transparent; color: var(--sl-color-text, inherit); border: 2px solid #b3261e; border-radius: 999px; padding: 0.5rem 1.2rem; font-weight: 700; cursor: pointer; }
+	#manage :global(.primary) { background: #0069a0; color: #fff; border: 2px solid transparent; border-radius: 999px; padding: 0.6rem 1.4rem; font-weight: 700; cursor: pointer; }
+	.danger { background: transparent; color: var(--sl-color-text, inherit); border: 2px solid #b3261e; border-color: light-dark(#b3261e, #ff8a80); border-radius: 999px; padding: 0.5rem 1.2rem; font-weight: 700; cursor: pointer; }
 </style>

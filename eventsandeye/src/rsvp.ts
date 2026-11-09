@@ -1,17 +1,19 @@
 // Events&I – Copyright (C) 2026 andeye Ltd. AGPL-3.0, see ../LICENSE.
 import { attachments, entriesFor, hashEntry, liveState, parseState, plan, saveState } from './calendar';
 import { type Env, fromAddress, notifyEmail, orgName, privacyUrl, siteUrl, sourceUrl } from './env';
-import { sendBatch, sendEmail, type OutgoingEmail } from './email';
+import { IdempotencyConflict, sendBatch, sendEmail, type OutgoingEmail } from './email';
 import { syncHosts } from './hosts';
 import { buildIcs } from './ics';
 import {
 	alreadyRegisteredIntro, type Brand, calendarUpdateEmail, cancellationEmail, confirmEmail, declinedEmail, type EventRow, instructionsEmail, messageEmail,
-	notification, onlyWaiting, optedIn, optinWaiting, type RegistrationRow, type SessionRow, waitingForPlace, waitlistReminderEmail,
+	organiserConfirmedIntro, 	hostReleasedEmail, notification, onlyWaiting, optedIn, optinWaiting, type RegistrationRow, type SessionRow, waitingForPlace, waitlistReminderEmail,
 } from './templates';
 import { modeOf } from './mode';
 import { mdToHtml, mdToText } from './markdown';
+import { adminPolls, parseBookingBallots, saveBookingBallots, unansweredPolls, voterPolls } from './polls';
+import { recordCronRun } from './health';
 import { makeToken } from './tokens';
-import { cleanLine, cleanText, EMAIL_RE, escapeHtml, nowIso, randomToken, ukDateTime } from './util';
+import { cleanLine, cleanText, editDistance, EMAIL_RE, escapeHtml, nowIso, randomToken, sha256, ukDateTime } from './util';
 
 const HOUR = 3600_000;
 export const MAX_HOLD_MS = 48 * HOUR;
@@ -20,10 +22,12 @@ export const MAX_HOLD_MS = 48 * HOUR;
  * changes may trigger in an hour (each change can email hosts and the organiser too). */
 const REMINDER_COOLDOWN_MS = 10 * 60_000;
 const MAX_RESENDS = 3;
+const MAX_REMINDERS_A_DAY = 3;
 const MAX_CHANGE_EMAILS_PER_HOUR = 10;
 
 export class UserError extends Error {
-	constructor(message: string, public status = 400) {
+	/** field names the form input at fault, so the form can mark and focus it. */
+	constructor(message: string, public status = 400, public field?: string) {
 		super(message);
 	}
 }
@@ -61,6 +65,9 @@ export async function latestInstructions(env: Env, eventId: string) {
 		.first<{ event_id: string; version: number; subject: string; body_md: string; change_note: string | null; created_at: string }>();
 }
 
+/** The event's own wording for the forms; null where the components' defaults should be used. */
+export const eventLabels = (ev: EventRow) => ({ in_person_label: ev.in_person_label ?? null, remote_label: ev.remote_label ?? null, tour_legend: ev.tour_legend ?? null });
+
 export const registrationOpen = (ev: EventRow, now = Date.now()) => now < Date.parse(ev.deadline);
 /** Optional sessions can be booked or changed until their own deadline, by default their start. */
 export const sessionBookingOpen = (s: SessionRow, now = Date.now()) => now < Date.parse(s.booking_deadline ?? s.starts_at);
@@ -74,12 +81,13 @@ export async function capacity(env: Env, ev: EventRow, sessions: SessionRow[], n
 	const held = `(status = 'confirmed' OR (status = 'pending' AND hold_expires_at > ?))`;
 	const inPerson = await env.DB.prepare(
 		`SELECT
-			SUM(CASE WHEN attendance='in_person' AND place='place' AND ${held} THEN 1 ELSE 0 END) AS held,
+			SUM(CASE WHEN attendance='in_person' AND place='place' AND ${held.replace('?', '?1')} THEN 1 ELSE 0 END) AS held,
 			SUM(CASE WHEN attendance='in_person' AND place='waitlist' AND status='confirmed' THEN 1 ELSE 0 END) AS waiting,
 			SUM(CASE WHEN attendance='in_person' AND place='place' AND status='confirmed' THEN 1 ELSE 0 END) AS confirmed,
 			SUM(CASE WHEN attendance='remote' AND status='confirmed' THEN 1 ELSE 0 END) AS remote,
-			SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) AS pending
-		 FROM registrations WHERE event_id = ?`,
+			SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) AS pending,
+			SUM(CASE WHEN attendance='in_person' AND place='place' AND status='pending' AND hold_expires_at > ?1 THEN 1 ELSE 0 END) AS pendingHeld
+		 FROM registrations WHERE event_id = ?2`,
 	).bind(now, ev.id).first<Record<string, number | null>>();
 	const rows = await env.DB.prepare(
 		`SELECT tour_id,
@@ -108,6 +116,7 @@ export async function capacity(env: Env, ev: EventRow, sessions: SessionRow[], n
 		inPerson: {
 			max: ev.in_person_max, held: n(inPerson?.held), confirmed: n(inPerson?.confirmed), waiting: n(inPerson?.waiting),
 			available: n(inPerson?.held) < ev.in_person_max && n(inPerson?.waiting) === 0,
+			pendingHeld: n(inPerson?.pendingHeld),
 		},
 		remote: n(inPerson?.remote),
 		pending: n(inPerson?.pending),
@@ -129,20 +138,28 @@ const listedIn = (col: string, param: string) => `instr(',' || COALESCE(${col}, 
 const ids = (list: string | null | undefined) => (list ?? '').split(',').filter(Boolean);
 const joinIds = (list: string[]) => list.join(',') || null;
 
+/**
+ * How many in-person places unconfirmed registrations may hold at once. Anyone can register any address, so without a
+ * limit made-up registrations could hold every place for up to 48 hours. Beyond it, a new registration holds nothing and
+ * gets a place when it is confirmed, if one is free then.
+ */
+export const holdLimit = (ev: EventRow) => Math.max(5, Math.ceil(ev.in_person_max / 4));
+
 /** Hold for unconfirmed registrations: the shorter of 48 hours or a third of the time left to the deadline. */
 export function holdMs(ev: EventRow, now = Date.now()): number {
 	const third = Math.max(0, (Date.parse(ev.deadline) - now) / 3);
 	return Math.max(15 * 60_000, Math.min(MAX_HOLD_MS, third));
 }
 
-export async function manageUrl(env: Env, id: string) {
-	return `${siteUrl(env)}/events/manage/?t=${encodeURIComponent(await makeToken(env, 'manage', id))}`;
+/** at: a fixed time for the link's expiry, so an email sent again on a retry is the same email. */
+export async function manageUrl(env: Env, id: string, at?: number) {
+	return `${siteUrl(env)}/events/manage/?t=${encodeURIComponent(await makeToken(env, 'manage', id, at))}`;
 }
 export async function confirmUrl(env: Env, id: string) {
 	return `${siteUrl(env)}/events/confirm/?t=${encodeURIComponent(await makeToken(env, 'confirm', id))}`;
 }
-export async function icsUrlFor(env: Env, id: string) {
-	const t = encodeURIComponent(await makeToken(env, 'calendar', id));
+export async function icsUrlFor(env: Env, id: string, at?: number) {
+	const t = encodeURIComponent(await makeToken(env, 'calendar', id, at));
 	return (key: string) => `${siteUrl(env)}/api/rsvp/calendar?t=${t}&entry=${encodeURIComponent(key)}`;
 }
 
@@ -165,17 +182,19 @@ export interface RegistrationInput {
 	optins?: unknown;
 	consent?: unknown;
 	share_contact?: unknown;
+	/** Poll rankings from the booking form: [{ poll, ranking, bar }]. */
+	polls?: unknown;
 }
 
 const truthy = (v: unknown) => v === true || v === 'on' || v === 'true' || v === 1 || v === '1';
 
 function parseCommon(input: RegistrationInput, sessions: SessionRow[]) {
 	const name = cleanLine(input.name, 120);
-	if (!name) throw new UserError('Please enter your name.');
+	if (!name) throw new UserError('Please enter your name.', 400, 'name');
 	// 'extras' (just the opt-in sessions, e.g. only the dinner) is stored as in person with no place: see mode.ts.
 	const extras = input.attendance === 'extras';
 	const attendance = input.attendance === 'remote' ? 'remote' : input.attendance === 'in_person' || extras ? 'in_person' : null;
-	if (!attendance) throw new UserError('Please choose how you will attend.');
+	if (!attendance) throw new UserError('Please choose how you will attend.', 400, 'attendance');
 	let tour_id: string | null = null;
 	if (attendance === 'in_person' && !extras && input.tour_id && input.tour_id !== 'none') {
 		const t = tourSessions(sessions).find((x) => x.id === input.tour_id);
@@ -184,7 +203,7 @@ function parseCommon(input: RegistrationInput, sessions: SessionRow[]) {
 	}
 	const asked = Array.isArray(input.optins) ? input.optins.map(String) : typeof input.optins === 'string' && input.optins ? input.optins.split(',') : [];
 	const optins = attendance === 'in_person' ? sessions.filter((s) => s.optin && asked.includes(s.id)).map((s) => s.id).join(',') || null : null;
-	if (extras && !optins) throw new UserError('Please tick what you would like to join us for.');
+	if (extras && !optins) throw new UserError('Please tick what you would like to join us for.', 400, 'optins');
 	return {
 		name, attendance, extras, tour_id, optins, affiliation: cleanLine(input.affiliation, 200), needs: cleanText(input.needs, 1000), extra_answer: cleanText(input.extra_answer, 500),
 		share_contact: truthy(input.share_contact) ? 1 : 0,
@@ -199,23 +218,24 @@ function parseCommon(input: RegistrationInput, sessions: SessionRow[]) {
 export async function register(env: Env, eventId: string, input: RegistrationInput) {
 	const ev = await getEvent(env, eventId);
 	if (!registrationOpen(ev)) throw new UserError('Registration for this event has closed.', 409);
-	if (!truthy(input.consent)) throw new UserError('Please tick the consent box to register.');
+	if (!truthy(input.consent)) throw new UserError('Please tick the consent box to register.', 400, 'consent');
 	const sessions = await getSessions(env, ev.id);
 	const c = parseCommon(input, sessions);
 	const email = cleanText(input.email, 254)?.toLowerCase() ?? '';
-	if (!EMAIL_RE.test(email)) throw new UserError('Please enter a valid email address.');
+	if (!EMAIL_RE.test(email)) throw new UserError('Please enter a valid email address.', 400, 'email');
 
 	// Checked before looking the address up, so the answer is the same whether or not the address is already registered.
 	const tour = c.tour_id ? sessions.find((s) => s.id === c.tour_id)! : null;
 	if (tour && !sessionBookingOpen(tour)) throw new UserError(`Booking for the ${tour.label} has closed.`, 409);
 	for (const s of sessions.filter((x) => ids(c.optins).includes(x.id))) if (!sessionBookingOpen(s)) throw new UserError(`Booking for the ${s.label} has closed.`, 409);
+	const ballots = await parseBookingBallots(env, ev, input.polls);
 
 	const existing = await env.DB.prepare('SELECT * FROM registrations WHERE event_id = ? AND email = ?').bind(ev.id, email).first<RegistrationRow>();
 	if (existing && existing.status === 'confirmed') {
-		// One reminder per cooldown: repeated submissions must not let anyone flood a registered address with email.
-		const recent = await env.DB.prepare(`SELECT 1 FROM deliveries WHERE registration_id = ? AND kind = 'already_registered' AND sent_at > ? LIMIT 1`)
-			.bind(existing.id, new Date(Date.now() - REMINDER_COOLDOWN_MS).toISOString()).first();
-		if (recent) return { ok: true as const };
+		// One reminder per cooldown, and a few a day: repeated submissions must not let anyone flood a registered address.
+		const recent = await env.DB.prepare(`SELECT SUM(sent_at > ?) AS soon, COUNT(*) AS day FROM deliveries WHERE registration_id = ? AND kind = 'already_registered' AND sent_at > ?`)
+			.bind(new Date(Date.now() - REMINDER_COOLDOWN_MS).toISOString(), existing.id, new Date(Date.now() - 24 * HOUR).toISOString()).first<{ soon: number | null; day: number }>();
+		if ((recent?.soon ?? 0) > 0 || (recent?.day ?? 0) >= MAX_REMINDERS_A_DAY) return { ok: true as const };
 		if (waitingForPlace(existing, sessions)) {
 			const pid = await sendEmail(env, waitlistReminderEmail(brand(env), ev, existing, sessions, await manageUrl(env, existing.id)));
 			await recordDelivery(env, existing.id, 'already_registered', pid);
@@ -234,10 +254,12 @@ export async function register(env: Env, eventId: string, input: RegistrationInp
 	const now = Date.now();
 	const nowS = new Date(now).toISOString();
 	const cap = await capacity(env, ev, sessions, nowS);
-	const place = c.attendance === 'in_person' && !c.extras ? (cap.inPerson.available ? 'place' : 'waitlist') : null;
+	const unheld = c.attendance === 'in_person' && !c.extras && cap.inPerson.available && cap.inPerson.pendingHeld >= holdLimit(ev);
+	const place = c.attendance === 'in_person' && !c.extras ? (cap.inPerson.available && !unheld ? 'place' : 'waitlist') : null;
 	const tourCap = tour ? cap.tours.find((t) => t.id === tour.id)! : null;
-	const tour_place = tourCap ? (tourCap.available ? 'place' : 'waitlist') : null;
-	const optins_waiting = joinIds(ids(c.optins).filter((o) => !cap.optins.find((x) => x.id === o)!.available));
+	// Beyond the hold limit nothing is held, tours and opt-in sessions included: confirming decides all of them.
+	const tour_place = tourCap ? (tourCap.available && !unheld ? 'place' : 'waitlist') : null;
+	const optins_waiting = joinIds(ids(c.optins).filter((o) => unheld || !cap.optins.find((x) => x.id === o)!.available));
 	const id = randomToken(16);
 	try {
 		await env.DB.prepare(
@@ -258,10 +280,12 @@ export async function register(env: Env, eventId: string, input: RegistrationInp
 	for (const o of after.optins) {
 		if (o.capacity != null && o.held > o.capacity && ids(c.optins).includes(o.id) && !ids(optins_waiting).includes(o.id)) await demoteOptinIfLatest(env, id, o.id, nowS);
 	}
+	// Saved with the registration and deleted with it (a confirmed address registering again keeps its own answers above).
+	await saveBookingBallots(env, id, ballots);
 	const reg = (await getRegistration(env, id))!;
 	let pid: string;
 	try {
-		pid = await sendEmail(env, confirmEmail(brand(env), ev, reg, sessions, await confirmUrl(env, id)));
+		pid = await sendEmail(env, confirmEmail(brand(env), ev, reg, sessions, await confirmUrl(env, id), { unheld }));
 	} catch (e) {
 		// Nobody can confirm a registration whose email never went out: do not keep their details or hold a place.
 		await env.DB.prepare(`DELETE FROM registrations WHERE id = ? AND status = 'pending'`).bind(id).run();
@@ -300,28 +324,35 @@ async function demoteOptinIfLatest(env: Env, id: string, sessionId: string, now:
  * changed entries (or all of them when resendAllCalendar), and entries that no longer apply are cancelled.
  */
 async function sendInstructions(env: Env, ev: EventRow, reg: RegistrationRow, sessions: SessionRow[],
-	opts: { intro?: { html: string; text: string }; resendAllCalendar?: boolean; kind?: string; subject?: string } = {}) {
+	opts: { intro?: { html: string; text: string }; resendAllCalendar?: boolean; kind?: string; subject?: string; idempotencyKey?: string;
+		instructions?: { version: number; subject: string; body_md: string }; at?: number } = {}) {
 	// Without a saved version yet, people still get their status, manage link and calendar, and a promise of instructions.
-	const instr = (await latestInstructions(env, ev.id))
+	const instr = opts.instructions ?? (await latestInstructions(env, ev.id))
 		?? { version: 0, subject: `Your registration: ${ev.title}`, body_md: 'Joining instructions will follow by email nearer the day.' };
-	const murl = await manageUrl(env, reg.id);
+	const murl = await manageUrl(env, reg.id, opts.at);
 	const p = await plan(parseState(reg.calendar_state), entriesFor(env, ev, sessions, reg));
 	const send = opts.resendAllCalendar ? [...p.requests, ...p.unchanged] : p.requests;
-	const files = attachments(env, ev, reg, send, p.cancels);
-	const mail = instructionsEmail(brand(env), ev, reg, sessions, instr, murl, { entries: p.entries, icsUrl: await icsUrlFor(env, reg.id) }, files, opts.intro);
+	const files = attachments(env, ev, reg, send, p.cancels, opts.at);
+	const mail = instructionsEmail(brand(env), ev, reg, sessions, instr, murl, { entries: p.entries, icsUrl: await icsUrlFor(env, reg.id, opts.at) }, files, opts.intro, await unansweredPolls(env, ev, reg.id));
 	if (opts.subject) mail.subject = opts.subject;
-	const pid = await sendEmail(env, mail);
-	await env.DB.prepare('UPDATE registrations SET instructions_version = ?, calendar_state = ? WHERE id = ?').bind(instr.version, JSON.stringify(p.state), reg.id).run();
+	const pid = await sendEmail(env, mail, opts.idempotencyKey);
+	// MAX: a message carrying an older version must not mark someone who already has a newer one as behind.
+	await env.DB.prepare('UPDATE registrations SET instructions_version = MAX(instructions_version, ?), calendar_state = ? WHERE id = ?').bind(instr.version, JSON.stringify(p.state), reg.id).run();
 	await recordDelivery(env, reg.id, opts.kind ?? 'instructions', pid, { version: instr.version });
 }
 
 /** Sends updated or cancelled invitations if, and only if, this person's calendar entries changed. */
-async function syncCalendar(env: Env, ev: EventRow, reg: RegistrationRow, sessions: SessionRow[]) {
-	const murl = await manageUrl(env, reg.id);
+/** opts.at and an idempotency key from the planned calendar make a retried update the same email, sent once. */
+async function syncCalendar(env: Env, ev: EventRow, reg: RegistrationRow, sessions: SessionRow[], opts: { at?: number } = {}) {
+	const murl = await manageUrl(env, reg.id, opts.at);
 	const p = await plan(parseState(reg.calendar_state), entriesFor(env, ev, sessions, reg));
 	if (!p.requests.length && !p.cancels.length) return false;
-	const files = attachments(env, ev, reg, p.requests, p.cancels);
-	const pid = await sendEmail(env, calendarUpdateEmail(brand(env), ev, reg, p.requests, p.cancels.map((c) => c.summary), { entries: p.entries, icsUrl: await icsUrlFor(env, reg.id) }, murl, files));
+	const files = attachments(env, ev, reg, p.requests, p.cancels, opts.at);
+	const key = opts.at === undefined ? undefined : `cal-${reg.id}-${(await sha256(JSON.stringify(p.state))).slice(0, 24)}`;
+	// The key is the planned calendar itself, so a conflict means this same update went before (with other links or
+	// stamps): its state is saved as sent.
+	const pid = await sendEmail(env, calendarUpdateEmail(brand(env), ev, reg, p.requests, p.cancels.map((c) => c.summary), { entries: p.entries, icsUrl: await icsUrlFor(env, reg.id, opts.at) }, murl, files), key)
+		.catch((e) => { if (e instanceof IdempotencyConflict) return 'repeat'; throw e; });
 	await saveState(env, reg.id, p.state);
 	await recordDelivery(env, reg.id, 'calendar_update', pid);
 	return true;
@@ -366,8 +397,10 @@ export function publicStatus(reg: RegistrationRow, sessions: SessionRow[]) {
 	};
 }
 
-/** Confirms the email address. Idempotent. Sends joining instructions unless the person is waitlisted in person. */
-export async function confirm(env: Env, id: string) {
+/** Confirms the email address. Idempotent. Sends joining instructions unless the person is waitlisted in person.
+ * byOrganiser: the organiser confirms for someone who has told them they are coming (in person, by phone, by email)
+ * but has not pressed the button; their email says so, so the earlier confirm link does not leave them wondering. */
+export async function confirm(env: Env, id: string, opts: { byOrganiser?: boolean } = {}) {
 	let reg = await getRegistration(env, id);
 	if (!reg) throw new UserError('This registration no longer exists. Unconfirmed registrations are deleted after a while, so please register again.', 404);
 	const ev = await getEvent(env, reg.event_id);
@@ -382,8 +415,17 @@ export async function confirm(env: Env, id: string) {
 		if (reg.attendance === 'in_person' && reg.place) place = cap.inPerson.available ? 'place' : 'waitlist';
 		if (reg.tour_id) tour_place = cap.tours.find((t) => t.id === reg!.tour_id)?.available ? 'place' : 'waitlist';
 		optins_waiting = joinIds(ids(reg.optins).filter((o) => !cap.optins.find((x) => x.id === o)?.available));
+	} else if (reg.attendance === 'in_person' && (reg.place === 'waitlist' || reg.tour_place === 'waitlist' || reg.optins_waiting)) {
+		// Registered when something was full or the hold limit was reached: a place freed since, with nobody confirmed
+		// waiting for it, goes to whoever confirms first. Only what was waiting is looked at; what is held stays held.
+		const cap = await capacity(env, ev, sessions, now);
+		if (reg.place === 'waitlist' && cap.inPerson.available) place = 'place';
+		if (reg.tour_place === 'waitlist' && cap.tours.find((t) => t.id === reg!.tour_id)?.available) tour_place = 'place';
+		optins_waiting = joinIds(ids(reg.optins_waiting).filter((o) => !cap.optins.find((x) => x.id === o)?.available));
 	}
-	const joinsWaitlist = place === 'waitlist';
+	// A place given now, not held since registering: two people confirming into the last one at once are checked below.
+	const granted = place === 'place' && (reg.place !== 'place' || !!reg.hold_expires_at && reg.hold_expires_at <= now);
+	let joinsWaitlist = place === 'waitlist';
 	const joinsTourWaitlist = tour_place === 'waitlist';
 	const upd = await env.DB.prepare(
 		`UPDATE registrations SET status='confirmed', confirmed_at=?, updated_at=?, hold_expires_at=NULL, place=?, tour_place=?, optins_waiting=?,
@@ -397,14 +439,27 @@ export async function confirm(env: Env, id: string) {
 		return { ok: true as const, already: true, registration: confirmStatus(again, sessions) };
 	}
 	reg = (await getRegistration(env, id))!;
+	if (granted && (await capacity(env, ev, sessions, now)).inPerson.held > ev.in_person_max) {
+		// Over by one: the place goes to whichever registered first (by rowid, as in demoteIfLatest), so of two people
+		// confirming at once exactly one keeps it.
+		const ahead = await env.DB.prepare(
+			`SELECT COUNT(*) AS n FROM registrations WHERE event_id = ? AND attendance = 'in_person' AND place = 'place' AND ${HELD} AND rowid < (SELECT rowid FROM registrations WHERE id = ?)`,
+		).bind(ev.id, now, id).first<{ n: number }>();
+		if ((ahead?.n ?? 0) >= ev.in_person_max) {
+			await env.DB.prepare(`UPDATE registrations SET place='waitlist', waitlist_since=? WHERE id=?`).bind(now, id).run();
+			joinsWaitlist = true;
+			reg = (await getRegistration(env, id))!;
+		}
+	}
 
-	if (!waitingForPlace(reg, sessions)) await sendInstructions(env, ev, reg, sessions);
+	const intro = opts.byOrganiser ? organiserConfirmedIntro(ev) : undefined;
+	if (!waitingForPlace(reg, sessions)) await sendInstructions(env, ev, reg, sessions, { intro });
 	else {
 		// Waiting for an in-person place: no joining instructions yet, but they need their manage link.
-		const pid = await sendEmail(env, waitlistReminderEmail(brand(env), ev, reg, sessions, await manageUrl(env, reg.id), true));
+		const pid = await sendEmail(env, waitlistReminderEmail(brand(env), ev, reg, sessions, await manageUrl(env, reg.id), true, intro));
 		await recordDelivery(env, reg.id, 'waitlist_confirmed', pid);
 	}
-	await notifyWaitlist(env, ev, sessions, reg, joinsWaitlist, joinsTourWaitlist, 'has confirmed and joined', ids(reg.optins_waiting));
+	await notifyWaitlist(env, ev, sessions, reg, joinsWaitlist, joinsTourWaitlist, opts.byOrganiser ? 'was confirmed by an organiser and joined' : 'has confirmed and joined', ids(reg.optins_waiting));
 	await syncHosts(env, brand(env), ev, sessions);
 	return { ok: true as const, already: false, registration: confirmStatus(reg, sessions) };
 }
@@ -419,11 +474,12 @@ export async function manageView(env: Env, id: string) {
 	const ics = await icsUrlFor(env, reg.id);
 	return {
 		ok: true as const,
-		event: { id: ev.id, title: ev.title, starts_at: ev.starts_at, deadline: ev.deadline, page_path: ev.page_path, open: registrationOpen(ev), extra_question: ev.extra_question ?? null },
+		event: { id: ev.id, title: ev.title, starts_at: ev.starts_at, deadline: ev.deadline, ...eventLabels(ev), timezone: ev.timezone, page_path: ev.page_path, open: registrationOpen(ev), extra_question: ev.extra_question ?? null },
 		tours: cap.tours.map((t) => ({ id: t.id, label: t.label, available: t.available, open: t.open })),
 		optins: sessions.filter((s) => s.optin).map((s) => ({ id: s.id, label: s.label, starts_at: s.starts_at, location: s.location, available: !!cap.optins.find((o) => o.id === s.id)?.available })),
 		registration: publicStatus(reg, sessions),
 		calendar: entriesFor(env, ev, sessions, reg).map((e) => ({ key: e.key, summary: e.summary, start: e.start, url: ics(e.key) })),
+		polls: await voterPolls(env, reg.id, ev),
 	};
 }
 
@@ -444,6 +500,9 @@ export async function updateRegistration(env: Env, id: string, input: Registrati
 	const cap = await capacity(env, ev, sessions, now);
 
 	let place = reg.place, waitlist_since = reg.waitlist_since;
+	// The opt-in sessions have places of their own, so after the close the move from remote to just the extras is refused
+	// like the move to the full day. Someone already in person may still tick opt-ins (each session has its own deadline).
+	if (c.extras && reg.attendance === 'remote' && !registrationOpen(ev)) throw new UserError('Registration has closed, so places can no longer be added. Please email ' + notifyEmail(env) + '.', 409);
 	if (c.attendance === 'remote' || c.extras) {
 		place = null;
 		waitlist_since = null;
@@ -557,12 +616,41 @@ export async function calendarFile(env: Env, id: string, key: string) {
 	const sent = parseState(reg.calendar_state)[key];
 	const entry = sent ? { ...fresh, uid: sent.uid } : fresh;
 	const seq = !sent ? 0 : sent.hash === await hashEntry(entry) ? sent.seq : sent.seq + 1;
-	return buildIcs({ method: 'PUBLISH', entry, sequence: seq, organizer: { name: orgName(env), email: fromAddress(env) }, tz: ev.timezone });
+	const ics = buildIcs({ method: 'PUBLISH', entry, sequence: seq, organizer: { name: orgName(env), email: fromAddress(env) }, tz: ev.timezone });
+	// Named from the event and the entry so the day and the dinner do not both save as "event.ics".
+	return { ics, filename: `${ev.id}-${key}.ics`.replace(/[^A-Za-z0-9._-]+/g, '-') };
 }
 
 // ---------- admin ----------
 
-export async function promote(env: Env, id: string, what: 'event' | 'tour' | 'optin', sessionId = '') {
+/** The organiser confirms an unconfirmed registration for someone they know is coming: same place rules and the same
+ * email as pressing the button, opening with a line saying who confirmed it. Already confirmed is not an error.
+ * The organiser pastes the address the person gave them, so a typo in the form cannot send joining instructions to a
+ * stranger. If it differs, they must say the typed one was wrong (fix_email), and if it differs by more than one
+ * character, which may well be someone else's address, that its owner has agreed to be registered (permission). */
+export async function adminConfirm(env: Env, id: string, input: { email?: unknown; fix_email?: unknown; permission?: unknown }) {
+	const reg = await getRegistration(env, id);
+	if (!reg) throw new UserError('This registration no longer exists: it may have lapsed or been removed.', 404);
+	const email = cleanText(input.email, 254)?.toLowerCase() ?? '';
+	if (!EMAIL_RE.test(email)) throw new UserError('Please paste the email address the person gave you.', 400, 'email');
+	if (reg.status === 'confirmed') return confirm(env, id);
+	if (email !== reg.email) {
+		if (!truthy(input.fix_email)) throw new UserError(`That is not the address they registered with (${reg.email}). Confirm that theirs was mistyped to correct it.`, 409, 'email');
+		if (editDistance(email, reg.email) > 1 && !truthy(input.permission)) {
+			throw new UserError('The addresses differ by more than one character, so this may be someone else: confirm you have their permission to register them.', 409, 'email');
+		}
+		try {
+			const r = await env.DB.prepare("UPDATE registrations SET email = ?, updated_at = ? WHERE id = ? AND status = 'pending'").bind(email, nowIso(), id).run();
+			if (!r.meta.changes) return confirm(env, id);
+		} catch (e) {
+			if (/UNIQUE/i.test(String(e))) throw new UserError(`${email} already has a registration for this event. Remove one of the two first.`, 409, 'email');
+			throw e;
+		}
+	}
+	return confirm(env, id, { byOrganiser: true });
+}
+
+export async function promote(env: Env, id: string, what: 'event' | 'tour' | 'optin', sessionId = '', opts: { skipHosts?: boolean } = {}) {
 	const reg = await getRegistration(env, id);
 	if (!reg || reg.status !== 'confirmed') throw new UserError('Only confirmed registrations can be promoted.', 404);
 	const ev = await getEvent(env, reg.event_id);
@@ -586,12 +674,14 @@ export async function promote(env: Env, id: string, what: 'event' | 'tour' | 'op
 	// Someone still waiting for an in-person place gets instructions only once they have one.
 	const intro = { html: '<p><strong>Good news: a place has become available for you.</strong></p>', text: 'Good news: a place has become available for you.' };
 	if (!waitingForPlace(updated, sessions)) await sendInstructions(env, ev, updated, sessions, { intro });
-	await syncHosts(env, brand(env), ev, sessions);
+	if (!opts.skipHosts) await syncHosts(env, brand(env), ev, sessions);
 	return { ok: true as const };
 }
 
 /** Promotes people from the in-person waiting list, in waiting-list order, until the in-person maximum is reached
- * (for when a bigger room is found). Each gets the latest joining instructions, as with a single promotion. */
+ * (for when a bigger room is found). Each gets the latest joining instructions, as with a single promotion. A few at a
+ * time (each promotion is several queries and an email): `more` says to call again, as the admin page does. */
+const PROMOTE_CHUNK = 2;
 export async function promoteAll(env: Env, eventId: string) {
 	const ev = await getEvent(env, eventId);
 	const cap = await capacity(env, ev, await getSessions(env, ev.id));
@@ -599,9 +689,13 @@ export async function promoteAll(env: Env, eventId: string) {
 	const waiting = await env.DB.prepare(
 		`SELECT id FROM registrations WHERE event_id = ? AND status = 'confirmed' AND attendance = 'in_person' AND place = 'waitlist'
 		 ORDER BY waitlist_since, confirmed_at LIMIT ?`,
-	).bind(ev.id, room).all<{ id: string }>();
-	for (const r of waiting.results) await promote(env, r.id, 'event');
-	return { ok: true as const, promoted: waiting.results.length, still_waiting: cap.inPerson.waiting - waiting.results.length };
+	).bind(ev.id, Math.min(room, PROMOTE_CHUNK)).all<{ id: string }>();
+	for (const r of waiting.results) await promote(env, r.id, 'event', '', { skipHosts: true });
+	const still = cap.inPerson.waiting - waiting.results.length;
+	const more = still > 0 && room > waiting.results.length;
+	// Hosts get one list for the lot, once the last few have been promoted.
+	if (!more && waiting.results.length) await syncHosts(env, brand(env), ev, await getSessions(env, ev.id));
+	return { ok: true as const, promoted: waiting.results.length, still_waiting: still, more };
 }
 
 /** "I did not register": deletes a registration that has not been confirmed, from the link in the confirmation email,
@@ -631,7 +725,9 @@ export async function adminDelete(env: Env, id: string) {
 }
 
 export interface Audience {
-	attendance?: 'all' | 'in_person' | 'remote';
+	/** in_person: everyone coming in person; day: those with a day place (or waiting for one); extras: those coming only to opt-in sessions. */
+	attendance?: 'all' | 'in_person' | 'day' | 'remote' | 'extras';
+	optin?: string; // an opt-in session id: only people signed up for it (waiting for it too, with include_waitlist)
 	tour_id?: string; // a tour session id, 'none' for no tour, or undefined for any
 	below_version?: number; // only people whose last joining instructions are older than this version
 	include_waitlist?: boolean; // include people waiting for an in-person place
@@ -640,7 +736,8 @@ export interface Audience {
 export function parseAudience(v: unknown): Audience {
 	const a = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
 	return {
-		attendance: a.attendance === 'in_person' || a.attendance === 'remote' ? a.attendance : 'all',
+		attendance: ['in_person', 'day', 'remote', 'extras'].includes(a.attendance as string) ? (a.attendance as Audience['attendance']) : 'all',
+		optin: typeof a.optin === 'string' && a.optin ? a.optin : undefined,
 		tour_id: typeof a.tour_id === 'string' && a.tour_id ? a.tour_id : undefined,
 		below_version: Number.isInteger(a.below_version) && (a.below_version as number) > 0 ? (a.below_version as number) : undefined,
 		include_waitlist: a.include_waitlist === true,
@@ -650,7 +747,15 @@ export function parseAudience(v: unknown): Audience {
 export async function audienceRecipients(env: Env, eventId: string, a: Audience): Promise<RegistrationRow[]> {
 	const where = [`event_id = ?`, `status = 'confirmed'`];
 	const binds: unknown[] = [eventId];
-	if (a.attendance && a.attendance !== 'all') { where.push('attendance = ?'); binds.push(a.attendance); }
+	// "In person" includes people coming only to an opt-in session (no place); "day" and "extras" split them.
+	if (a.attendance === 'in_person') where.push(`attendance = 'in_person'`);
+	else if (a.attendance === 'day') where.push(`attendance = 'in_person' AND place IS NOT NULL`);
+	else if (a.attendance === 'extras') where.push(`attendance = 'in_person' AND place IS NULL`);
+	else if (a.attendance === 'remote') where.push(`attendance = 'remote'`);
+	if (a.optin) {
+		where.push(`attendance = 'in_person' AND ${listedIn('optins', '?')}`); binds.push(a.optin);
+		if (!a.include_waitlist) { where.push(`NOT ${listedIn('optins_waiting', '?')}`); binds.push(a.optin); }
+	}
 	if (!a.include_waitlist) where.push(`NOT (attendance = 'in_person' AND place = 'waitlist')`);
 	if (a.tour_id === 'none') where.push('tour_id IS NULL');
 	else if (a.tour_id) { where.push('tour_id = ?'); binds.push(a.tour_id); }
@@ -665,7 +770,8 @@ export async function audienceRecipients(env: Env, eventId: string, a: Audience)
 interface MessageRow {
 	id: string; event_id: string; subject: string; body_md: string; audience: string; marks_instructions_version: number | null;
 	status: string; scheduled_at: string | null; sent_at: string | null; recipients_count: number | null; error: string | null;
-	created_at: string; created_by: string | null;
+	created_at: string; created_by: string | null; claimed_until?: string | null; started_at?: string | null; recipient_ids?: string | null; attempts?: number;
+	piece_size?: number | null;
 }
 
 export async function createMessage(env: Env, eventId: string, input: Record<string, unknown>, createdBy: string) {
@@ -678,6 +784,8 @@ export async function createMessage(env: Env, eventId: string, input: Record<str
 	if (input.scheduled_at) {
 		const t = Date.parse(String(input.scheduled_at));
 		if (Number.isNaN(t)) throw new UserError('Invalid schedule time.');
+		// A time already gone is a mistake (the organiser asked for later, not now): sending at once would surprise them.
+		if (t < Date.now() - 60_000) throw new UserError('That time has passed. Choose a later time, or leave "Send at" empty to send now.');
 		if (t > Date.now() + 60_000) scheduled_at = new Date(t).toISOString();
 	}
 	const marks = Number.isInteger(input.marks_instructions_version) && (input.marks_instructions_version as number) > 0 ? (input.marks_instructions_version as number) : null;
@@ -686,50 +794,182 @@ export async function createMessage(env: Env, eventId: string, input: Record<str
 		`INSERT INTO messages (id, event_id, subject, body_md, audience, marks_instructions_version, status, scheduled_at, created_at, created_by)
 		 VALUES (?,?,?,?,?,?,?,?,?,?)`,
 	).bind(id, eventId, subject, body, JSON.stringify(audience), marks, 'scheduled', scheduled_at, nowIso(), createdBy).run();
-	if (!scheduled_at) await deliverMessage(env, id);
+	// The first piece goes now. If it fails, the message stays "sending" and the cron retries it: the admin page shows the
+	// error against it, rather than an error the organiser might answer by sending the message again.
+	if (!scheduled_at) {
+		try { await deliverMessage(env, id); } catch (e) { console.error('message first piece failed', id, e); }
+	}
 	return env.DB.prepare('SELECT * FROM messages WHERE id = ?').bind(id).first<MessageRow>();
 }
 
-/** Sends a message to its audience, recording each delivery. Safe to call from the cron: claims the row first. */
+/** How much one request (or cron run) sends, to stay inside the Workers free plan's 50 queries and 50 outbound requests
+ * per invocation: a message's plain copies go to Resend 100 at a time, but each copy carrying joining instructions and
+ * calendar files is a request and several queries of its own. PAID_PLAN=true allows ten times as many copies with
+ * joining instructions per piece (the paid plan allows 1,000 queries). */
+const MESSAGE_PLAIN_CHUNK = 100;
+const instructionsChunk = (env: Env) => (env.PAID_PLAN === 'true' ? 30 : 3);
+const CLAIM_MS = 4 * 60_000;
+/** A message whose pieces fail this many times running is marked failed (the admin page can resume it), so it cannot
+ * hold up the others. Counted when a piece is claimed, so a run killed outright counts too. */
+const MAX_ATTEMPTS = 5;
+/** Delivery records of a piece written but not yet sent: plain copies, and copies with joining instructions. */
+const PENDING = 'pending', PENDING_FULL = 'pending-full', REFUSED = 'refused';
+/** Copies that may or may not have gone (a retry found the key used for a different body, or the piece was too old to
+ * retry safely): never sent again, not counted as delivered, and shown on the admin page. */
+const UNCERTAIN = 'uncertain';
+const NOT_DELIVERED = `('${PENDING}', '${PENDING_FULL}', '${REFUSED}', '${UNCERTAIN}')`;
+/** Resend keeps idempotency keys for a day: a piece pending longer cannot be retried without risking a second copy. */
+const KEY_LIFETIME_MS = 23 * 3600_000;
+
+/**
+ * Sends the next piece of a message. The first piece goes when the message is sent or falls due; the cron Worker sends
+ * the rest, a piece per run. The audience is fixed when sending starts. Each piece is written down as pending before
+ * it is sent, and a piece that fails is retried as exactly that piece, with the same links and calendar stamps (fixed
+ * at the message's start) and the same idempotency key: if Resend took it the first time, it sends nothing again.
+ * Resend refusing a piece (one bad address refuses a whole batch) makes the pieces smaller, down to the one person,
+ * who is recorded as refused so everyone else still gets the message. A claim of a few minutes, with a token, stops two
+ * runs working on the same message, and only the claimant can finish it, so a cancel in between stands.
+ */
 export async function deliverMessage(env: Env, id: string) {
-	const claim = await env.DB.prepare(`UPDATE messages SET status='sending' WHERE id=? AND status = 'scheduled' RETURNING *` /* one claim only, even if two cron runs overlap */).bind(id).first<MessageRow>();
-	if (!claim) return;
+	const now = nowIso();
+	const mine = `${new Date(Date.now() + CLAIM_MS).toISOString()}#${randomToken(6)}`;
+	const claim = await env.DB.prepare(
+		`UPDATE messages SET status = 'sending', started_at = COALESCE(started_at, ?1), claimed_until = ?2, attempts = attempts + 1
+		 WHERE id = ?3 AND status IN ('scheduled', 'sending') AND (claimed_until IS NULL OR claimed_until < ?1) RETURNING *`,
+	).bind(now, mine, id).first<MessageRow>();
+	if (!claim) return { sent: 0, left: 0 };
+	const release = (sql: string, ...binds: unknown[]) => env.DB.prepare(`UPDATE messages SET claimed_until = NULL${sql} WHERE id = ? AND status = 'sending' AND claimed_until = ?`).bind(...binds, id, mine).run();
+	if ((claim.attempts ?? 0) > MAX_ATTEMPTS) {
+		await release(`, status = 'failed', error = COALESCE(error, 'Stopped after repeated failures.')`);
+		return { sent: 0, left: 0 };
+	}
+	let piece: RegistrationRow[] = [];
 	try {
-		const recipients = await audienceRecipients(env, claim.event_id, JSON.parse(claim.audience));
-		// "Include the latest joining instructions": the message opens a full copy of the instructions (with any calendar
-		// changes) for everyone who has a place; people still waiting for one get the message alone.
-		const latest = await latestInstructions(env, claim.event_id);
-		const withInstructions = !!latest && claim.marks_instructions_version === latest.version;
-		const ev = withInstructions ? await getEvent(env, claim.event_id) : null;
-		const sessions = await getSessions(env, claim.event_id);
-		const plain = recipients.filter((r) => !withInstructions || waitingForPlace(r, sessions));
-		const emails: OutgoingEmail[] = [];
-		for (const r of plain) emails.push(messageEmail(brand(env), r, claim, await manageUrl(env, r.id)));
-		const plainIds = await sendBatch(env, emails);
-		const ids = recipients.map((r) => (plain.includes(r) ? plainIds[plain.indexOf(r)] : null));
-		if (ev) for (const r of recipients) if (!plain.includes(r)) await sendInstructions(env, ev, r, sessions, { intro: { html: mdToHtml(claim.body_md), text: mdToText(claim.body_md) }, subject: claim.subject, kind: 'message_instructions' });
-		const stmts = recipients.map((r, i) =>
-			env.DB.prepare('INSERT INTO deliveries (registration_id, kind, message_id, instructions_version, sent_at, provider_id) VALUES (?,?,?,?,?,?)')
-				.bind(r.id, 'message', id, claim.marks_instructions_version, nowIso(), ids[i] ?? null));
-		if (claim.marks_instructions_version) {
-			for (const r of recipients) stmts.push(env.DB.prepare('UPDATE registrations SET instructions_version = MAX(instructions_version, ?) WHERE id = ?').bind(claim.marks_instructions_version, r.id));
+		let ids: string[];
+		if (claim.recipient_ids) ids = JSON.parse(claim.recipient_ids);
+		else {
+			ids = (await audienceRecipients(env, claim.event_id, JSON.parse(claim.audience))).map((r) => r.id);
+			await env.DB.prepare('UPDATE messages SET recipient_ids = ? WHERE id = ?').bind(JSON.stringify(ids), id).run();
 		}
-		stmts.push(env.DB.prepare(`UPDATE messages SET status='sent', sent_at=?, recipients_count=? WHERE id=?`).bind(nowIso(), recipients.length, id));
-		await env.DB.batch(stmts);
+		// A piece left pending for longer than Resend keeps its key cannot be retried safely: it may have gone.
+		await env.DB.prepare(`UPDATE deliveries SET provider_id = '${UNCERTAIN}' WHERE message_id = ? AND provider_id IN ('${PENDING}', '${PENDING_FULL}') AND sent_at < ?`)
+			.bind(id, new Date(Date.now() - KEY_LIFETIME_MS).toISOString()).run();
+		const rows = (await env.DB.prepare('SELECT registration_id AS r, provider_id AS p FROM deliveries WHERE message_id = ?').bind(id).all<{ r: string; p: string | null }>()).results;
+		const handled = new Set(rows.map((x) => x.r));
+		// A piece written down before, retried as it was recorded: who was in it, and whether they get the instructions.
+		const pendingPlain = rows.filter((x) => x.p === PENDING).map((x) => x.r).sort();
+		const pendingFull = rows.filter((x) => x.p === PENDING_FULL).map((x) => x.r).sort();
+		// Still registered and confirmed; anyone who has cancelled since is simply left out (with any pending row).
+		const regs = new Map((await confirmedRegs(env, claim.event_id)).map((r) => [r.id, r]));
+		// "Include the joining instructions": the version chosen when the message was written, even if a newer one is saved
+		// while it goes out. It opens a full copy of them for everyone with a place; people still waiting get the message alone.
+		const instructions = claim.marks_instructions_version
+			? await env.DB.prepare('SELECT version, subject, body_md FROM instructions WHERE event_id = ? AND version = ?').bind(claim.event_id, claim.marks_instructions_version).first<{ version: number; subject: string; body_md: string }>()
+			: null;
+		const sessions = await getSessions(env, claim.event_id);
+		const full = (r: RegistrationRow) => !!instructions && !waitingForPlace(r, sessions);
+		const todo = ids.filter((x) => !handled.has(x) && regs.has(x)).map((x) => regs.get(x)!);
+		let plainIds: string[], fullIds: string[];
+		if (pendingPlain.length || pendingFull.length) [plainIds, fullIds] = [pendingPlain, pendingFull];
+		else {
+			const size = claim.piece_size ?? Infinity;
+			const plainTodo = todo.filter((r) => !full(r));
+			const chosen = (plainTodo.length ? plainTodo.slice(0, Math.min(MESSAGE_PLAIN_CHUNK, size)) : todo.slice(0, Math.min(instructionsChunk(env), size))).map((r) => r.id).sort();
+			[plainIds, fullIds] = plainTodo.length ? [chosen, []] : [[], chosen];
+			// One statement whatever the piece's size (D1 allows 100 bound values a statement).
+			if (chosen.length) await env.DB.prepare(`INSERT INTO deliveries (registration_id, kind, message_id, instructions_version, sent_at, provider_id)
+				SELECT value, 'message', ?, ?, ?, ? FROM json_each(?)`).bind(id, claim.marks_instructions_version, nowIso(), plainIds.length ? PENDING : PENDING_FULL, JSON.stringify(chosen)).run();
+		}
+		piece = [...plainIds, ...fullIds].filter((x) => regs.has(x)).map((x) => regs.get(x)!);
+		const at = Date.parse(claim.started_at ?? now);
+		// Recorded as sent in two statements however many people: the delivery records and their instructions version.
+		const uncertain = (people: string[]) => env.DB.prepare(`UPDATE deliveries SET provider_id = '${UNCERTAIN}' WHERE message_id = ? AND provider_id IN ('${PENDING}', '${PENDING_FULL}') AND registration_id IN (SELECT value FROM json_each(?))`)
+			.bind(id, JSON.stringify(people)).run();
+		const done = (people: string[]) => env.DB.batch([
+			env.DB.prepare(`UPDATE deliveries SET provider_id = 'sent', sent_at = ? WHERE message_id = ? AND provider_id IN ('${PENDING}', '${PENDING_FULL}') AND registration_id IN (SELECT value FROM json_each(?))`)
+				.bind(nowIso(), id, JSON.stringify(people)),
+			...(claim.marks_instructions_version ? [env.DB.prepare('UPDATE registrations SET instructions_version = MAX(instructions_version, ?) WHERE id IN (SELECT value FROM json_each(?))')
+				.bind(claim.marks_instructions_version, JSON.stringify(people))] : []),
+		]);
+		const plain = piece.filter((r) => plainIds.includes(r.id)), withInstr = piece.filter((r) => fullIds.includes(r.id));
+		if (plain.length) {
+			const emails: OutgoingEmail[] = [];
+			for (const r of plain) emails.push(messageEmail(brand(env), r, claim, await manageUrl(env, r.id, at)));
+			// The key is the piece as recorded, even if someone in it has cancelled since: if Resend took it, a retry under the
+			// same key sends nothing again, and a retry that differs (fewer people) leaves them marked uncertain (see email.ts).
+			try {
+				await sendBatch(env, emails, `msg-${id}-${(await sha256(plainIds.join(','))).slice(0, 24)}`);
+				await done(plain.map((r) => r.id));
+			} catch (e) {
+				if (!(e instanceof IdempotencyConflict)) throw e;
+				await uncertain(plain.map((r) => r.id));
+			}
+		}
+		if (withInstr.length) {
+			const ev = await getEvent(env, claim.event_id);
+			for (const r of withInstr) {
+				try {
+					await sendInstructions(env, ev, r, sessions, { intro: { html: mdToHtml(claim.body_md), text: mdToText(claim.body_md) }, subject: claim.subject, kind: 'message_instructions',
+						idempotencyKey: `msg-${id}-${r.id}`, instructions: instructions!, at });
+					await done([r.id]);
+				} catch (e) {
+					// Their calendar is not marked as updated either: the next email that carries it catches up.
+					if (!(e instanceof IdempotencyConflict)) throw e;
+					await uncertain([r.id]);
+				}
+			}
+		}
+		// Pending rows of people who have since cancelled went with their registrations.
+		const left = todo.filter((r) => !piece.includes(r)).length;
+		// Pieces stay small until the refused address they are narrowing down to has been set aside (then full size again).
+		if (left > 0) await release(`, error = NULL, attempts = 0`);
+		else {
+			await release(`, status = 'sent', sent_at = ?, error = NULL, attempts = 0,
+				recipients_count = (SELECT COUNT(DISTINCT registration_id) FROM deliveries WHERE message_id = ? AND provider_id NOT IN ${NOT_DELIVERED})`, nowIso(), id);
+		}
+		return { sent: piece.length, left };
 	} catch (e) {
-		await env.DB.prepare(`UPDATE messages SET status='failed', error=? WHERE id=?`).bind(String(e).slice(0, 500), id).run();
+		if (/Resend error 422/.test(String(e)) && piece.length) {
+			// Refused, so nothing in the piece went: try smaller pieces, and at one person, record them as refused.
+			if (piece.length > 1) {
+				await env.DB.prepare(`DELETE FROM deliveries WHERE message_id = ? AND provider_id IN ('${PENDING}', '${PENDING_FULL}')`).bind(id).run();
+				await release(`, piece_size = ?, attempts = attempts - 1, error = ?`, Math.max(1, Math.ceil(piece.length / 10)), String(e).slice(0, 500));
+			} else {
+				await env.DB.prepare(`UPDATE deliveries SET provider_id = ? WHERE message_id = ? AND provider_id IN ('${PENDING}', '${PENDING_FULL}')`).bind(REFUSED, id).run();
+				// Refused by itself before anyone has had it, twice: the refusal is about the message (its sender, say), not
+				// an address, so it stops here with its error rather than setting everyone aside.
+				const tally = await env.DB.prepare(`SELECT SUM(provider_id = '${REFUSED}') AS refused, SUM(provider_id NOT IN ${NOT_DELIVERED}) AS sent FROM deliveries WHERE message_id = ?`).bind(id).first<{ refused: number; sent: number }>();
+				if ((tally?.refused ?? 0) >= 2 && !(tally?.sent ?? 0)) await release(`, status = 'failed', error = ?`, `${String(e).slice(0, 400)}: refused for everyone tried, so probably not about an address (check EMAIL_FROM and the message)`);
+				else await release(`, attempts = attempts - 1, piece_size = NULL, error = ?`, `${String(e).slice(0, 400)} (one address refused; the rest carry on)`);
+			}
+			return { sent: 0, left: 1 };
+		}
+		// Still 'sending', pending piece and all, for the cron to retry; the error shows on the admin page.
+		await release(`, error = ?`, String(e).slice(0, 500));
 		throw e;
 	}
 }
 
+/** A failed message carries on from where it stopped: its delivery records say who already has it. */
+export async function resumeMessage(env: Env, id: string) {
+	const r = await env.DB.prepare(`UPDATE messages SET status = 'sending', attempts = 0, claimed_until = NULL WHERE id = ? AND status = 'failed' RETURNING id`).bind(id).first();
+	if (!r) throw new UserError('Only a message that failed can be resumed.', 409);
+	await deliverMessage(env, id).catch((e) => console.error('resumed message failed again', id, e));
+	return { ok: true as const };
+}
+
+/** A scheduled message, or the rest of one part sent (its delivery records say who already has it). */
 export async function cancelMessage(env: Env, id: string) {
-	const r = await env.DB.prepare(`UPDATE messages SET status='cancelled' WHERE id=? AND status='scheduled' RETURNING id`).bind(id).first();
-	if (!r) throw new UserError('Only scheduled messages that have not started sending can be cancelled.', 409);
+	const now = nowIso();
+	const r = await env.DB.prepare(`UPDATE messages SET status='cancelled', recipients_count = (SELECT COUNT(DISTINCT registration_id) FROM deliveries WHERE message_id = ?1 AND provider_id NOT IN ${NOT_DELIVERED})
+		WHERE id = ?1 AND (status = 'scheduled' OR (status = 'sending' AND (claimed_until IS NULL OR claimed_until < ?2))) RETURNING id`).bind(id, now).first();
+	if (!r) throw new UserError('Only messages that have not finished sending can be cancelled, and not while a part is going out: try again in a few minutes.', 409);
 	return { ok: true as const };
 }
 
 export async function listMessages(env: Env, eventId: string) {
-	return (await env.DB.prepare('SELECT * FROM messages WHERE event_id = ? ORDER BY COALESCE(sent_at, scheduled_at, created_at) DESC').bind(eventId).all<MessageRow>()).results;
+	return (await env.DB.prepare(`SELECT m.*, (SELECT COUNT(*) FROM deliveries d WHERE d.message_id = m.id AND d.provider_id = '${UNCERTAIN}') AS uncertain
+		FROM messages m WHERE m.event_id = ? ORDER BY COALESCE(m.sent_at, m.scheduled_at, m.created_at) DESC`).bind(eventId).all<MessageRow & { uncertain: number }>()).results;
 }
 
 export async function listInstructions(env: Env, eventId: string) {
@@ -760,9 +1000,15 @@ export async function updateSettings(env: Env, eventId: string, input: Record<st
 	const max = input.in_person_max === undefined ? ev.in_person_max : Number(input.in_person_max);
 	if (!Number.isInteger(max) || max < 0 || max > 10000) throw new UserError('In-person maximum must be a whole number.');
 	const deadline = input.deadline === undefined ? ev.deadline : optDate(input.deadline, 'deadline') ?? ev.deadline;
+	// As when the event is created or edited: a deadline after the end would leave registration open after the event.
+	if (Date.parse(deadline) !== Date.parse(ev.deadline) && Date.parse(deadline) > Date.parse(ev.ends_at)) throw new UserError('Registration must close before the event ends.');
 	const travel = input.travel_minutes === undefined ? ev.travel_minutes : Number(input.travel_minutes);
 	if (!Number.isInteger(travel) || travel < 0 || travel > 1440) throw new UserError('Travel time must be a whole number of minutes.');
-	await env.DB.prepare('UPDATE events SET in_person_max=?, deadline=?, travel_minutes=? WHERE id=?').bind(max, deadline, travel, eventId).run();
+	const hostMinutes = input.host_list_minutes === undefined ? ev.host_list_minutes ?? 0 : Number(input.host_list_minutes);
+	if (!Number.isInteger(hostMinutes) || hostMinutes < 0 || hostMinutes > 1440) throw new UserError('The gap between host lists must be a whole number of minutes, up to a day.');
+	await env.DB.prepare('UPDATE events SET in_person_max=?, deadline=?, travel_minutes=?, host_list_minutes=? WHERE id=?').bind(max, deadline, travel, hostMinutes, eventId).run();
+	// A shorter gap can release lists held back under the old one (the cron only looks at events with a gap).
+	if (hostMinutes < (ev.host_list_minutes ?? 0)) await syncHosts(env, brand(env), { ...ev, host_list_minutes: hostMinutes }, await getSessions(env, ev.id));
 	// A new travel time changes everyone's "time to leave" reminder, which is not worth an email to every attendee:
 	// like a quiet session save, each person's calendar catches up with their next email.
 	return { ok: true as const, calendar_updates: 0 };
@@ -784,6 +1030,14 @@ export async function updateSessions(env: Env, eventId: string, input: Record<st
 		if (e.starts_at !== undefined) s.starts_at = optDate(e.starts_at, 'start time') ?? s.starts_at;
 		if (e.ends_at !== undefined) s.ends_at = optDate(e.ends_at, 'end time') ?? s.ends_at;
 		if (Date.parse(s.ends_at) <= Date.parse(s.starts_at)) throw new UserError(`${s.label}: the end must be after the start.`);
+		// The rule for adding a session, a day's slack either side; only for a time changed now, so an old session
+		// outside it can still have its other details edited.
+		const old = sessions.find((x) => x.id === s.id)!;
+		// Instants, not strings: seeded times are stored without milliseconds.
+		if ((Date.parse(s.starts_at) !== Date.parse(old.starts_at) || Date.parse(s.ends_at) !== Date.parse(old.ends_at))
+			&& (Date.parse(s.ends_at) < Date.parse(ev.starts_at) - 86400_000 || Date.parse(s.starts_at) > Date.parse(ev.ends_at) + 86400_000)) {
+			throw new UserError(`${s.label}: the session must be during the event, give or take a day.`);
+		}
 		if (e.location !== undefined) s.location = cleanLine(e.location, 300);
 		if (e.online_url !== undefined) {
 			const u = cleanText(e.online_url, 500);
@@ -812,32 +1066,84 @@ export async function updateSessions(env: Env, eventId: string, input: Record<st
 		return { ok: true as const, calendar_updates: n };
 	}
 	const stmts = [];
+	const released: SessionRow[] = [];
 	for (const s of next) {
 		const old = sessions.find((x) => x.id === s.id)!;
 		if (JSON.stringify(old) === JSON.stringify(s)) continue;
 		stmts.push(env.DB.prepare('UPDATE sessions SET starts_at=?, ends_at=?, location=?, online_url=?, host_name=?, host_email=?, capacity=?, booking_deadline=? WHERE id=?')
 			.bind(s.starts_at, s.ends_at, s.location, s.online_url, s.host_name, s.host_email, s.capacity, s.booking_deadline, s.id));
 		// A new host gets the whole list, not a diff against the previous host's.
-		if (old.host_email !== s.host_email) stmts.push(env.DB.prepare('DELETE FROM host_snapshots WHERE session_id=?').bind(s.id));
+		if (old.host_email !== s.host_email) {
+			stmts.push(env.DB.prepare('DELETE FROM host_snapshots WHERE session_id=?').bind(s.id));
+			// Only a host who was actually sent a list has anything to delete.
+			if (old.host_email && await env.DB.prepare('SELECT 1 FROM host_snapshots WHERE session_id=?').bind(s.id).first()) released.push(old);
+		}
 	}
 	if (stmts.length) await env.DB.batch(stmts);
+	// Each note on its own: the save is done, so one failed send must not stop the others or the updates below.
+	for (const old of released) {
+		try { await sendEmail(env, hostReleasedEmail(brand(env), ev, old)); } catch (e) { console.error('replaced-host note failed', old.id, e); }
+	}
 	// "Save without emailing": calendars aren't updated now. Each person's entries catch up with the next email that
 	// carries their calendar (joining instructions, a message that includes them, or a change of their own).
-	const updates = input.quiet === true ? 0 : await resyncCalendars(env, ev.id);
+	const updates = input.quiet === true ? { sent: 0, queued: 0 } : await resyncCalendars(env, ev.id);
 	await syncHosts(env, brand(env), ev, await getSessions(env, ev.id));
-	return { ok: true as const, calendar_updates: updates };
+	return { ok: true as const, calendar_updates: updates.sent + updates.queued, calendar_queued: updates.queued };
 }
 
 const confirmedRegs = async (env: Env, eventId: string) =>
 	(await env.DB.prepare(`SELECT * FROM registrations WHERE event_id = ? AND status = 'confirmed'`).bind(eventId).all<RegistrationRow>()).results;
 
+/** Calendar updates sent in the request that changed the sessions; the rest are queued for the cron Worker. */
+const CALENDAR_CHUNK = 8;
+
+/** Works out who needs a calendar update (no queries), sends the first few and queues the rest. Returns both counts. */
 async function resyncCalendars(env: Env, eventId: string) {
 	const ev = await getEvent(env, eventId);
 	const sessions = await getSessions(env, ev.id);
-	let n = 0;
+	const changed: RegistrationRow[] = [];
 	for (const r of await confirmedRegs(env, ev.id)) {
 		// People who have never been sent a calendar (e.g. still waiting) are skipped by the plan itself.
-		if (await syncCalendar(env, ev, r, sessions)) n++;
+		const p = await plan(parseState(r.calendar_state), entriesFor(env, ev, sessions, r));
+		if (p.requests.length || p.cancels.length) changed.push(r);
+	}
+	// Everyone queued first, so a failure part way leaves the rest for the cron rather than nowhere.
+	for (let i = 0; i < changed.length; i += 90) {
+		const ids = changed.slice(i, i + 90).map((r) => r.id);
+		await env.DB.prepare(`UPDATE registrations SET calendar_dirty = 1 WHERE id IN (${ids.map(() => '?').join(',')})`).bind(...ids).run();
+	}
+	let sent = 0;
+	for (const r of changed.slice(0, CALENDAR_CHUNK)) if (await calendarFromQueue(env, ev, { ...r, calendar_dirty: 1 }, sessions)) sent++;
+	return { sent, queued: changed.length - sent };
+}
+
+/**
+ * One queued calendar update. The person is claimed first (their flag cleared only if it is still what was read), so
+ * a request and the cron cannot both send it, and the update is planned from the row as claimed. Its links and stamps
+ * are fixed to the day and its idempotency key comes from the planned calendar, so a retry is the same email, sent
+ * once. A failure puts the person back in the queue; after a few, they are left for their next email to catch up.
+ */
+async function calendarFromQueue(env: Env, ev: EventRow, r: RegistrationRow, sessions: SessionRow[]) {
+	const was = r.calendar_dirty ?? 1;
+	const claimed = await env.DB.prepare('UPDATE registrations SET calendar_dirty = 0 WHERE id = ? AND calendar_dirty = ? RETURNING *').bind(r.id, was).first<RegistrationRow>();
+	if (!claimed) return false;
+	try {
+		return claimed.status === 'confirmed' && await syncCalendar(env, ev, claimed, sessions, { at: Math.floor(Date.now() / 86400_000) * 86400_000 });
+	} catch (e) {
+		console.error('calendar update failed', r.id, e);
+		await env.DB.prepare('UPDATE registrations SET calendar_dirty = ? WHERE id = ? AND calendar_dirty = 0').bind(was >= 3 ? 0 : was + 1, r.id).run();
+		return false;
+	}
+}
+
+/** The cron's share of calendar updates: a few queued people per run. Each is re-planned, so a later change is included. */
+async function runCalendarQueue(env: Env, limit = CALENDAR_CHUNK) {
+	const dirty = (await env.DB.prepare('SELECT * FROM registrations WHERE calendar_dirty > 0 ORDER BY event_id, calendar_dirty LIMIT ?').bind(limit).all<RegistrationRow>()).results;
+	let n = 0;
+	for (const evId of [...new Set(dirty.map((r) => r.event_id))]) {
+		const ev = await getEvent(env, evId);
+		const sessions = await getSessions(env, evId);
+		for (const r of dirty.filter((x) => x.event_id === evId)) if (await calendarFromQueue(env, ev, r, sessions)) n++;
 	}
 	return n;
 }
@@ -887,6 +1193,13 @@ export async function sentLogMarkdown(env: Env, eventId: string): Promise<string
 			`- Recipients: ${m.recipients_count ?? '–'}`, `- Audience: \`${m.audience}\``,
 			`- Counts as joining instructions version: ${m.marks_instructions_version ?? '–'}`, '', m.body_md, '');
 	}
+	// Totals only, no names: enough to draft "the most popular choice was…" without the log naming anyone.
+	const polls = (await adminPolls(env, eventId)).polls;
+	if (polls.length) out.push('## Polls', '');
+	for (const p of polls) {
+		out.push(`### ${p.question}`, '', `- ${p.open ? 'Open' : 'Closed'}; ${p.tally.voters} answer(s)${p.tally.nothing ? `, ${p.tally.nothing} would join none of the options` : ''}`,
+			...p.tally.results.map((r) => `- ${r.label}: ${r.willing} would join (${r.first} first choice), ${r.out} would stay at home`), '');
+	}
 	return out.join('\n');
 }
 
@@ -894,14 +1207,12 @@ export async function sentLogMarkdown(env: Env, eventId: string): Promise<string
 
 export async function runScheduled(env: Env, now = Date.now()) {
 	const nowS = new Date(now).toISOString();
-	const report = { messagesSent: 0, holdsWarned: 0, holdsExpired: 0, retentionDeleted: 0 };
-
-	const due = (await env.DB.prepare(`SELECT id FROM messages WHERE status='scheduled' AND scheduled_at <= ?`).bind(nowS).all<{ id: string }>()).results;
-	for (const m of due) {
-		try { await deliverMessage(env, m.id); report.messagesSent++; } catch (e) { console.error('message failed', m.id, e); }
-	}
+	const report = { messagesSent: 0, calendarUpdates: 0, holdsWarned: 0, holdsExpired: 0, retentionDeleted: 0 };
+	await recordCronRun(env, now);
 
 	const pending = (await env.DB.prepare(`SELECT * FROM registrations WHERE status='pending'`).all<RegistrationRow>()).results;
+	// One warning per event per run, however many holds reached half way: made-up registrations must not flood the organiser.
+	const warn = new Map<string, RegistrationRow[]>();
 	for (const r of pending) {
 		if (!r.hold_expires_at) continue;
 		const exp = Date.parse(r.hold_expires_at), start = Date.parse(r.created_at);
@@ -911,15 +1222,26 @@ export async function runScheduled(env: Env, now = Date.now()) {
 		} else if (!r.hold_warned_at && now >= start + (exp - start) / 2) {
 			// Marked first: a failed send must not block the deletions below or repeat every five minutes.
 			await env.DB.prepare('UPDATE registrations SET hold_warned_at=? WHERE id=?').bind(nowS, r.id).run();
-			try {
-				const ev = await getEvent(env, r.event_id);
-				await sendEmail(env, notification(brand(env), `Unconfirmed registration half way to expiry: ${ev.title}`, [
-					`${r.name} registered at ${ukDateTime(r.created_at, ev.timezone)} but has not confirmed their email address.`,
-					`Their ${r.attendance === 'in_person' ? (r.place === 'place' ? 'held in-person place' : r.place === 'waitlist' ? 'waiting-list request' : 'sign-up for the optional sessions') : 'remote registration'} will be deleted at ${ukDateTime(r.hold_expires_at, ev.timezone)} unless they confirm.`,
-				]));
-				report.holdsWarned++;
-			} catch (e) { console.error('hold warning failed', r.id, e); }
+			warn.set(r.event_id, [...(warn.get(r.event_id) ?? []), r]);
 		}
+	}
+	for (const [eventId, regs] of warn) {
+		try {
+			const ev = await getEvent(env, eventId);
+			const what = (r: RegistrationRow) => r.attendance === 'in_person' ? (r.place === 'place' ? 'held in-person place' : r.place === 'waitlist' ? 'registration (waiting list, or a place if one is free when they confirm)' : 'sign-up for the optional sessions') : 'remote registration';
+			const shown = regs.slice(0, 20);
+			await sendEmail(env, notification(brand(env), regs.length === 1 ? `Unconfirmed registration half way to expiry: ${ev.title}` : `${regs.length} unconfirmed registrations half way to expiry: ${ev.title}`, [
+				...shown.map((r) => `${r.name} registered at ${ukDateTime(r.created_at, ev.timezone)} but has not confirmed their email address. Their ${what(r)} will be deleted at ${ukDateTime(r.hold_expires_at!, ev.timezone)} unless they confirm.`),
+				...(regs.length > shown.length ? [`And ${regs.length - shown.length} more. Many unconfirmed registrations at once can mean someone is registering made-up addresses: see the admin page.`] : []),
+			]));
+			report.holdsWarned += regs.length;
+		} catch (e) { console.error('hold warning failed', eventId, e); }
+	}
+
+	// Host lists held back by an event's host_list_minutes go out once their interval has passed.
+	const throttled = (await env.DB.prepare('SELECT * FROM events WHERE host_list_minutes > 0 AND ends_at > ?').bind(nowS).all<EventRow>()).results;
+	for (const ev of throttled) {
+		try { await syncHosts(env, brand(env), ev, await getSessions(env, ev.id), now); } catch (e) { console.error('host lists failed', ev.id, e); }
 	}
 
 	// Retention: registrations, their delivery records and host lists are deleted 30 days after the event ends.
@@ -928,6 +1250,27 @@ export async function runScheduled(env: Env, now = Date.now()) {
 	report.retentionDeleted = r.meta.changes ?? 0;
 	await env.DB.prepare(`DELETE FROM host_snapshots WHERE session_id IN (SELECT s.id FROM sessions s JOIN events e ON e.id = s.event_id WHERE e.ends_at <= ?)`).bind(cutoff).run();
 	await env.DB.prepare(`UPDATE sessions SET host_name = NULL, host_email = NULL WHERE event_id IN (SELECT id FROM events WHERE ends_at <= ?)`).bind(cutoff).run();
+	// Polls go too: suggestions are registrants' own words, and decisions name an organiser's address. Their totals are
+	// in the sent log for anyone who needs them afterwards.
+	await env.DB.prepare(`DELETE FROM polls WHERE event_id IN (SELECT id FROM events WHERE ends_at <= ?)`).bind(cutoff).run();
 	await env.DB.prepare('DELETE FROM dev_outbox WHERE created_at <= ?').bind(cutoff).run();
+	// Messages can name attendees, and both they and joining instructions name the organiser who wrote them: messages
+	// go, and instructions (kept so the event can be cloned) lose their author.
+	await env.DB.prepare(`DELETE FROM messages WHERE event_id IN (SELECT id FROM events WHERE ends_at <= ?)`).bind(cutoff).run();
+	await env.DB.prepare(`UPDATE instructions SET created_by = NULL WHERE created_by IS NOT NULL AND event_id IN (SELECT id FROM events WHERE ends_at <= ?)`).bind(cutoff).run();
+
+	// Last, so holds and retention always run: one piece of a message per run (a big message finishes over a few runs),
+	// a message falling due first, then the one in progress that has failed least and started first; then queued
+	// calendar updates, a couple alongside a message piece or a fuller share without one. That keeps a run inside the
+	// free plan's limits.
+	try {
+		const due = await env.DB.prepare(`SELECT id FROM messages WHERE (status = 'scheduled' AND scheduled_at <= ?1) OR (status = 'sending' AND (claimed_until IS NULL OR claimed_until < ?1))
+			ORDER BY status = 'sending', attempts, COALESCE(started_at, scheduled_at) LIMIT 1`).bind(nowS).first<{ id: string }>();
+		if (due) report.messagesSent += (await deliverMessage(env, due.id)).sent;
+	} catch (e) { console.error('sending failed', e); }
+	try {
+		report.calendarUpdates = await runCalendarQueue(env, report.messagesSent ? 2 : CALENDAR_CHUNK);
+	} catch (e) { console.error('sending failed', e); }
+
 	return report;
 }

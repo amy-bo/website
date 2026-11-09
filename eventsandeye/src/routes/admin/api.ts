@@ -1,16 +1,19 @@
 // Events&I – Copyright (C) 2026 andeye Ltd. AGPL-3.0, see ../../../LICENSE.
+import { setupChecks } from '../../health';
 import { handle, readJson } from '../../http';
 import { mdToHtml } from '../../markdown';
+import { adminPollAction, adminPolls } from '../../polls';
+import { eventAction, listEvents } from '../../setup';
 import {
-	addInstructions, adminDelete, adminSummary, audienceRecipients, cancelMessage, createMessage, listInstructions, listMessages, parseAudience,
-	promote, promoteAll, registrationsCsv, sentLogMarkdown, updateSessions, updateSettings,
+	addInstructions, adminConfirm, adminDelete, adminSummary, audienceRecipients, cancelMessage, createMessage, listInstructions, listMessages, parseAudience,
+	promote, promoteAll, registrationsCsv, resumeMessage, sentLogMarkdown, updateSessions, updateSettings,
 } from '../../rsvp';
 
 const ev = (request: Request) => new URL(request.url).searchParams.get('event') || '';
 /** For Content-Disposition filenames: a quote in an event id would break the header. */
 const fileSafe = (s: string) => s.replace(/[^A-Za-z0-9._-]/g, '_');
 
-export const summary = handle(async ({ env, request }) => adminSummary(env, ev(request)));
+export const summary = handle(async ({ env, request }) => ({ ...(await adminSummary(env, ev(request))), setup: await setupChecks(env, request) }));
 
 export const settings = handle(async ({ env, request }) => {
 	const body = await readJson(request);
@@ -22,8 +25,11 @@ export const sessions = handle(async ({ env, request }) => {
 	return updateSessions(env, String(body.event || ''), body);
 });
 
+/** Promote someone from a waiting list, or (what: 'confirm') confirm an unconfirmed registration for someone the
+ * organiser knows is coming. Confirming shares this endpoint so host sites need no new function file. */
 export const promoteHandler = handle(async ({ env, request }) => {
 	const body = await readJson(request);
+	if (body.what === 'confirm') return adminConfirm(env, String(body.id || ''), body);
 	return promote(env, String(body.id || ''), body.what === 'tour' ? 'tour' : body.what === 'optin' ? 'optin' : 'event', String(body.session || ''));
 });
 
@@ -61,6 +67,7 @@ export const messagesPost = handle(async ({ env, request, data }) => {
 	const body = await readJson(request);
 	const event = String(body.event || '');
 	if (body.dry_run === true) return { ok: true, count: (await audienceRecipients(env, event, parseAudience(body.audience))).length };
+	if (body.action === 'resume') return resumeMessage(env, String(body.id || ''));
 	return { ok: true, message: await createMessage(env, event, body, data.adminEmail || 'admin') };
 });
 export const messagesCancel = handle(async ({ env, request }) => cancelMessage(env, String((await readJson(request)).id || '')));
@@ -76,3 +83,14 @@ export const preview = handle(async ({ request }) => {
 	const body = await readJson(request);
 	return { ok: true, html: mdToHtml(typeof body.body_md === 'string' ? body.body_md : '') };
 });
+
+export const pollsGet = handle(async ({ env, request }) => adminPolls(env, ev(request)));
+/** Create, edit or delete polls and options, and decide suggestions. Nobody is emailed. */
+export const pollsPost = handle(async ({ env, request, data }) => {
+	const body = await readJson(request);
+	return adminPollAction(env, { ...body, by: data.adminEmail || 'admin' });
+});
+
+export const eventsGet = handle(async ({ env, request }) => ({ ...(await listEvents(env)), setup: await setupChecks(env, request) }));
+/** Create, edit or clone events, and add or remove sessions. Nobody is emailed. */
+export const eventsPost = handle(async ({ env, request, data }) => eventAction(env, await readJson(request), data.adminEmail || 'admin'));
