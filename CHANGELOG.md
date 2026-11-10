@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-11-10
 
+- [x] **"Please don't share images of me" tick box** — on the registration form and the manage page (Events&I migration 0011, applied by the production deploy). Anyone confirmed who ticks it is emailed: best endeavours to keep them out of published photos and recordings, an offer to check official media against a photo they send, camera off if online, and that other attendees' photos are outside our control. Hello@ is emailed too, and the admin page tags and counts them. The privacy notice says the same.
 - [x] **Unconfirmed registrations kept after their hold lapses** — Events&I no longer deletes them: the place is released, but the person (or the organiser, with "Confirm for them") can still confirm later. Privacy page updated to match. Made in the vendored copy; still to carry upstream to andeyePro/eventsandeye.
 - [x] **Event page: badge and refreshments cut-off** — the When card says "Register by 16:00 on Tuesday 10 November if you'd like a printed name badge and free refreshments at Imperial." instead of the old 6 November deadline. The form's own "Registration closes …" line follows the deadline set on the admin page, so registration can stay open later without editing the page.
 - [x] **Admin set-up check as a traffic light** — the Events&I set-up check on /admin/rsvps/ is now always shown, green, amber, red or grey (not checked), instead of disappearing when all is well. Made in the vendored copy; still to carry upstream to andeyePro/eventsandeye.
