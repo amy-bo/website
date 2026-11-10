@@ -2,6 +2,10 @@
 
 Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
+## 2026-11-10
+
+- [x] **Admin set-up check as a traffic light** — the Events&I set-up check on /admin/rsvps/ is now always shown, green, amber, red or grey (not checked), instead of disappearing when all is well. Made in the vendored copy; still to carry upstream to andeyePro/eventsandeye.
+
 ## 2026-11-09
 
 - [x] **Homepage tagline matches the mission statement** — "Let's end world hunger, poverty, and the biodiversity and climate crises by making delicious, wholesome, sustainable protein universally accessible." The 25 October rewrite changed About but left the homepage on the old wording.
