@@ -19,6 +19,19 @@ ADMIN_EMAILS = "hello@amybo.org"
 # The "AMYBO admin" Access application requires an authenticator app itself (Authentication → MFA → Customize).
 # Its tokens don't report that, so the code relies on the application's setting. Keep that setting on.
 ACCESS_MFA = "application"
+# Name badges on the admin page (Events&I): the Avery 4822 holders' 90 × 60 mm inserts, AMYBO's logo in the top corner
+# with EVENT'26 under it, names in Montserrat SemiBold, affiliations in AMYBO blue, the dots on i and j in AMYBO green.
+BADGE_TEMPLATE = "avery-4822"
+BADGE_LOGO_URL = "/badges/amybo-logo-black.svg"
+BADGE_LOGO_POSITION = "corner"
+BADGE_TAG = "EVENT’26"
+BADGE_TAG_COLOUR = "#007CBB"
+BADGE_TAG_WIDTH = "0.64"
+BADGE_FONT_URL = "/fonts/Montserrat-SemiBold.woff2"
+BADGE_FONT_FAMILY = "Montserrat SemiBold"
+BADGE_COLOUR = "#000000"
+BADGE_AFFILIATION_COLOUR = "#007CBB"
+BADGE_ACCENT_COLOUR = "#87BD25"
 
 [[d1_databases]]
 binding = "DB"
