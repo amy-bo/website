@@ -54,7 +54,7 @@ Cloudflare, Resend and Google act as data processors on our behalf. Where they p
 
 ## How long we keep it
 
-Unconfirmed registrations are deleted automatically if the email address is not confirmed in time. All registrations for an event, the record of emails sent to them, the lists sent to session hosts and the hosts' own contact details are **deleted from our registration system 30 days after the event ends**. The database keeps a point-in-time backup for up to 30 days more (Cloudflare D1 Time Travel), so a deleted record can be restored from backup for that long and is then gone. Notification emails about registrations in our organisers' mailbox are deleted within 30 days after the event. Resend keeps its own delivery logs under its retention policy.
+An unconfirmed registration stops holding a place if the email address is not confirmed in time; it is kept, so it can still be confirmed, until it is deleted with the rest. All registrations for an event, the record of emails sent to them, the lists sent to session hosts and the hosts' own contact details are **deleted from our registration system 30 days after the event ends**. The database keeps a point-in-time backup for up to 30 days more (Cloudflare D1 Time Travel), so a deleted record can be restored from backup for that long and is then gone. Notification emails about registrations in our organisers' mailbox are deleted within 30 days after the event. Resend keeps its own delivery logs under its retention policy.
 
 ## Withdrawing consent and your rights
 
