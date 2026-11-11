@@ -2,6 +2,10 @@
 
 Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
+## 2026-11-11
+
+- [x] **Name badges: a second print run** — The Name badges section of the admin page has "Only people confirmed, promoted or edited since": enter when you last printed to get just the new badges and as many blanks as you type, instead of the whole list again (Events&I).
+
 ## 2026-11-10
 
 - [x] **Avery 4822 badges line up** — the 4822 sheet layout now comes from Avery's own Word template (first column 10 mm in, a 10 mm gap between columns, 28.5 mm down, from Avery's Design & Print template) instead of a guessed centred grid with no gap, which printed out of line.
