@@ -1,0 +1,72 @@
+---
+// Live, anonymous totals for a poll whose results an organiser has made public (Events&I: GET /api/rsvp/poll-results).
+// Counts only: the feed carries no names, and neither does this page.
+interface Props { event: string; every?: number }
+const { event, every = 10 } = Astro.props;
+---
+<div class="not-content poll-results" data-event={event} data-every={every}>
+	<h2 class="pr-q" hidden></h2>
+	<p class="pr-status" role="status">Loading the votes…</p>
+	<ol class="pr-list"></ol>
+	<p class="pr-foot" hidden></p>
+	<noscript><p>The live votes need JavaScript.</p></noscript>
+</div>
+<script>
+	type Option = { id: string; label: string; willing: number; out: number; firstChoices: number; score: number };
+	type Feed = { updatedAt: string; question: string; voters: number; stayingHome: number; options: Option[] };
+	const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
+	const people = (c: number) => (c === 1 ? '1 person' : `${c} people`);
+	for (const root of document.querySelectorAll<HTMLElement>('.poll-results')) {
+		const q = root.querySelector<HTMLElement>('.pr-q')!, status = root.querySelector<HTMLElement>('.pr-status')!;
+		const list = root.querySelector<HTMLElement>('.pr-list')!, foot = root.querySelector<HTMLElement>('.pr-foot')!;
+		const url = `/api/rsvp/poll-results?event=${encodeURIComponent(root.dataset.event || '')}`;
+		let shown = false;
+		const say = (text: string) => { if (status.textContent !== text) status.textContent = text; };
+		const draw = (f: Feed) => {
+			const voters = n(f.voters), options = Array.isArray(f.options) ? f.options : [];
+			q.textContent = String(f.question || ''); q.hidden = !q.textContent;
+			list.replaceChildren(...options.map((o) => {
+				const li = document.createElement('li'), label = document.createElement('span'), count = document.createElement('span'), track = document.createElement('span'), bar = document.createElement('span');
+				label.className = 'pr-label'; label.textContent = String(o.label ?? '');
+				count.className = 'pr-count'; count.textContent = `${n(o.willing)} would come`;
+				track.className = 'pr-track'; track.setAttribute('aria-hidden', 'true');
+				bar.className = 'pr-bar'; bar.style.width = `${voters ? Math.min(100, (n(o.willing) / voters) * 100) : 0}%`;
+				track.append(bar); li.append(label, count, track);
+				return li;
+			}));
+			const home = n(f.stayingHome);
+			foot.textContent = `${voters} voted.${home ? ` ${people(home)} would stay home whatever we do.` : ''}`;
+			foot.hidden = false;
+			const at = new Date(f.updatedAt);
+			say(voters ? `Live: updated ${Number.isNaN(at.getTime()) ? 'just now' : at.toLocaleTimeString('en-GB')}.` : 'No votes yet.');
+			shown = true;
+		};
+		const load = async () => {
+			try {
+				const res = await fetch(url, { cache: 'no-store' });
+				if (res.status === 404) { if (!shown) say('The votes are not public yet. This page checks again every few seconds.'); return; }
+				if (!res.ok) throw new Error(String(res.status));
+				draw(await res.json() as Feed);
+			} catch {
+				say(shown ? 'Could not reach the live votes just now: showing the last we had, and trying again.' : 'Could not reach the live votes: trying again.');
+			}
+		};
+		load();
+		setInterval(() => { if (!document.hidden) load(); }, Math.max(5, Number(root.dataset.every) || 10) * 1000);
+		document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+	}
+</script>
+<style>
+	.poll-results { margin-block: 1.5rem; }
+	.poll-results :global([hidden]) { display: none !important; }
+	.pr-q { font-size: var(--sl-text-h3, 1.5rem); margin: 0 0 0.5rem; }
+	.pr-status, .pr-foot { margin: 0.5rem 0; }
+	.pr-list { list-style: none; margin: 1rem 0; padding: 0; display: grid; gap: 1rem; }
+	.pr-list :global(li) { display: grid; grid-template-columns: 1fr auto; gap: 0.25rem 1rem; align-items: baseline; margin: 0; }
+	.pr-list :global(.pr-label) { font-weight: 700; font-size: var(--sl-text-lg, 1.125rem); }
+	.pr-list :global(.pr-count) { font-variant-numeric: tabular-nums; white-space: nowrap; }
+	.pr-list :global(.pr-track) { grid-column: 1 / -1; display: block; height: 1.25rem; border: 1px solid var(--sl-color-gray-3, #889); border-radius: 0.3rem; overflow: hidden; }
+	.pr-list :global(.pr-bar) { display: block; height: 100%; background: #007cbb; transition: width 0.4s ease; }
+	@media (prefers-reduced-motion: reduce) { .pr-list :global(.pr-bar) { transition: none; } }
+	@media (forced-colors: active) { .pr-list :global(.pr-bar) { background: Highlight; } }
+</style>

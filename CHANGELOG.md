@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-11-11
 
+- [x] **Live Saturday votes page** — [/event/saturday14](https://amybo.org/event/saturday14/) (also reached as amy.bo/event/saturday14) shows the Saturday poll's totals live for Martin's talk on 13 November: each option's "would come" count as a bar, how many would stay home whatever, and how many voted, refreshed every 10 seconds. Totals only, never names. It reads Events&I's public poll-results feed, and says the votes are not public yet until that feed is deployed and an organiser makes the poll's results public.
 - [x] **Name badges: guillotine marks** — "Cutting guides" in the Name badges section can print guillotine marks for plain card (short lines in the top and bottom margins to cut strips, a hairline at each badge's right-hand corners to cut the strips up) instead of dashed lines around every badge (Events&I).
 - [x] **Name badges: a second print run** — The Name badges section of the admin page has "Only people confirmed, promoted or edited since": enter when you last printed to get just the new badges and as many blanks as you type, instead of the whole list again (Events&I).
 
