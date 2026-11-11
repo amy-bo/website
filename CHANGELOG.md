@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-11-11
 
+- [x] **Name badges: guillotine marks** — "Cutting guides" in the Name badges section can print guillotine marks for plain card (short lines in the top and bottom margins to cut strips, a hairline at each badge's right-hand corners to cut the strips up) instead of dashed lines around every badge (Events&I).
 - [x] **Name badges: a second print run** — The Name badges section of the admin page has "Only people confirmed, promoted or edited since": enter when you last printed to get just the new badges and as many blanks as you type, instead of the whole list again (Events&I).
 
 ## 2026-11-10
