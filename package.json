@@ -21,8 +21,9 @@
     "pages:dev": "wrangler pages dev ./dist --port 8788",
     "test:e2e": "E2E_DB=amybo-rsvp-eu E2E_PAGES=/,/events/2026-11-13-london/,/privacy/,/events/confirm/,/events/manage/,/projects/electropioreactor/,/about/ node eventsandeye/tests/e2e.mjs",
     "test:a11y": "node scripts/a11y.mjs",
+    "test:glasgow": "node tests/glasgow.e2e.mjs",
     "test:forum": "node --test tests/forum.test.mjs",
-    "test:unit": "node --test tests/forum.test.mjs eventsandeye/tests/markdown.test.mjs workers/amy-bo/index.test.mjs",
+    "test:unit": "node --test tests/forum.test.mjs tests/glasgow.test.mjs eventsandeye/tests/markdown.test.mjs workers/amy-bo/index.test.mjs",
     "review": "node scripts/review.mjs",
     "build:test": "PUBLIC_TURNSTILE_ALLOW_TEST_KEY=true astro build",
     "test:links": "node tests/links.e2e.mjs"

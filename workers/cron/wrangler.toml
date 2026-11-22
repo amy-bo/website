@@ -1,6 +1,6 @@
 # Companion cron Worker for amybo.org. Deploy with: npx wrangler deploy --config workers/cron/wrangler.toml
 name = "amybo-cron"
-main = "../../eventsandeye/worker/index.ts"
+main = "index.ts"
 compatibility_date = "2026-09-01"
 
 [triggers]

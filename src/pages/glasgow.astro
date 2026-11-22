@@ -1,0 +1,218 @@
+---
+// Live lecture polling: the students' page. Static; it polls /api/glasgow/state and shows whichever question the
+// presenter's slide has opened. Anonymous: a random device id kept in this browser, nothing else.
+import { ACTIVE_SET, findSet } from '../glasgow/sets';
+const set = findSet(ACTIVE_SET)!;
+---
+<!doctype html>
+<html lang="en-GB">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<title>{set.title} · live questions · AMYBO</title>
+	<meta name="description" content="Answer the lecture's live questions. Anonymous answers, shown live in the lecture." />
+	<meta name="robots" content="noindex" />
+	<meta name="color-scheme" content="light" />
+	<meta name="theme-color" content="#ffffff" />
+	<link rel="icon" href="/favicon.svg" />
+	<link rel="preload" href="/fonts/Montserrat-SemiBold.woff2" as="font" type="font/woff2" crossorigin />
+</head>
+<body>
+	<main id="app" data-set={set.id} data-poll={set.pollSeconds}>
+		<header>
+			<img src="/link-media/amybo.svg" alt="AMYBO" width="96" height="66" />
+			<p class="lecture">{set.title}</p>
+		</header>
+
+		<section id="waiting" aria-live="polite">
+			<h1>Live questions</h1>
+			<p id="waiting-text">Keep this page open: the next question appears here when the lecture reaches it.</p>
+		</section>
+
+		<form id="question" hidden novalidate>
+			<h1 id="prompt" tabindex="-1"></h1>
+			<div id="number-box" hidden>
+				<output id="number-out" for="number-range" aria-live="polite"></output>
+				<input id="number-range" type="range" aria-labelledby="prompt" />
+				<div class="ends" aria-hidden="true"><span id="range-min"></span><span id="range-max"></span></div>
+				<label class="exact" for="number-input">Or type it exactly <input id="number-input" type="number" inputmode="decimal" /><span id="number-unit"></span></label>
+			</div>
+			<div id="text-box" hidden>
+				<label for="text-input" class="vh">Your answer</label>
+				<input id="text-input" type="text" autocomplete="off" enterkeyhint="send" />
+				<p class="count" id="text-count" aria-live="polite"></p>
+			</div>
+			<button id="send" type="submit">Send</button>
+			<p id="status" role="status"></p>
+		</form>
+
+		<p class="notice">Anonymous answers, shown live in the lecture. <a href="/privacy/#live-lecture-questions">Privacy</a></p>
+		<noscript><p>This page needs JavaScript to show the questions.</p></noscript>
+	</main>
+
+	<script>
+		type Q = { id: string; type: 'number' | 'text'; prompt: string; min?: number; max?: number; step?: number; scale?: 'linear' | 'log'; unit?: string; maxLength?: number };
+		type State = { set: string; current: string | null; pollSeconds: number; questions: Q[] };
+		const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+		const app = $('app'), setId = app.dataset.set || '';
+		let every = Math.max(1, Number(app.dataset.poll) || 2) * 1000;
+
+		// A random id, made here and kept here, so each phone answers once per question and can change its answer.
+		const store = (() => { try { const k = '__t'; localStorage.setItem(k, k); localStorage.removeItem(k); return localStorage; } catch { return null; } })();
+		const memory: Record<string, string> = {};
+		const get = (k: string) => (store ? store.getItem(k) : memory[k] ?? null);
+		const put = (k: string, v: string) => { try { store ? store.setItem(k, v) : (memory[k] = v); } catch { memory[k] = v; } };
+		let device = get('glasgow-device');
+		if (!device || !/^[A-Za-z0-9_-]{16,64}$/.test(device)) {
+			const b = crypto.getRandomValues(new Uint8Array(18));
+			device = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+			put('glasgow-device', device);
+		}
+		const sentKey = (q: string) => `glasgow-${setId}-${q}`;
+
+		const form = $<HTMLFormElement>('question'), waiting = $('waiting'), status = $('status'), prompt = $('prompt');
+		const numBox = $('number-box'), range = $<HTMLInputElement>('number-range'), exact = $<HTMLInputElement>('number-input'), out = $<HTMLOutputElement>('number-out');
+		const textBox = $('text-box'), text = $<HTMLInputElement>('text-input'), count = $('text-count'), send = $<HTMLButtonElement>('send');
+		let shown: Q | null = null;
+		let sending = false;
+
+		const decimals = (q: Q) => Math.max(0, -Math.floor(Math.log10(q.step || 1) + 1e-9));
+		// A log slider runs over log10 of the value; 0 sits at the slider's left end (0.01 %, say, is close enough to none).
+		const LOG_STEPS = 1000;
+		const logMin = (q: Q) => Math.max(q.step || 0.01, q.min || 0) || 0.01;
+		const fromSlider = (q: Q, s: number) => {
+			if (q.scale !== 'log') return s;
+			if (s <= 0) return q.min ?? 0;
+			const lo = Math.log10(logMin(q)), hi = Math.log10(q.max ?? 10);
+			return Number((10 ** (lo + (hi - lo) * (s / LOG_STEPS))).toPrecision(2));
+		};
+		const toSlider = (q: Q, v: number) => {
+			if (q.scale !== 'log') return v;
+			if (v <= logMin(q) / 2) return 0;
+			const lo = Math.log10(logMin(q)), hi = Math.log10(q.max ?? 10);
+			return Math.round(((Math.log10(Math.min(Math.max(v, logMin(q)), q.max ?? 10)) - lo) / (hi - lo)) * LOG_STEPS);
+		};
+		const fmt = (q: Q, v: number) => {
+			const d = q.scale === 'log' ? (v >= 1 ? 1 : v >= 0.1 ? 2 : 3) : decimals(q);
+			return `${Number(v.toFixed(d))}${q.unit === '%' ? '%' : q.unit ? ' ' + q.unit : ''}`;
+		};
+		let numberValue = 0;
+		const setNumber = (q: Q, v: number, from: 'range' | 'exact' | 'init') => {
+			numberValue = v;
+			out.textContent = fmt(q, v);
+			if (from !== 'range') range.value = String(toSlider(q, v));
+			if (from !== 'exact') exact.value = String(v);
+		};
+
+		function show(q: Q | null) {
+			if (shown && q && shown.id === q.id) return;
+			shown = q;
+			status.textContent = '';
+			if (!q) { form.hidden = true; waiting.hidden = false; return; }
+			waiting.hidden = true; form.hidden = false;
+			prompt.textContent = q.prompt;
+			const previous = get(sentKey(q.id));
+			numBox.hidden = q.type !== 'number'; textBox.hidden = q.type !== 'text';
+			if (q.type === 'number') {
+				const log = q.scale === 'log';
+				range.min = log ? '0' : String(q.min); range.max = log ? String(LOG_STEPS) : String(q.max); range.step = log ? '1' : String(q.step);
+				exact.min = String(q.min); exact.max = String(q.max); exact.step = String(q.step);
+				$('range-min').textContent = log ? `${q.min}${q.unit === '%' ? '%' : ''}` : fmt(q, q.min!);
+				$('range-max').textContent = fmt(q, q.max!);
+				$('number-unit').textContent = q.unit || '';
+				const start = previous !== null ? Number(previous) : log ? 1 : Number((((q.min ?? 0) + (q.max ?? 0)) / 2).toFixed(decimals(q)));
+				setNumber(q, start, 'init');
+			} else {
+				text.maxLength = q.maxLength || 80;
+				text.value = previous ?? '';
+				count.textContent = `${[...text.value].length} of ${text.maxLength}`;
+			}
+			send.textContent = previous !== null ? 'Change my answer' : 'Send';
+			if (previous !== null) status.textContent = 'Your answer is in. You can change it.';
+			prompt.focus({ preventScroll: true });
+		}
+
+		range.addEventListener('input', () => shown && setNumber(shown, fromSlider(shown, Number(range.value)), 'range'));
+		exact.addEventListener('input', () => { if (shown && exact.value !== '' && Number.isFinite(Number(exact.value))) setNumber(shown, Number(exact.value), 'exact'); });
+		text.addEventListener('input', () => { count.textContent = `${[...text.value].length} of ${text.maxLength}`; });
+
+		form.addEventListener('submit', async (e) => {
+			e.preventDefault();
+			const q = shown;
+			if (!q || sending) return;
+			let value: number | string;
+			if (q.type === 'number') {
+				value = numberValue;
+				if (!Number.isFinite(value) || value < (q.min ?? -Infinity) || value > (q.max ?? Infinity)) { status.textContent = `Please give a number from ${q.min} to ${q.max}.`; return; }
+			} else {
+				value = text.value.trim();
+				if (!value) { status.textContent = 'Please type an answer.'; text.focus(); return; }
+			}
+			sending = true; send.disabled = true; status.textContent = 'Sending…';
+			try {
+				const res = await fetch('/api/glasgow/answer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ set: setId, q: q.id, value, device }) });
+				const body = await res.json().catch(() => ({}));
+				if (res.ok) {
+					put(sentKey(q.id), String(body.value ?? value));
+					send.textContent = 'Change my answer';
+					status.textContent = 'Thank you: your answer is in. You can change it.';
+				} else if (res.status === 409) {
+					status.textContent = 'That question has just closed.';
+					tick();
+				} else status.textContent = body.error || 'That did not go through: please try again.';
+			} catch {
+				status.textContent = 'No connection just now: please try again.';
+			} finally { sending = false; send.disabled = false; }
+		});
+
+		let timer = 0;
+		async function tick() {
+			clearTimeout(timer);
+			try {
+				const res = await fetch(`/api/glasgow/state?set=${encodeURIComponent(setId)}`, { cache: 'no-store' });
+				if (res.ok) {
+					const s = await res.json() as State;
+					every = Math.max(1, Number(s.pollSeconds) || 2) * 1000;
+					show(s.questions.find((q) => q.id === s.current) ?? null);
+					$('waiting-text').textContent = 'Keep this page open: the next question appears here when the lecture reaches it.';
+				}
+			} catch {
+				if (!shown) $('waiting-text').textContent = 'Trying to connect…';
+			}
+			if (!document.hidden) timer = window.setTimeout(tick, every);
+		}
+		document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); else clearTimeout(timer); });
+		tick();
+	</script>
+
+	<style is:global>
+		@font-face { font-family: 'Montserrat SemiBold'; src: url('/fonts/Montserrat-SemiBold.woff2') format('woff2'); font-weight: 1 1000; font-display: swap; }
+		:root { color-scheme: light; --blue: #007cbb; --green: #87bd25; --ink: #111; --muted: #555; }
+		* { box-sizing: border-box; }
+		html { -webkit-text-size-adjust: 100%; }
+		body { margin: 0; background: #fff; color: var(--ink); font: 18px/1.45 'Montserrat SemiBold', Montserrat, Arial, Helvetica, sans-serif; }
+		main { max-width: 34rem; margin: 0 auto; padding: max(1rem, env(safe-area-inset-top)) 1rem max(1.5rem, env(safe-area-inset-bottom)); min-height: 100dvh; display: flex; flex-direction: column; gap: 1.25rem; }
+		header { display: flex; align-items: center; justify-content: space-between; }
+		header img { display: block; height: 2.6rem; width: auto; }
+		.lecture { margin: 0; color: var(--blue); font-size: 1.05rem; }
+		h1 { font-size: 1.6rem; line-height: 1.25; margin: 0 0 0.75rem; outline: none; }
+		#waiting p { color: var(--muted); margin: 0; }
+		form { display: flex; flex-direction: column; gap: 1rem; }
+		output { display: block; text-align: center; font-size: 3rem; line-height: 1.1; color: var(--blue); font-variant-numeric: tabular-nums; }
+		input[type=range] { width: 100%; height: 2.75rem; accent-color: var(--blue); margin: 0; }
+		.ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.9rem; margin-top: -0.5rem; }
+		.exact { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; color: var(--muted); font-size: 0.95rem; }
+		.exact input { width: 6.5rem; font: inherit; color: var(--ink); padding: 0.4rem 0.5rem; border: 2px solid #8a8a8a; border-radius: 0.4rem; }
+		#text-input { width: 100%; font: inherit; font-size: 1.2rem; padding: 0.75rem; border: 2px solid #8a8a8a; border-radius: 0.5rem; }
+		input:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+		.count { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.9rem; text-align: right; }
+		button { font: inherit; font-size: 1.2rem; min-height: 3.25rem; border: 0; border-radius: 0.6rem; background: var(--blue); color: #fff; cursor: pointer; }
+		button:disabled { opacity: 0.6; }
+		#status { min-height: 1.5em; margin: 0; }
+		.notice { margin-top: auto; color: var(--muted); font-size: 0.9rem; }
+		.notice a { color: var(--blue); }
+		.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+		[hidden] { display: none !important; }
+	</style>
+</body>
+</html>

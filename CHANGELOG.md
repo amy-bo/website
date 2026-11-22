@@ -2,6 +2,10 @@
 
 Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
+## 2026-11-22
+
+- [x] **Live lecture questions for Glasgow** — [amybo.org/glasgow](https://amybo.org/glasgow) (and amy.bo/glasgow) for Martin's Glasgow MSc lecture "Why" on 25 November: the phones show the question the slide has opened (warming by 2100, sunlight to steak, the weakest step in the food chain), one anonymous answer per device, changeable. An open-origin API for the slide (state, results with values, mean, median and histogram, or the latest 30 texts), presenter-only switching and hiding with a token kept as a Cloudflare secret, a word filter, rate limits, and deletion 30 days after the lecture by the cron Worker. Privacy notice updated. Question sets for later lectures go in `src/glasgow/sets.ts`.
+
 ## 2026-11-11
 
 - [x] **Public poll totals (Events&I)** — Events&I's public poll results are in: a "Make the totals public" tick box on each poll on the admin page (off by default), and `GET /api/rsvp/poll-results?event=<id>`, which returns counts only, to any origin, never cached, and 404 while the poll is hidden. Migration 0012 adds the per-poll setting. The Saturday votes page and Martin's talk read it.

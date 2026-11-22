@@ -94,6 +94,16 @@ Link-in-bio pages for AMYBO volunteers and supporters, and AMYBO's own at amy.bo
 - **amy.bo:** the `amybo-redirects` Worker in `workers/amy-bo/` keeps the short links and serves `/~name` and `/links` from the Pages project under the amy.bo address. The deploy workflow deploys it once the repository variable `DEPLOY_AMYBO_WORKER` is `true` (the API token then also needs Workers Routes edit on the amy.bo zone). Until then, edit the Worker in the Cloudflare dashboard by pasting `workers/amy-bo/index.js`.
 - **Tests:** `npm run build:test && npm run test:links` (pages, clicks, invitations, sign-in, editing, diary, security checks and accessibility), and `node --test workers/amy-bo/index.test.mjs`.
 
+## Live lecture questions (amybo.org/glasgow)
+
+Students open [amybo.org/glasgow](https://amybo.org/glasgow) (or amy.bo/glasgow) on their phones; the page shows whichever question the presenter's slide has opened and checks for a change every couple of seconds. Answers are anonymous (a random device id kept in the phone's browser), one per device per question, changeable while the question is open.
+
+- **Questions** are in `src/glasgow/sets.ts`: one set per lecture, with number questions (range, step, linear or log scale, bins for the slide's histogram) and short text questions. To add a lecture, add a set and point `ACTIVE_SET` at it.
+- **API** (`functions/api/glasgow/`, open to any origin so a slide opened from a file can use it): `GET state`, `GET results?q=`, `POST answer {q, value, device}`, and, with the `X-Presenter-Token` header, `POST current {q}` (or `{q: null}`) and `POST hide {q, id, hidden}` to take a text off the results.
+- **Presenter token:** a secret `GLASGOW_PRESENTER_TOKEN` on the Cloudflare Pages project (Settings, Variables and Secrets, Production), never in the repo. Pages picks it up on the next deployment. Without it nobody can switch questions.
+- **Data:** three `glasgow_` tables in the registrations database, created by the API on first use (`src/glasgow/db.ts`). Answers are deleted after the set's `deleteAfter` (30 days after the lecture) by the cron Worker (`workers/cron/index.ts`, which runs Events&I's jobs and then this). Rate limits: 12 answers a minute per device, 120 per address, counted against a keyed hash of the address that is cleared within the hour.
+- **Tests:** `node --test tests/glasgow.test.mjs`, and `npm run build:test && npm run test:glasgow` against a local database.
+
 ## Deploying from GitHub (the quick route)
 
 `.github/workflows/deploy.yml` deploys from GitHub Actions on every push, so nothing has to run on a laptop. It has three jobs:
