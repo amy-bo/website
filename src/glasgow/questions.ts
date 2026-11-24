@@ -69,11 +69,17 @@ export function checkQuestion(id: string, body: any): Checked {
 	}
 	if (body?.type === 'choice') {
 		const options = body.options;
-		if (!Array.isArray(options) || options.length < 2 || options.length > 8) return { ok: false, error: 'A choice question needs 2 to 8 "options".' };
+		if (!Array.isArray(options) || options.length < 2 || options.length > 12) return { ok: false, error: 'A choice question needs 2 to 12 "options".' };
 		const tidy = options.map((o: unknown) => (typeof o === 'string' ? o.replace(/\s+/g, ' ').trim() : ''));
 		if (tidy.some((o: string) => !o || [...o].length > 40)) return { ok: false, error: 'Each option must be text of 1 to 40 characters.' };
 		if (new Set(tidy.map((o: string) => o.toLowerCase())).size !== tidy.length) return { ok: false, error: 'The options must all be different.' };
 		const q: ChoiceQuestion = { id, type: 'choice', prompt, options: tidy };
+		// Colours per option: kept only when there is one per option (null for "the default").
+		if (body.colors !== undefined && body.colors !== null) {
+			if (!Array.isArray(body.colors) || body.colors.some((c: unknown) => c !== null && (typeof c !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(c))))
+				return { ok: false, error: '"colors" must be a list of colours like "#1C64F2" (or null), one per option.' };
+			if (body.colors.length === tidy.length && body.colors.some((c: unknown) => c !== null)) q.colors = body.colors.map((c: string | null) => (c ? c.toUpperCase() : null));
+		}
 		return { ok: true, question: q, order };
 	}
 	return { ok: false, error: '"type" must be "number", "text" or "choice".' };

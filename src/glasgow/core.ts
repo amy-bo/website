@@ -68,7 +68,7 @@ export function numberResults(q: NumberQuestion, values: number[]) {
 export function choiceResults(q: ChoiceQuestion, values: number[]) {
 	const counts = q.options.map(() => 0);
 	for (const v of values) if (Number.isInteger(v) && v >= 0 && v < counts.length) counts[v]++;
-	return { type: 'choice' as const, options: q.options, counts, count: counts.reduce((a, b) => a + b, 0) };
+	return { type: 'choice' as const, options: q.options, ...(q.colors ? { colors: q.colors } : {}), counts, count: counts.reduce((a, b) => a + b, 0) };
 }
 
 /** Answers grouped for a word cloud: case-insensitive, spaces collapsed; each shown with its first-sent spelling. */

@@ -7,7 +7,8 @@ export interface NumberQuestion { id: string; type: 'number'; prompt: string; mi
 /** multiple: each send adds another answer (a word cloud), up to maxPerDevice per phone; otherwise a send replaces the last. */
 export interface TextQuestion { id: string; type: 'text'; prompt: string; maxLength: number; multiple?: boolean; maxPerDevice?: number }
 /** A few labelled choices, one tap each (Yes / No / Don't know); answers are stored as the option's index. */
-export interface ChoiceQuestion { id: string; type: 'choice'; prompt: string; options: string[] }
+/** colors: optional, parallel to options, '#rrggbb' or null (null: the page's own colour for Yes / No / Don't know, else plain). */
+export interface ChoiceQuestion { id: string; type: 'choice'; prompt: string; options: string[]; colors?: (string | null)[] }
 export type Question = NumberQuestion | TextQuestion | ChoiceQuestion;
 /** logo: the lecture's own logo, shown right of the AMYBO logo at the same height (a file in public/). */
 export interface QuestionSet { id: string; title: string; logo?: { src: string; alt: string }; date: string; deleteAfter: string; pollSeconds: number; questions: Question[] }

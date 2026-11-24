@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-11-24
 
+- [x] **Glasgow lecture: colours chosen per option** — A choice question can carry `colors`, one `#RRGGBB` (or null) per option, set from the slides; the phones colour each button with it, in white or black text, whichever contrasts more, and `/state` and `/results` pass the colours on for the slide's charts. Options without a colour keep the Yes / No / Don't know colours or the plain button. Up to 12 options.
 - [x] **Glasgow lecture: coloured Yes / No / Don't know buttons** — On the phones, choice options labelled Yes, No or Don't know (matched by label, ignoring case and apostrophes) are big filled buttons in orange-red (#E8590C), blue (#1C64F2) and grey (#6B7280), the same colours as the slide's result bars; the chosen one is ringed and ticked.
 - [x] **Glasgow lecture: choice questions** — A third question type, `choice` (2 to 8 options such as Yes / No / Don't know): one big button per option on the phones, one answer per phone that a tap changes, and `counts` per option in the results for a pie chart. Added from the slides like any other question. The phones also redraw a question the presenter edits while it is showing.
 - [x] **Glasgow lecture: the altProtein Why logo** — The student page shows the lecture's own logo ("altProtein: Why?") right-aligned across from the AMYBO logo, at the same height, set per lecture in `src/glasgow/sets.ts`.

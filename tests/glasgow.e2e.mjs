@@ -191,8 +191,9 @@ try {
 	r = await call('DELETE', '/api/glasgow/questions/q120', undefined, presenter);
 	check('the presenter deletes it, with its answers', r.status === 200 && r.data.answers === 1 && (await call('GET', '/api/glasgow/results?q=q120')).status === 404, JSON.stringify(r));
 	check('deleting an unknown question → 404', (await call('DELETE', '/api/glasgow/questions/q999', undefined, presenter)).status === 404);
-	r = await call('PUT', '/api/glasgow/questions/nuke', { type: 'choice', prompt: 'Nuclear war by 2100?', options: ['Yes', 'No', "Don't know"] }, presenter);
-	check('a choice question', r.status === 200 && r.data.question.options.length === 3, JSON.stringify(r));
+	r = await call('PUT', '/api/glasgow/questions/nuke', { type: 'choice', prompt: 'Nuclear war by 2100?', options: ['Yes', 'No', "Don't know"], colors: ['#e8590c', null, '#6B7280'] }, presenter);
+	check('a choice question, with colours', r.status === 200 && r.data.question.options.length === 3 && JSON.stringify(r.data.question.colors) === '["#E8590C",null,"#6B7280"]', JSON.stringify(r));
+	check('…and /state carries the colours', JSON.stringify((await call('GET', '/api/glasgow/state')).data.questions.find((q) => q.id === 'nuke').colors) === '["#E8590C",null,"#6B7280"]');
 	await call('POST', '/api/glasgow/current', { q: 'nuke' }, presenter);
 	for (const [n, v] of [[1, 0], [2, 2], [3, 2], [1, 1]]) await call('POST', '/api/glasgow/answer', { q: 'nuke', value: v, device: dev(n) });
 	check('an option out of range → 400', (await call('POST', '/api/glasgow/answer', { q: 'nuke', value: 3, device: dev(4) })).status === 400);

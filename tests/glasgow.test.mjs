@@ -132,11 +132,25 @@ test('choice questions: an option index in, counts per option out', async () => 
 	const c = checkQuestion('nuke', { type: 'choice', prompt: 'Nuclear war by 2100?', options: [' Yes ', 'No', "Don't know"] });
 	assert.equal(c.ok, true);
 	assert.deepEqual(c.question.options, ['Yes', 'No', "Don't know"]);
-	for (const [options, why] of [[['Yes'], 'one option'], [Array.from({ length: 9 }, (_, i) => `o${i}`), 'nine'], [['Yes', ''], 'empty'], [['Yes', 'x'.repeat(41)], 'too long'], [['Yes', 'yes'], 'duplicate'], ['Yes,No', 'not a list']])
+	for (const [options, why] of [[['Yes'], 'one option'], [Array.from({ length: 13 }, (_, i) => `o${i}`), 'thirteen'], [['Yes', ''], 'empty'], [['Yes', 'x'.repeat(41)], 'too long'], [['Yes', 'yes'], 'duplicate'], ['Yes,No', 'not a list']])
 		assert.equal(checkQuestion('nuke', { type: 'choice', prompt: 'x', options }).ok, false, why);
 	const q = c.question;
 	assert.deepEqual(checkAnswer(q, 2), { ok: true, num: 2, text: null });
 	assert.deepEqual(checkAnswer(q, '0'), { ok: true, num: 0, text: null });
 	for (const bad of [3, -1, 1.5, 'Yes', null]) assert.equal(checkAnswer(q, bad).ok, false, String(bad));
 	assert.deepEqual(choiceResults(q, [0, 2, 2, 1, 2]), { type: 'choice', options: ['Yes', 'No', "Don't know"], counts: [1, 1, 3], count: 5 });
+});
+
+test('choice colours: one per option, hex or null; a wrong count is dropped', async () => {
+	const { checkQuestion } = await import('../src/glasgow/questions.ts');
+	const base = { type: 'choice', prompt: 'Which?', options: ['A', 'B', 'C'] };
+	assert.deepEqual(checkQuestion('c', { ...base, colors: ['#e8590c', null, '#6B7280'] }).question.colors, ['#E8590C', null, '#6B7280']);
+	assert.equal(checkQuestion('c', { ...base, colors: ['#E8590C', null] }).question.colors, undefined, 'length mismatch: ignored');
+	assert.equal(checkQuestion('c', { ...base, colors: [null, null, null] }).question.colors, undefined, 'all null: nothing to keep');
+	assert.equal(checkQuestion('c', { ...base, colors: ['red', null, null] }).ok, false, 'not hex');
+	assert.equal(checkQuestion('c', { ...base, colors: '#E8590C' }).ok, false, 'not a list');
+	assert.equal(checkQuestion('c', { ...base, options: Array.from({ length: 12 }, (_, i) => `o${i}`) }).ok, true, 'twelve options');
+	assert.equal(checkQuestion('c', { ...base, options: Array.from({ length: 13 }, (_, i) => `o${i}`) }).ok, false, 'thirteen');
+	const q = checkQuestion('c', { ...base, colors: ['#E8590C', null, null] }).question;
+	assert.deepEqual(choiceResults(q, [0]).colors, ['#E8590C', null, null], 'the results carry the colours for the chart');
 });
