@@ -130,6 +130,12 @@ const set = findSet(ACTIVE_SET)!;
 			mine.replaceChildren(...list.map((t) => { const li = document.createElement('li'); li.textContent = t; return li; }));
 		}
 
+		// Yes / No / Don't know get their own colours, the same as the lecture slide's result bars; any other option is blue-outlined.
+		function choiceTone(label: string) {
+			const k = label.toLowerCase().replace(/[’'`.!?]/g, '').replace(/\s+/g, ' ').trim();
+			return k === 'yes' ? 'tone-yes' : k === 'no' ? 'tone-no' : k === 'dont know' || k === 'do not know' ? 'tone-dk' : '';
+		}
+
 		function show(q: Q | null) {
 			// Redrawn only when the question changes, or the presenter edits it while it is showing.
 			if (shown && q && JSON.stringify(shown) === JSON.stringify(q)) return;
@@ -145,7 +151,7 @@ const set = findSet(ACTIVE_SET)!;
 				// One big button per option: a tap sends it; the chosen one stays marked, and another tap changes it.
 				choiceBox.replaceChildren(...(q.options || []).map((label, i) => {
 					const b = document.createElement('button');
-					b.type = 'button'; b.className = 'choice'; b.textContent = label;
+					b.type = 'button'; b.className = `choice ${choiceTone(label)}`; b.textContent = label;
 					b.setAttribute('aria-pressed', String(previous === String(i)));
 					b.addEventListener('click', () => sendAnswer(q, i));
 					return b;
@@ -329,6 +335,13 @@ const set = findSet(ACTIVE_SET)!;
 		.choice { background: #fff; color: var(--blue); border: 2px solid var(--blue); font-size: 1.3rem; min-height: 3.5rem; }
 		.choice[aria-pressed="true"] { background: var(--blue); color: #fff; }
 		.choice[aria-pressed="true"]::after { content: ' ✓'; }
+		/* Yes orange-red, No blue, Don't know grey, white text at 24px (large text, so 3:1 contrast is enough; all pass). */
+		.choice.tone-yes, .choice.tone-no, .choice.tone-dk { color: #fff; border: 0; min-height: 4.5rem; font-size: 1.5rem; }
+		.choice.tone-yes { background: #e8590c; }
+		.choice.tone-no { background: #1c64f2; }
+		.choice.tone-dk { background: #6b7280; }
+		/* The chosen one: a thick dark ring as well as the tick. (Not fading the others: that would fail contrast.) */
+		.choice[class*="tone-"][aria-pressed="true"] { box-shadow: 0 0 0 4px #fff, 0 0 0 7px #111; }
 		#status, #ask-status { min-height: 1.5em; margin: 0; }
 		#audience { display: flex; flex-direction: column; gap: 1rem; border-top: 2px solid #e5e5e5; padding-top: 1.25rem; }
 		#hand { background: #fff; color: var(--blue); border: 2px solid var(--blue); }

@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-11-24
 
+- [x] **Glasgow lecture: coloured Yes / No / Don't know buttons** — On the phones, choice options labelled Yes, No or Don't know (matched by label, ignoring case and apostrophes) are big filled buttons in orange-red (#E8590C), blue (#1C64F2) and grey (#6B7280), the same colours as the slide's result bars; the chosen one is ringed and ticked.
 - [x] **Glasgow lecture: choice questions** — A third question type, `choice` (2 to 8 options such as Yes / No / Don't know): one big button per option on the phones, one answer per phone that a tap changes, and `counts` per option in the results for a pie chart. Added from the slides like any other question. The phones also redraw a question the presenter edits while it is showing.
 - [x] **Glasgow lecture: the altProtein Why logo** — The student page shows the lecture's own logo ("altProtein: Why?") right-aligned across from the AMYBO logo, at the same height, set per lecture in `src/glasgow/sets.ts`.
 - [x] **Glasgow lecture: questions edited from the slides** — The poll questions now live in the database, seeded once with the six in `src/glasgow/sets.ts`, so Martin can add, edit and delete questions from the presentation with no deploy: `PUT`/`DELETE /api/glasgow/questions/<id>` with the presenter token, strictly checked, saying how many answers a question already has. The question showing cannot be deleted.
