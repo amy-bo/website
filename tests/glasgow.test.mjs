@@ -98,3 +98,31 @@ test('presenter token and device ids', async () => {
 	assert.equal(k, await rateKey('192.0.2.1', 's'));
 	assert.notEqual(k, await rateKey('192.0.2.1', 't'), 'keyed: not a plain hash of the address');
 });
+
+test('questions sent from the slides are checked strictly', async () => {
+	const { checkQuestion, defaultBins } = await import('../src/glasgow/questions.ts');
+	const ok = checkQuestion('q120', { type: 'number', prompt: ' How   many? ', min: 0, max: 100, step: 1 });
+	assert.equal(ok.ok, true);
+	assert.deepEqual([ok.question.prompt, ok.question.scale, ok.question.unit, ok.question.bins.length], ['How many?', 'linear', '', 11]);
+	for (const [id, body, why] of [
+		['Q1', { type: 'text', prompt: 'x' }, 'capital in id'],
+		['a'.repeat(25), { type: 'text', prompt: 'x' }, 'id too long'],
+		['q1', { type: 'text', prompt: '' }, 'no prompt'],
+		['q1', { type: 'text', prompt: 'x'.repeat(201) }, 'prompt too long'],
+		['q1', { type: 'poll', prompt: 'x' }, 'bad type'],
+		['q1', { type: 'number', prompt: 'x', min: 5, max: 1, step: 1 }, 'min > max'],
+		['q1', { type: 'number', prompt: 'x', min: 0, max: 1, step: 0 }, 'step 0'],
+		['q1', { type: 'number', prompt: 'x', min: 0, max: 10, step: 0.1, scale: 'log' }, 'log from 0'],
+		['q1', { type: 'number', prompt: 'x', min: '0', max: 10, step: 1 }, 'string min'],
+		['q1', { type: 'text', prompt: 'x', maxLength: 501 }, 'maxLength too big'],
+		['q1', { type: 'text', prompt: 'x', multiple: 'yes' }, 'multiple not boolean'],
+		['q1', { id: 'q2', type: 'text', prompt: 'x' }, 'id mismatch'],
+		['q1', { type: 'text', prompt: 'x', order: 1.5 }, 'fractional order'],
+	]) assert.equal(checkQuestion(id, body).ok, false, why);
+	const cloud = checkQuestion('cloud', { type: 'text', prompt: 'Words?', maxLength: 40, multiple: true });
+	assert.deepEqual([cloud.question.multiple, cloud.question.maxPerDevice], [true, 30]);
+	assert.deepEqual(defaultBins({ min: 0.0001, max: 100, step: 0.0001, scale: 'log' }), [0.0001, 0.001, 0.01, 0.1, 1, 10, 100], 'a bin per decade');
+	assert.deepEqual(defaultBins({ min: 1, max: 3, step: 1, scale: 'linear' }), [1, 1.5, 2.5, 3], 'a bin per choice');
+	assert.deepEqual(defaultBins({ min: 1, max: 2, step: 1, scale: 'linear' }), [1, 1.5, 2]);
+	for (const id of ['q61', 'q105', 'q106']) { const q = findQuestion(set, id); assert.deepEqual(q.bins, defaultBins(q), `${id}: the seed's bins match what an edit would give`); }
+});

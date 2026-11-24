@@ -2,8 +2,8 @@
 // Every question and every hand going up or down is kept with its (anonymous, random) device id and time until the
 // set's deleteAfter, as a record the presenter can go back to.
 import { DEVICE_RE, fail, json, rateKey } from './core';
-import { ensureSchema, now, presenter, underLimit, type GlasgowEnv } from './db';
-import { findQuestion, findSet, type QuestionSet } from './sets';
+import { ensureSchema, getQuestion, now, presenter, underLimit, type GlasgowEnv } from './db';
+import { findSet, type QuestionSet } from './sets';
 
 /** A raised hand counts while its phone re-sends it at least this often (the page re-sends every 60 s). */
 export const HAND_STALE_MS = 3 * 60_000;
@@ -164,7 +164,7 @@ export async function postClear(env: GlasgowEnv, request: Request) {
 		const before = await env.DB.prepare('SELECT COUNT(*) AS n FROM glasgow_questions WHERE set_id = ?').bind(set.id).first<{ n: number }>();
 		return json({ ok: true, cleared: answers + up.length, answers, hands: up.length, questionsHidden: before?.n ?? 0 });
 	}
-	const q = findQuestion(set, typeof r.body?.q === 'string' ? r.body.q : null);
+	const q = await getQuestion(env, set, r.body?.q);
 	if (!q) return fail(404, 'No such question: send {"q": "<id>"} or {"all": true}.');
 	const res = await env.DB.prepare('DELETE FROM glasgow_answers WHERE set_id = ? AND q = ?').bind(set.id, q.id).run();
 	return json({ ok: true, cleared: res.meta.changes ?? 0 });

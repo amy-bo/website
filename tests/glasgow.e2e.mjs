@@ -170,6 +170,32 @@ try {
 	a = await call('GET', '/api/glasgow/audience', undefined, presenter);
 	check('a new question after a clear is listed', a.data.questions.length === 1 && a.data.questions[0].text === 'After the clear', JSON.stringify(a.data.questions));
 
+	console.log('Editing questions from the slides');
+	check('adding a question needs the token', (await call('PUT', '/api/glasgow/questions/q120', { type: 'number', prompt: 'How many?', min: 0, max: 10, step: 1 })).status === 401);
+	r = await call('PUT', '/api/glasgow/questions/q120', { type: 'number', prompt: 'How many cows?', min: 0, max: 10, step: 1, unit: 'cows', order: 15 }, presenter);
+	check('the presenter adds a question', r.status === 200 && r.data.created === true && r.data.answers === 0 && r.data.order === 15, JSON.stringify(r));
+	s = await call('GET', '/api/glasgow/state');
+	check('…and the phones see it, in its place', s.data.questions.map((q) => q.id).join() === 'q00,q120,q42,q61,q93,q105,q106' && !('bins' in s.data.questions[1]), s.data.questions.map((q) => q.id).join());
+	check('a bad question → 400 with a reason', (await call('PUT', '/api/glasgow/questions/q121', { type: 'number', prompt: 'x', min: 5, max: 1, step: 1 }, presenter)).data?.error === '"min" must be less than "max".');
+	check('a bad id → 400', (await call('PUT', '/api/glasgow/questions/Q%20bad', { type: 'text', prompt: 'x' }, presenter)).status === 400);
+	await call('POST', '/api/glasgow/current', { q: 'q120' }, presenter);
+	await call('POST', '/api/glasgow/answer', { q: 'q120', value: 3, device: dev(1) });
+	check('an answer to the new question', (await call('GET', '/api/glasgow/results?q=q120')).data.count === 1);
+	r = await call('PUT', '/api/glasgow/questions/q120', { type: 'number', prompt: 'How many cows, really?', min: 0, max: 20, step: 1 }, presenter);
+	check('editing it says how many answers it already has, and keeps its place', r.status === 200 && r.data.created === false && r.data.answers === 1 && r.data.order === 15, JSON.stringify(r));
+	check('…and the phones see the edit', (await call('GET', '/api/glasgow/state')).data.questions[1].prompt === 'How many cows, really?');
+	check('POST /questions with the id in the body works too', (await call('POST', '/api/glasgow/questions', { id: 'q122', type: 'text', prompt: 'One word?', maxLength: 20 }, presenter)).data?.created === true);
+	check('deleting the question that is showing → 409', (await call('DELETE', '/api/glasgow/questions/q120', undefined, presenter)).status === 409);
+	await call('POST', '/api/glasgow/current', { q: null }, presenter);
+	check('deleting needs the token', (await call('DELETE', '/api/glasgow/questions/q120')).status === 401);
+	r = await call('DELETE', '/api/glasgow/questions/q120', undefined, presenter);
+	check('the presenter deletes it, with its answers', r.status === 200 && r.data.answers === 1 && (await call('GET', '/api/glasgow/results?q=q120')).status === 404, JSON.stringify(r));
+	check('deleting an unknown question → 404', (await call('DELETE', '/api/glasgow/questions/q999', undefined, presenter)).status === 404);
+	await call('DELETE', '/api/glasgow/questions/q122', undefined, presenter);
+	check('the seeded questions are as they were', (await call('GET', '/api/glasgow/state')).data.questions.map((q) => q.id).join() === 'q00,q42,q61,q93,q105,q106');
+	const pre2 = await fetch(`${BASE}/api/glasgow/questions/q1`, { method: 'OPTIONS', headers: { origin: 'null', 'access-control-request-method': 'PUT' } });
+	check('preflight allows PUT and DELETE', /PUT/.test(pre2.headers.get('access-control-allow-methods') || '') && /DELETE/.test(pre2.headers.get('access-control-allow-methods') || ''));
+
 	console.log('Closing');
 	r = await call('POST', '/api/glasgow/current', { q: null }, presenter);
 	check('the presenter can show nothing', r.status === 200 && r.data.current === null && (await call('GET', '/api/glasgow/state')).data.current === null);

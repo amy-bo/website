@@ -3,7 +3,7 @@ import type { NumberQuestion, Question, TextQuestion } from './sets';
 
 export const CORS = {
 	'access-control-allow-origin': '*',
-	'access-control-allow-methods': 'GET, POST, OPTIONS',
+	'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
 	'access-control-allow-headers': 'content-type, x-presenter-token',
 	'access-control-max-age': '86400',
 };

@@ -1,5 +1,6 @@
 // Live polling for lectures (amybo.org/glasgow). One question set per lecture; the presenter's slide chooses which of
-// its questions is showing. To add a lecture, add a set here and point ACTIVE_SET at it on the day.
+// its questions is showing. The questions here are only the seed: on first use they are copied into D1, and from then
+// on they are added and edited from the slides (PUT /api/glasgow/questions/<id>), not here. To add a lecture, add a set here and point ACTIVE_SET at it on the day.
 // Answers are anonymous (a random device id kept in the phone's browser) and deleted after deleteAfter.
 
 export interface NumberQuestion { id: string; type: 'number'; prompt: string; min: number; max: number; step: number; scale: 'linear' | 'log'; unit: string; bins: number[] }
@@ -32,4 +33,5 @@ export const SETS: QuestionSet[] = [
 export const ACTIVE_SET = 'why-2026';
 
 export const findSet = (id?: string | null) => SETS.find((s) => s.id === (id || ACTIVE_SET));
+/** The seeded question, from this file: tests only. The live questions are in D1 (src/glasgow/db.ts, getQuestions). */
 export const findQuestion = (set: QuestionSet, q?: string | null) => set.questions.find((x) => x.id === q);
