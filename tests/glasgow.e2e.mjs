@@ -153,6 +153,23 @@ try {
 	r = await call('POST', '/api/glasgow/hands/clear', undefined, presenter);
 	check('the presenter lowers every hand', r.status === 200 && r.data.lowered === 1 && (await call('GET', '/api/glasgow/audience', undefined, presenter)).data.hands.count === 0, JSON.stringify(r));
 
+	console.log('Clear');
+	await call('POST', '/api/glasgow/hand', { device: dev(5), up: true });
+	check('clearing needs the token', (await call('POST', '/api/glasgow/clear', { q: 'q42' })).status === 401);
+	check('clearing an unknown question → 404', (await call('POST', '/api/glasgow/clear', { q: 'q99' }, presenter)).status === 404);
+	r = await call('POST', '/api/glasgow/clear', { q: 'q42' }, presenter);
+	check('clear one question: its answers go', r.status === 200 && r.data.cleared === 4 && (await call('GET', '/api/glasgow/results?q=q42')).data.count === 0, JSON.stringify(r));
+	check('…and only its answers', (await call('GET', '/api/glasgow/results?q=q61')).data.count === 3);
+	r = await call('POST', '/api/glasgow/clear', { all: true }, presenter);
+	check('clear all: every answer, the hand, and the questions list', r.status === 200 && r.data.hands === 1 && r.data.answers > 0, JSON.stringify(r));
+	const after = await Promise.all(['q00', 'q61', 'q93'].map((q) => call('GET', `/api/glasgow/results?q=${q}`)));
+	check('…results all empty', after.every((x) => x.data.count === 0 && (x.data.texts?.length ?? 0) === 0 && (x.data.words?.length ?? 0) === 0), JSON.stringify(after.map((x) => x.data.count)));
+	a = await call('GET', '/api/glasgow/audience', undefined, presenter);
+	check('…audience empty', a.data.hands.count === 0 && a.data.questions.length === 0, JSON.stringify(a.data));
+	await call('POST', '/api/glasgow/question', { device: dev(6), text: 'After the clear' });
+	a = await call('GET', '/api/glasgow/audience', undefined, presenter);
+	check('a new question after a clear is listed', a.data.questions.length === 1 && a.data.questions[0].text === 'After the clear', JSON.stringify(a.data.questions));
+
 	console.log('Closing');
 	r = await call('POST', '/api/glasgow/current', { q: null }, presenter);
 	check('the presenter can show nothing', r.status === 200 && r.data.current === null && (await call('GET', '/api/glasgow/state')).data.current === null);

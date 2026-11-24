@@ -3,7 +3,7 @@
 // set's deleteAfter, as a record the presenter can go back to.
 import { DEVICE_RE, fail, json, rateKey } from './core';
 import { ensureSchema, now, presenter, underLimit, type GlasgowEnv } from './db';
-import { findSet, type QuestionSet } from './sets';
+import { findQuestion, findSet, type QuestionSet } from './sets';
 
 /** A raised hand counts while its phone re-sends it at least this often (the page re-sends every 60 s). */
 export const HAND_STALE_MS = 3 * 60_000;
@@ -96,7 +96,8 @@ export async function getAudience(env: GlasgowEnv, request: Request) {
 	const fresh = new Date(Date.now() - HAND_STALE_MS).toISOString();
 	const [hands, questions] = await env.DB.batch([
 		env.DB.prepare('SELECT device, since FROM glasgow_hands WHERE set_id = ? AND up = 1 AND seen_at > ? ORDER BY since, device').bind(set.id, fresh),
-		env.DB.prepare('SELECT id, text, at, slide_n, slide_key, device, answered_at FROM glasgow_questions WHERE set_id = ? ORDER BY id').bind(set.id),
+		env.DB.prepare(`SELECT id, text, at, slide_n, slide_key, device, answered_at FROM glasgow_questions
+			WHERE set_id = ? AND id > COALESCE((SELECT questions_after FROM glasgow_clears WHERE set_id = ?), 0) ORDER BY id`).bind(set.id, set.id),
 	]);
 	const h = (hands.results as { device: string; since: string }[]).map((x) => ({ device: short(x.device), since: x.since }));
 	const q = (questions.results as { id: number; text: string; at: string; slide_n: number | null; slide_key: string | null; device: string; answered_at: string | null }[])
@@ -134,4 +135,37 @@ export async function postClearHands(env: GlasgowEnv, request: Request) {
 		...up.map((x) => env.DB.prepare('INSERT INTO glasgow_hand_events (set_id, device, up, at, delete_after) VALUES (?, ?, 0, ?, ?)').bind(set.id, x.device, t, set.deleteAfter)),
 	]);
 	return json({ ok: true, lowered: up.length });
+}
+
+/**
+ * Clear, for wiping a rehearsal. {q}: delete that question's answers. {all: true}: delete every answer in the set,
+ * lower every hand, and take every question off the presenter's list. Questions and hand events stay in the record
+ * (until deleteAfter), as Martin asked; only answers to the polls are deleted.
+ */
+export async function postClear(env: GlasgowEnv, request: Request) {
+	const denied = presenter(env, request);
+	if (denied) return denied;
+	await ensureSchema(env.DB);
+	const r = await readBody(request);
+	if (!r.ok) return fail(400, 'Expected JSON.');
+	const set = setOf(r.body);
+	if (!set) return fail(404, 'No such question set.');
+	if (r.body?.all === true) {
+		const t = now(), fresh = new Date(Date.now() - HAND_STALE_MS).toISOString();
+		const up = (await env.DB.prepare('SELECT device FROM glasgow_hands WHERE set_id = ? AND up = 1 AND seen_at > ?').bind(set.id, fresh).all<{ device: string }>()).results;
+		const res = await env.DB.batch([
+			env.DB.prepare('DELETE FROM glasgow_answers WHERE set_id = ?').bind(set.id),
+			env.DB.prepare(`INSERT INTO glasgow_clears (set_id, questions_after, at) VALUES (?, COALESCE((SELECT MAX(id) FROM glasgow_questions WHERE set_id = ?), 0), ?)
+				ON CONFLICT (set_id) DO UPDATE SET questions_after = excluded.questions_after, at = excluded.at`).bind(set.id, set.id, t),
+			env.DB.prepare('UPDATE glasgow_hands SET up = 0, seen_at = ? WHERE set_id = ? AND up = 1').bind(t, set.id),
+			...up.map((x) => env.DB.prepare('INSERT INTO glasgow_hand_events (set_id, device, up, at, delete_after) VALUES (?, ?, 0, ?, ?)').bind(set.id, x.device, t, set.deleteAfter)),
+		]);
+		const answers = res[0].meta.changes ?? 0;
+		const before = await env.DB.prepare('SELECT COUNT(*) AS n FROM glasgow_questions WHERE set_id = ?').bind(set.id).first<{ n: number }>();
+		return json({ ok: true, cleared: answers + up.length, answers, hands: up.length, questionsHidden: before?.n ?? 0 });
+	}
+	const q = findQuestion(set, typeof r.body?.q === 'string' ? r.body.q : null);
+	if (!q) return fail(404, 'No such question: send {"q": "<id>"} or {"all": true}.');
+	const res = await env.DB.prepare('DELETE FROM glasgow_answers WHERE set_id = ? AND q = ?').bind(set.id, q.id).run();
+	return json({ ok: true, cleared: res.meta.changes ?? 0 });
 }

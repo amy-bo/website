@@ -38,6 +38,8 @@ const SCHEMA = [
 	`CREATE INDEX IF NOT EXISTS glasgow_questions_device ON glasgow_questions (device, at)`,
 	`CREATE TABLE IF NOT EXISTS glasgow_hands (set_id TEXT NOT NULL, device TEXT NOT NULL, up INTEGER NOT NULL, since TEXT NOT NULL,
 		seen_at TEXT NOT NULL, delete_after TEXT NOT NULL, PRIMARY KEY (set_id, device))`,
+	// "Clear" for questions keeps the record: /audience lists only questions after this id.
+	`CREATE TABLE IF NOT EXISTS glasgow_clears (set_id TEXT PRIMARY KEY, questions_after INTEGER NOT NULL, at TEXT NOT NULL)`,
 	`CREATE TABLE IF NOT EXISTS glasgow_hand_events (id INTEGER PRIMARY KEY, set_id TEXT NOT NULL, device TEXT NOT NULL, up INTEGER NOT NULL,
 		at TEXT NOT NULL, delete_after TEXT NOT NULL)`,
 ];
