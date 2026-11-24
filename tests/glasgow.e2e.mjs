@@ -37,7 +37,7 @@ try {
 
 	console.log('State and CORS');
 	let s = await call('GET', '/api/glasgow/state');
-	check('state: no question showing yet, the three questions listed', s.status === 200 && s.data.current === null && s.data.questions.map((q) => q.id).join() === 'q42,q61,q93,q105,q106' && s.data.set === 'why-2026' && s.data.pollSeconds === 2, JSON.stringify(s.data));
+	check('state: no question showing yet, the three questions listed', s.status === 200 && s.data.current === null && s.data.questions.map((q) => q.id).join() === 'q00,q42,q61,q93,q105,q106' && s.data.set === 'why-2026' && s.data.pollSeconds === 2, JSON.stringify(s.data));
 	check('state: open to any origin, never cached', s.headers.get('access-control-allow-origin') === '*' && s.headers.get('cache-control') === 'no-store');
 	check('state: no internal bins in the public question list', !('bins' in s.data.questions[0]));
 	const pre = await fetch(`${BASE}/api/glasgow/current`, { method: 'OPTIONS', headers: { origin: 'null', 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type, x-presenter-token' } });
@@ -74,9 +74,10 @@ try {
 	console.log('q61: log scale');
 	await call('POST', '/api/glasgow/current', { q: 'q61' }, presenter);
 	check('the closed question no longer takes answers', (await call('POST', '/api/glasgow/answer', { q: 'q42', value: 3, device: dev(9) })).status === 409);
-	for (const [n, v] of [[1, 0.1], [2, 0], [3, 7.5]]) await call('POST', '/api/glasgow/answer', { q: 'q61', value: v, device: dev(n) });
+	for (const [n, v] of [[1, 0.1], [2, 0.0001], [3, 75]]) await call('POST', '/api/glasgow/answer', { q: 'q61', value: v, device: dev(n) });
 	r = await call('GET', '/api/glasgow/results?q=q61');
-	check('q61 totals', r.data.count === 3 && r.data.median === 0.1 && r.data.bins.at(-1).n === 1, JSON.stringify(r.data));
+	check('q61 totals: 0.0001 % to 100 %, one bin per decade', r.data.count === 3 && r.data.median === 0.1 && r.data.bins.length === 6 && r.data.bins[0].n === 1 && r.data.bins.at(-1).n === 1, JSON.stringify(r.data));
+	check('q61 refuses 0 (below 0.0001 %)', (await call('POST', '/api/glasgow/answer', { q: 'q61', value: 0, device: dev(4) })).status === 400);
 	check('q42 results are kept after it closes', (await call('GET', '/api/glasgow/results?q=q42')).data.count === 4);
 
 	console.log('q93: text, filtered and moderated');
@@ -96,10 +97,25 @@ try {
 	check('…and can be shown again', (await call('POST', '/api/glasgow/hide', { q: 'q93', id: cowId, hidden: false }, presenter)).status === 200 && (await call('GET', '/api/glasgow/results?q=q93')).data.count === 2);
 	check('hiding an unknown answer → 404', (await call('POST', '/api/glasgow/hide', { q: 'q93', id: 999999 }, presenter)).status === 404);
 
+	console.log('q00: a word cloud, many answers per phone');
+	await call('POST', '/api/glasgow/current', { q: 'q00' }, presenter);
+	r = await call('POST', '/api/glasgow/answer', { q: 'q00', value: 'Mushrooms', device: dev(1) });
+	check('an answer is added, with its id', r.status === 200 && Number.isInteger(r.data.id), JSON.stringify(r));
+	check('a second within 2 s → 429', (await call('POST', '/api/glasgow/answer', { q: 'q00', value: 'insects', device: dev(1) })).status === 429);
+	await new Promise((res) => setTimeout(res, 2100));
+	check('…and after 2 s it is added too', (await call('POST', '/api/glasgow/answer', { q: 'q00', value: 'insects', device: dev(1) })).status === 200);
+	await call('POST', '/api/glasgow/answer', { q: 'q00', value: 'mushrooms ', device: dev(2) });
+	await call('POST', '/api/glasgow/answer', { q: 'q00', value: 'MUSHROOMS', device: dev(3) });
+	check('41 characters → 400', (await call('POST', '/api/glasgow/answer', { q: 'q00', value: 'x'.repeat(41), device: dev(4) })).status === 400);
+	r = await call('GET', '/api/glasgow/results?q=q00');
+	check('results: every answer, and the words counted case-insensitively', r.data.count === 4 && r.data.texts.length === 4 && JSON.stringify(r.data.words) === JSON.stringify([{ text: 'Mushrooms', n: 3 }, { text: 'insects', n: 1 }]), JSON.stringify(r.data));
+	check('q00 answers do not touch the one-per-phone questions', (await call('GET', '/api/glasgow/results?q=q42')).data.count === 4);
+	await call('POST', '/api/glasgow/current', { q: 'q93' }, presenter);
+
 	console.log('Rate limits');
 	let limited = 0;
-	for (let i = 0; i < 14; i++) if ((await call('POST', '/api/glasgow/answer', { q: 'q93', value: `try ${i}`, device: dev(7) })).status === 429) limited++;
-	check('one device changing its answer more than 12 times a minute is slowed down', limited === 2, String(limited));
+	for (let i = 0; i < 32; i++) if ((await call('POST', '/api/glasgow/answer', { q: 'q93', value: `try ${i}`, device: dev(7) })).status === 429) limited++;
+	check('one device sending more than 30 answers a minute is slowed down', limited === 2, String(limited));
 
 	console.log('Closing');
 	r = await call('POST', '/api/glasgow/current', { q: null }, presenter);

@@ -59,8 +59,23 @@ export function numberResults(q: NumberQuestion, values: number[]) {
 	return { type: 'number' as const, count: sorted.length, mean: sorted.length ? round(sorted.reduce((a, b) => a + b, 0) / sorted.length) : null, median: m === null ? null : round(m), values: sorted, bins };
 }
 
-export function textResults(_q: TextQuestion, rows: { id: number; text: string; at: string }[], count: number) {
-	return { type: 'text' as const, count, texts: rows.slice(0, 30) };
+/** Answers grouped for a word cloud: case-insensitive, spaces collapsed; each shown with its first-sent spelling. */
+export function wordCounts(rows: { text: string; at: string }[]) {
+	const groups = new Map<string, { text: string; n: number; first: string }>();
+	for (const r of rows) {
+		const text = r.text.replace(/\s+/g, ' ').trim();
+		if (!text) continue;
+		const key = text.toLocaleLowerCase('en-GB');
+		const g = groups.get(key);
+		if (!g) groups.set(key, { text, n: 1, first: r.at });
+		else { g.n++; if (r.at < g.first) { g.first = r.at; g.text = text; } }
+	}
+	return [...groups.values()].sort((a, b) => b.n - a.n || a.text.localeCompare(b.text)).map(({ text, n }) => ({ text, n }));
+}
+
+/** rows: every shown answer, newest first. A word-cloud question lists them all; others the latest 30. */
+export function textResults(q: TextQuestion, rows: { id: number; text: string; at: string }[]) {
+	return { type: 'text' as const, count: rows.length, texts: q.multiple ? rows : rows.slice(0, 30), words: wordCounts(rows) };
 }
 
 /** A presenter token check that takes the same time whatever the guess. */

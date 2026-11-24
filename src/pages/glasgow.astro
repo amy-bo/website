@@ -41,6 +41,7 @@ const set = findSet(ACTIVE_SET)!;
 				<label for="text-input" class="vh">Your answer</label>
 				<input id="text-input" type="text" autocomplete="off" enterkeyhint="send" />
 				<p class="count" id="text-count" aria-live="polite"></p>
+				<ul id="mine" hidden></ul>
 			</div>
 			<button id="send" type="submit">Send</button>
 			<p id="status" role="status"></p>
@@ -51,7 +52,7 @@ const set = findSet(ACTIVE_SET)!;
 	</main>
 
 	<script>
-		type Q = { id: string; type: 'number' | 'text'; prompt: string; min?: number; max?: number; step?: number; scale?: 'linear' | 'log'; unit?: string; maxLength?: number };
+		type Q = { id: string; type: 'number' | 'text'; prompt: string; min?: number; max?: number; step?: number; scale?: 'linear' | 'log'; unit?: string; maxLength?: number; multiple?: boolean };
 		type State = { set: string; current: string | null; pollSeconds: number; questions: Q[] };
 		const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 		const app = $('app'), setId = app.dataset.set || '';
@@ -93,8 +94,10 @@ const set = findSet(ACTIVE_SET)!;
 			return Math.round(((Math.log10(Math.min(Math.max(v, logMin(q)), q.max ?? 10)) - lo) / (hi - lo)) * LOG_STEPS);
 		};
 		const fmt = (q: Q, v: number) => {
-			const d = q.scale === 'log' ? (v >= 1 ? 1 : v >= 0.1 ? 2 : 3) : decimals(q);
-			return `${Number(v.toFixed(d))}${q.unit === '%' ? '%' : q.unit ? ' ' + q.unit : ''}`;
+			// A log scale shows two significant figures, so 0.00037 % reads as such; a linear one, the step's decimals.
+			const n = q.scale === 'log' ? (v >= 10 ? Number(v.toFixed(0)) : Number(v.toPrecision(2))) : Number(v.toFixed(decimals(q)));
+			const s = Math.abs(n) > 0 && Math.abs(n) < 0.001 ? n.toFixed(-Math.floor(Math.log10(Math.abs(n))) + 1).replace(/0+$/, '') : String(n);
+			return `${s}${q.unit === '%' ? '%' : q.unit ? ' ' + q.unit : ''}`;
 		};
 		let numberValue = 0;
 		const setNumber = (q: Q, v: number, from: 'range' | 'exact' | 'init') => {
@@ -103,6 +106,15 @@ const set = findSet(ACTIVE_SET)!;
 			if (from !== 'range') range.value = String(toSlider(q, v));
 			if (from !== 'exact') exact.value = String(v);
 		};
+
+		// A word-cloud question keeps a list of what this phone has added, so students can see what they sent.
+		const added = (q: Q): string[] => { try { return JSON.parse(get(sentKey(q.id) + '-list') || '[]'); } catch { return []; } };
+		const mine = $('mine');
+		function showMine(q: Q) {
+			const list = q.multiple ? added(q) : [];
+			mine.hidden = !list.length;
+			mine.replaceChildren(...list.map((t) => { const li = document.createElement('li'); li.textContent = t; return li; }));
+		}
 
 		function show(q: Q | null) {
 			if (shown && q && shown.id === q.id) return;
@@ -124,11 +136,17 @@ const set = findSet(ACTIVE_SET)!;
 				setNumber(q, start, 'init');
 			} else {
 				text.maxLength = q.maxLength || 80;
-				text.value = previous ?? '';
+				text.value = q.multiple ? '' : previous ?? '';
 				count.textContent = `${[...text.value].length} of ${text.maxLength}`;
 			}
-			send.textContent = previous !== null ? 'Change my answer' : 'Send';
-			if (previous !== null) status.textContent = 'Your answer is in. You can change it.';
+			showMine(q);
+			if (q.multiple) {
+				send.textContent = 'Add';
+				if (added(q).length) status.textContent = 'Add as many as you like, one at a time.';
+			} else {
+				send.textContent = previous !== null ? 'Change my answer' : 'Send';
+				if (previous !== null) status.textContent = 'Your answer is in. You can change it.';
+			}
 			prompt.focus({ preventScroll: true });
 		}
 
@@ -152,7 +170,13 @@ const set = findSet(ACTIVE_SET)!;
 			try {
 				const res = await fetch('/api/glasgow/answer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ set: setId, q: q.id, value, device }) });
 				const body = await res.json().catch(() => ({}));
-				if (res.ok) {
+				if (res.ok && q.multiple) {
+					put(sentKey(q.id) + '-list', JSON.stringify([...added(q), String(body.value ?? value)]));
+					text.value = ''; count.textContent = `0 of ${text.maxLength}`;
+					showMine(q);
+					status.textContent = 'Added. Add another, or wait for the next question.';
+					text.focus();
+				} else if (res.ok) {
 					put(sentKey(q.id), String(body.value ?? value));
 					send.textContent = 'Change my answer';
 					status.textContent = 'Thank you: your answer is in. You can change it.';
@@ -206,6 +230,8 @@ const set = findSet(ACTIVE_SET)!;
 		#text-input { width: 100%; font: inherit; font-size: 1.2rem; padding: 0.75rem; border: 2px solid #8a8a8a; border-radius: 0.5rem; }
 		input:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 		.count { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.9rem; text-align: right; }
+		#mine { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+		#mine li { background: #eef6fb; color: var(--blue); border-radius: 1rem; padding: 0.2rem 0.7rem; font-size: 0.95rem; }
 		button { font: inherit; font-size: 1.2rem; min-height: 3.25rem; border: 0; border-radius: 0.6rem; background: var(--blue); color: #fff; cursor: pointer; }
 		button:disabled { opacity: 0.6; }
 		#status { min-height: 1.5em; margin: 0; }

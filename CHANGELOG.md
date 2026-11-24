@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-11-24
 
+- [x] **Glasgow lecture: a word cloud first, and steak from 0.0001 %** — New first question q00, "What does altProtein mean to you?": each phone can add up to 30 short answers (40 characters), one every 2 seconds, and the results list every answer plus `words`, the answers counted case-insensitively for a live word cloud. q61 now runs from 0.0001 % to 100 % on its log slider, with one histogram bin per decade. Text results for every question gain `words`.
 - [x] **Glasgow lecture: two more questions** — q105 (what we grow in the remote reactor: 1 spirulina, 2 hydrogen-oxidising bacteria) and q106 (where the inoculum comes from, 1 to 3), as number questions with one histogram bin per choice, for the AMYBO-MC lecture slides.
 
 ## 2026-11-22

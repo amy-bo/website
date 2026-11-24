@@ -1,16 +1,18 @@
 // Live lecture polling (amybo.org/glasgow): the pure parts. The API itself is checked by tests/glasgow.e2e.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkAnswer, isBlocked, numberResults, textResults, tokenMatches, rateKey, DEVICE_RE } from '../src/glasgow/core.ts';
+import { checkAnswer, isBlocked, numberResults, textResults, wordCounts, tokenMatches, rateKey, DEVICE_RE } from '../src/glasgow/core.ts';
 import { SETS, ACTIVE_SET, findSet, findQuestion } from '../src/glasgow/sets.ts';
 
 const set = findSet(ACTIVE_SET);
 const q42 = findQuestion(set, 'q42'), q61 = findQuestion(set, 'q61'), q93 = findQuestion(set, 'q93');
 
 test('the Why set has the three questions as briefed, deleted 30 days after the lecture', () => {
-	assert.deepEqual(set.questions.map((q) => [q.id, q.type]), [['q42', 'number'], ['q61', 'number'], ['q93', 'text'], ['q105', 'number'], ['q106', 'number']]);
+	assert.deepEqual(set.questions.map((q) => [q.id, q.type]), [['q00', 'text'], ['q42', 'number'], ['q61', 'number'], ['q93', 'text'], ['q105', 'number'], ['q106', 'number']]);
 	assert.deepEqual([q42.min, q42.max, q42.step, q42.scale], [1, 5, 0.1, 'linear']);
-	assert.deepEqual([q61.min, q61.max, q61.scale, q61.unit], [0, 10, 'log', '%']);
+	assert.deepEqual([q61.min, q61.max, q61.step, q61.scale, q61.unit], [0.0001, 100, 0.0001, 'log', '%']);
+	const q00 = findQuestion(set, 'q00');
+	assert.deepEqual([q00.type, q00.maxLength, q00.multiple, q00.maxPerDevice], ['text', 40, true, 30]);
 	assert.equal(q93.maxLength, 80);
 	assert.equal(set.deleteAfter, '2026-12-25T00:00:00Z');
 	assert.equal(new Set(SETS.map((s) => s.id)).size, SETS.length, 'set ids are unique');
@@ -26,10 +28,11 @@ test('numbers: in range, rounded to the step; strings of numbers accepted; nonse
 	assert.equal(checkAnswer(q42, 0.9).ok, false);
 	assert.equal(checkAnswer(q42, 5.01).ok, false);
 	for (const bad of [null, '', 'abc', NaN, Infinity, {}, []]) assert.equal(checkAnswer(q42, bad).ok, false, String(bad));
-	assert.deepEqual(checkAnswer(q61, 0), { ok: true, num: 0, text: null });
-	assert.deepEqual(checkAnswer(q61, 0.004), { ok: true, num: 0, text: null }, 'to the nearest 0.01 %');
-	assert.deepEqual(checkAnswer(q61, 0.126), { ok: true, num: 0.13, text: null });
-	assert.equal(checkAnswer(q61, 11).ok, false);
+	assert.deepEqual(checkAnswer(q61, 0.0001), { ok: true, num: 0.0001, text: null });
+	assert.deepEqual(checkAnswer(q61, 0.00037), { ok: true, num: 0.0004, text: null }, 'to the nearest 0.0001 %');
+	assert.deepEqual(checkAnswer(q61, 100), { ok: true, num: 100, text: null });
+	assert.equal(checkAnswer(q61, 0).ok, false, 'below 0.0001 %');
+	assert.equal(checkAnswer(q61, 101).ok, false);
 });
 
 test('texts: tidied, up to 80 characters, non-strings refused', () => {
@@ -57,7 +60,7 @@ test('number totals: sorted values, mean, median and bins, with the top edge in 
 	assert.equal(numberResults(q42, [2, 4]).median, 3, 'even count: the middle two averaged');
 	const empty = numberResults(q42, []);
 	assert.deepEqual([empty.count, empty.mean, empty.median], [0, null, null]);
-	assert.deepEqual(numberResults(q61, [0, 0.005, 0.02, 9.9, 10]).bins.map((b) => b.n), [2, 1, 0, 0, 0, 0, 2]);
+	assert.deepEqual(numberResults(q61, [0.0001, 0.0005, 0.02, 9.9, 10, 100]).bins.map((b) => b.n), [2, 0, 1, 0, 1, 2], 'one bin per decade');
 });
 
 test('choice questions: whole numbers only in range, one bin per choice', () => {
@@ -69,11 +72,15 @@ test('choice questions: whole numbers only in range, one bin per choice', () => 
 	assert.deepEqual(numberResults(q106, [1, 2, 3, 3]).bins.map((b) => b.n), [1, 1, 2]);
 });
 
-test('text totals: at most 30', () => {
-	const rows = Array.from({ length: 40 }, (_, i) => ({ id: i + 1, text: `t${i}`, at: '' }));
-	const r = textResults(q93, rows, 40);
+test('text totals: the latest 30, or every one for a word cloud, with word counts', () => {
+	const rows = Array.from({ length: 40 }, (_, i) => ({ id: 40 - i, text: `t${i}`, at: `2026-11-25T12:00:${String(59 - i).padStart(2, '0')}Z` }));
+	const r = textResults(q93, rows);
 	assert.equal(r.texts.length, 30);
 	assert.equal(r.count, 40);
+	assert.equal(r.words.length, 40);
+	assert.equal(textResults(findQuestion(set, 'q00'), rows).texts.length, 40);
+	const w = wordCounts([{ text: 'Mushrooms', at: '2' }, { text: 'insects', at: '3' }, { text: 'mushrooms ', at: '1' }, { text: 'MUSHROOMS', at: '4' }, { text: 'cultured  meat', at: '5' }, { text: 'Insects', at: '6' }]);
+	assert.deepEqual(w, [{ text: 'mushrooms', n: 3 }, { text: 'insects', n: 2 }, { text: 'cultured meat', n: 1 }], 'case-insensitive, spelt as first sent, most first');
 });
 
 test('presenter token and device ids', async () => {

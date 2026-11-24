@@ -7,7 +7,11 @@ export interface GlasgowEnv { DB: D1Database; TOKEN_SECRET?: string; GLASGOW_PRE
 /** Answers allowed per address per minute, across all devices behind it (a lecture theatre on one network). */
 export const PER_ADDRESS_PER_MINUTE = 120;
 /** Answers (including changes) allowed per device per minute. */
-export const PER_DEVICE_PER_MINUTE = 12;
+export const PER_DEVICE_PER_MINUTE = 30;
+/** Shown answers to a text question, at most: enough for any lecture theatre's word cloud. */
+const MAX_TEXTS = 2000;
+/** Seconds between answers from one phone to a word-cloud question. */
+const CLOUD_GAP_SECONDS = 2;
 
 const now = () => new Date().toISOString();
 
@@ -58,10 +62,9 @@ export async function getResults(env: GlasgowEnv, setId: string | null, qId: str
 		const rows = (await env.DB.prepare('SELECT value_num FROM glasgow_answers WHERE set_id = ? AND q = ? AND value_num IS NOT NULL').bind(set.id, q.id).all<{ value_num: number }>()).results;
 		return json({ ...base, ...numberResults(q, rows.map((r: { value_num: number }) => r.value_num)) });
 	}
-	const shown = "set_id = ? AND q = ? AND value_text IS NOT NULL AND blocked = 0 AND hidden = 0";
-	const rows = (await env.DB.prepare(`SELECT id, value_text AS text, updated_at AS at FROM glasgow_answers WHERE ${shown} ORDER BY updated_at DESC, id DESC LIMIT 30`).bind(set.id, q.id).all<{ id: number; text: string; at: string }>()).results;
-	const count = (await env.DB.prepare(`SELECT COUNT(*) AS n FROM glasgow_answers WHERE ${shown}`).bind(set.id, q.id).first<{ n: number }>())?.n ?? 0;
-	return json({ ...base, ...textResults(q, rows, count) });
+	const rows = (await env.DB.prepare(`SELECT id, value_text AS text, updated_at AS at FROM glasgow_answers
+		WHERE set_id = ? AND q = ? AND value_text IS NOT NULL AND blocked = 0 AND hidden = 0 ORDER BY updated_at DESC, id DESC LIMIT ?`).bind(set.id, q.id, MAX_TEXTS).all<{ id: number; text: string; at: string }>()).results;
+	return json({ ...base, ...textResults(q, rows) });
 }
 
 /** Counts one hit against a key in the current minute; true while under the limit. */
@@ -91,11 +94,23 @@ export async function postAnswer(env: GlasgowEnv, request: Request) {
 	if (!(await underLimit(env, 'a:' + addr, PER_ADDRESS_PER_MINUTE)) || !(await underLimit(env, 'd:' + device, PER_DEVICE_PER_MINUTE))) return fail(429, 'Too many answers just now: please wait a minute.');
 	const blocked = checked.text !== null && isBlocked(checked.text) ? 1 : 0;
 	const t = now();
+	if (q.type === 'text' && q.multiple) {
+		// Each send is a new row, stored as "<device>#<time>" (a device id never contains "#"), so the one-per-device
+		// rule of the table still holds for every other question. Counted by the range of ids that start "<device>#".
+		const mine = await env.DB.prepare('SELECT COUNT(*) AS n, MAX(created_at) AS last FROM glasgow_answers WHERE set_id = ? AND q = ? AND device >= ? AND device < ?')
+			.bind(set.id, q.id, device + '#', device + '$').first<{ n: number; last: string | null }>();
+		if (mine?.last && Date.now() - Date.parse(mine.last) < CLOUD_GAP_SECONDS * 1000) return fail(429, 'Wait a moment before adding another.');
+		if ((mine?.n ?? 0) >= (q.maxPerDevice ?? 30)) return fail(429, "That's the most answers one phone can add.");
+		const row = await env.DB.prepare(`INSERT INTO glasgow_answers (set_id, q, device, value_num, value_text, blocked, hidden, created_at, updated_at, delete_after)
+			VALUES (?, ?, ?, NULL, ?, ?, 0, ?, ?, ?) RETURNING id`).bind(set.id, q.id, `${device}#${Date.now()}${Math.floor(Math.random() * 1000)}`, checked.text, blocked, t, t, set.deleteAfter).first<{ id: number }>();
+		return json({ ok: true, q: q.id, value: checked.text, id: row?.id ?? null });
+	}
 	await env.DB.prepare(`INSERT INTO glasgow_answers (set_id, q, device, value_num, value_text, blocked, hidden, created_at, updated_at, delete_after)
 		VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
 		ON CONFLICT (set_id, q, device) DO UPDATE SET value_num = excluded.value_num, value_text = excluded.value_text, blocked = excluded.blocked, hidden = 0, updated_at = excluded.updated_at`)
 		.bind(set.id, q.id, device, checked.num, checked.text, blocked, t, t, set.deleteAfter).run();
-	return json({ ok: true, q: q.id, value: checked.num ?? checked.text });
+	const row = await env.DB.prepare('SELECT id FROM glasgow_answers WHERE set_id = ? AND q = ? AND device = ?').bind(set.id, q.id, device).first<{ id: number }>();
+	return json({ ok: true, q: q.id, value: checked.num ?? checked.text, id: row?.id ?? null });
 }
 
 function presenter(env: GlasgowEnv, request: Request) {
