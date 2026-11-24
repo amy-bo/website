@@ -7,12 +7,14 @@ export interface NumberQuestion { id: string; type: 'number'; prompt: string; mi
 /** multiple: each send adds another answer (a word cloud), up to maxPerDevice per phone; otherwise a send replaces the last. */
 export interface TextQuestion { id: string; type: 'text'; prompt: string; maxLength: number; multiple?: boolean; maxPerDevice?: number }
 export type Question = NumberQuestion | TextQuestion;
-export interface QuestionSet { id: string; title: string; date: string; deleteAfter: string; pollSeconds: number; questions: Question[] }
+/** logo: the lecture's own logo, shown right of the AMYBO logo at the same height (a file in public/). */
+export interface QuestionSet { id: string; title: string; logo?: { src: string; alt: string }; date: string; deleteAfter: string; pollSeconds: number; questions: Question[] }
 
 export const SETS: QuestionSet[] = [
 	{
 		id: 'why-2026',
 		title: 'Why',
+		logo: { src: '/glasgow/altprotein-why.svg', alt: 'altProtein: Why?' },
 		date: '2026-11-25',
 		// 30 days after the lecture.
 		deleteAfter: '2026-12-25T00:00:00Z',

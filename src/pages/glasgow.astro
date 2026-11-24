@@ -21,7 +21,7 @@ const set = findSet(ACTIVE_SET)!;
 	<main id="app" data-set={set.id} data-poll={set.pollSeconds}>
 		<header>
 			<img src="/link-media/amybo.svg" alt="AMYBO" width="96" height="66" />
-			<p class="lecture">{set.title}</p>
+			{set.logo ? <img class="lecture-logo" src={set.logo.src} alt={set.logo.alt} width="440" height="206" /> : <p class="lecture">{set.title}</p>}
 		</header>
 
 		<section id="waiting" aria-live="polite">
@@ -283,6 +283,7 @@ const set = findSet(ACTIVE_SET)!;
 		main { max-width: 34rem; margin: 0 auto; padding: max(1rem, env(safe-area-inset-top)) 1rem max(1.5rem, env(safe-area-inset-bottom)); min-height: 100dvh; display: flex; flex-direction: column; gap: 1.25rem; }
 		header { display: flex; align-items: center; justify-content: space-between; }
 		header img { display: block; height: 2.6rem; width: auto; }
+		header { gap: 1rem; }
 		.lecture { margin: 0; color: var(--blue); font-size: 1.05rem; }
 		h1 { font-size: 1.6rem; line-height: 1.25; margin: 0 0 0.75rem; outline: none; }
 		#waiting p { color: var(--muted); margin: 0; }
