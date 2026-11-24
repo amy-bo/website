@@ -13,7 +13,7 @@ const MAX_TEXTS = 2000;
 /** Seconds between answers from one phone to a word-cloud question. */
 const CLOUD_GAP_SECONDS = 2;
 
-const now = () => new Date().toISOString();
+export const now = () => new Date().toISOString();
 
 /**
  * The tables, created on first use (idempotent), so the feature needs no step in the deploy workflow.
@@ -29,6 +29,17 @@ const SCHEMA = [
 	`CREATE INDEX IF NOT EXISTS glasgow_answers_q ON glasgow_answers (set_id, q, updated_at)`,
 	`CREATE INDEX IF NOT EXISTS glasgow_answers_expiry ON glasgow_answers (delete_after)`,
 	`CREATE TABLE IF NOT EXISTS glasgow_rate (key TEXT NOT NULL, minute INTEGER NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (key, minute))`,
+	// Hands up and audience questions (src/glasgow/audience.ts). Every question and every hand going up or down is kept,
+	// with its device id and time, until delete_after: a record for the presenter, never shown publicly.
+	`CREATE TABLE IF NOT EXISTS glasgow_slide (set_id TEXT PRIMARY KEY, n INTEGER, key TEXT, at TEXT NOT NULL)`,
+	`CREATE TABLE IF NOT EXISTS glasgow_questions (id INTEGER PRIMARY KEY, set_id TEXT NOT NULL, device TEXT NOT NULL, text TEXT NOT NULL,
+		at TEXT NOT NULL, slide_n INTEGER, slide_key TEXT, answered_at TEXT, delete_after TEXT NOT NULL)`,
+	`CREATE INDEX IF NOT EXISTS glasgow_questions_set ON glasgow_questions (set_id, id)`,
+	`CREATE INDEX IF NOT EXISTS glasgow_questions_device ON glasgow_questions (device, at)`,
+	`CREATE TABLE IF NOT EXISTS glasgow_hands (set_id TEXT NOT NULL, device TEXT NOT NULL, up INTEGER NOT NULL, since TEXT NOT NULL,
+		seen_at TEXT NOT NULL, delete_after TEXT NOT NULL, PRIMARY KEY (set_id, device))`,
+	`CREATE TABLE IF NOT EXISTS glasgow_hand_events (id INTEGER PRIMARY KEY, set_id TEXT NOT NULL, device TEXT NOT NULL, up INTEGER NOT NULL,
+		at TEXT NOT NULL, delete_after TEXT NOT NULL)`,
 ];
 let ready: Promise<unknown> | null = null;
 /** Once per Worker instance; retried if it failed. */
@@ -68,7 +79,7 @@ export async function getResults(env: GlasgowEnv, setId: string | null, qId: str
 }
 
 /** Counts one hit against a key in the current minute; true while under the limit. */
-async function underLimit(env: GlasgowEnv, key: string, limit: number) {
+export async function underLimit(env: GlasgowEnv, key: string, limit: number) {
 	const minute = Math.floor(Date.now() / 60000);
 	const row = await env.DB.prepare('INSERT INTO glasgow_rate (key, minute, n) VALUES (?, ?, 1) ON CONFLICT (key, minute) DO UPDATE SET n = n + 1 RETURNING n').bind(key, minute).first<{ n: number }>();
 	return (row?.n ?? 0) <= limit;
@@ -113,7 +124,7 @@ export async function postAnswer(env: GlasgowEnv, request: Request) {
 	return json({ ok: true, q: q.id, value: checked.num ?? checked.text, id: row?.id ?? null });
 }
 
-function presenter(env: GlasgowEnv, request: Request) {
+export function presenter(env: GlasgowEnv, request: Request) {
 	if (!env.GLASGOW_PRESENTER_TOKEN) return fail(503, 'The presenter token is not set up on the server.');
 	if (!tokenMatches(request.headers.get('x-presenter-token'), env.GLASGOW_PRESENTER_TOKEN)) return fail(401, 'Wrong presenter token.');
 	return null;
@@ -155,5 +166,7 @@ export async function purge(env: { DB: D1Database }) {
 	await ensureSchema(env.DB);
 	const a = await env.DB.prepare('DELETE FROM glasgow_answers WHERE delete_after <= ?').bind(now()).run();
 	const r = await env.DB.prepare('DELETE FROM glasgow_rate WHERE minute < ?').bind(Math.floor(Date.now() / 60000) - 60).run();
-	return { answers: a.meta.changes, rate: r.meta.changes };
+	const t = now();
+	const audience = await env.DB.batch(['glasgow_questions', 'glasgow_hands', 'glasgow_hand_events'].map((table) => env.DB.prepare(`DELETE FROM ${table} WHERE delete_after <= ?`).bind(t)));
+	return { answers: a.meta.changes, rate: r.meta.changes, audience: audience.reduce((n, x) => n + (x.meta.changes ?? 0), 0) };
 }

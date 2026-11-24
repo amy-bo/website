@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-11-24
 
+- [x] **Glasgow lecture: hands up and questions** — The student page now always has a "Hand up" toggle and an "Ask a question or comment" box (500 characters, as many as anyone likes, listed on the phone that sent them). The presenter's slide reads, with its token, how many hands are up and every question with the slide it arrived on, ticks questions off as answered and can lower all hands. Every question and hand event is kept with its anonymous device id until 25 December, as Martin asked, and the privacy notice says so.
 - [x] **Glasgow lecture: a word cloud first, and steak from 0.0001 %** — New first question q00, "What does altProtein mean to you?": each phone can add up to 30 short answers (40 characters), one every 2 seconds, and the results list every answer plus `words`, the answers counted case-insensitively for a live word cloud. q61 now runs from 0.0001 % to 100 % on its log slider, with one histogram bin per decade. Text results for every question gain `words`.
 - [x] **Glasgow lecture: two more questions** — q105 (what we grow in the remote reactor: 1 spirulina, 2 hydrogen-oxidising bacteria) and q106 (where the inoculum comes from, 1 to 3), as number questions with one histogram bin per choice, for the AMYBO-MC lecture slides.
 

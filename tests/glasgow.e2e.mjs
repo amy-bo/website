@@ -117,6 +117,42 @@ try {
 	for (let i = 0; i < 32; i++) if ((await call('POST', '/api/glasgow/answer', { q: 'q93', value: `try ${i}`, device: dev(7) })).status === 429) limited++;
 	check('one device sending more than 30 answers a minute is slowed down', limited === 2, String(limited));
 
+	console.log('Hands up and questions');
+	check('the audience list needs the token', (await call('GET', '/api/glasgow/audience')).status === 401);
+	check('…and so does the slide', (await call('POST', '/api/glasgow/slide', { n: 1, key: 'a' })).status === 401);
+	r = await call('POST', '/api/glasgow/question', { device: dev(1), text: 'Before any slide?' });
+	check('a question before any slide', r.status === 200 && Number.isInteger(r.data.id), JSON.stringify(r));
+	check('the presenter sets the slide', (await call('POST', '/api/glasgow/slide', { n: 42, key: 'warming' }, presenter)).status === 200);
+	await new Promise((res) => setTimeout(res, 1100));
+	r = await call('POST', '/api/glasgow/question', { device: dev(1), text: '  Why\r\n\r\n\r\n\r\nnot   insects?  ' });
+	const qid = r.data?.id;
+	check('a second question from the same phone, a second later', r.status === 200, JSON.stringify(r));
+	check('…but not within the same second', (await call('POST', '/api/glasgow/question', { device: dev(1), text: 'again' })).status === 429);
+	check('no word filter on questions: the record is kept as sent', (await call('POST', '/api/glasgow/question', { device: dev(2), text: 'this is shit' })).status === 200);
+	check('501 characters → 400', (await call('POST', '/api/glasgow/question', { device: dev(3), text: 'x'.repeat(501) })).status === 400);
+	check('an empty question → 400', (await call('POST', '/api/glasgow/question', { device: dev(3), text: '   ' })).status === 400);
+	check('a hand up', (await call('POST', '/api/glasgow/hand', { device: dev(1), up: true })).data?.up === true);
+	await call('POST', '/api/glasgow/hand', { device: dev(2), up: true });
+	await call('POST', '/api/glasgow/hand', { device: dev(2), up: true });
+	check('"up" must be true or false', (await call('POST', '/api/glasgow/hand', { device: dev(3), up: 'yes' })).status === 400);
+	let a = await call('GET', '/api/glasgow/audience', undefined, presenter);
+	check('audience: two hands up (sending it twice is still one hand)', a.status === 200 && a.data.hands.count === 2 && a.data.hands.devices[0].device === dev(1).slice(0, 8), JSON.stringify(a.data.hands));
+	check('audience: every question, oldest first, with its slide and a short device id', a.data.questions.length === 3 && a.data.questions[0].slide === null
+		&& a.data.questions[1].text === 'Why\n\nnot insects?' && a.data.questions[1].slide.n === 42 && a.data.questions[1].slide.key === 'warming' && a.data.questions[1].device === dev(1).slice(0, 8) && a.data.questions[2].text === 'this is shit', JSON.stringify(a.data.questions));
+	check('audience: never cached, open to any origin', a.headers.get('cache-control') === 'no-store' && a.headers.get('access-control-allow-origin') === '*');
+	check('ticking off a question needs the token', (await call('POST', '/api/glasgow/question/answered', { id: qid })).status === 401);
+	check('the presenter ticks one off', (await call('POST', '/api/glasgow/question/answered', { id: qid, answered: true }, presenter)).status === 200);
+	a = await call('GET', '/api/glasgow/audience', undefined, presenter);
+	const ticked = a.data.questions.find((x) => x.id === qid);
+	check('…and it shows as answered, with when', ticked.answered === true && !!ticked.answeredAt);
+	await call('POST', '/api/glasgow/question/answered', { id: qid, answered: false }, presenter);
+	check('…and can be unticked', (await call('GET', '/api/glasgow/audience', undefined, presenter)).data.questions.find((x) => x.id === qid).answered === false);
+	check('an unknown question id → 404', (await call('POST', '/api/glasgow/question/answered', { id: 999999 }, presenter)).status === 404);
+	await call('POST', '/api/glasgow/hand', { device: dev(1), up: false });
+	check('a hand lowered', (await call('GET', '/api/glasgow/audience', undefined, presenter)).data.hands.count === 1);
+	r = await call('POST', '/api/glasgow/hands/clear', undefined, presenter);
+	check('the presenter lowers every hand', r.status === 200 && r.data.lowered === 1 && (await call('GET', '/api/glasgow/audience', undefined, presenter)).data.hands.count === 0, JSON.stringify(r));
+
 	console.log('Closing');
 	r = await call('POST', '/api/glasgow/current', { q: null }, presenter);
 	check('the presenter can show nothing', r.status === 200 && r.data.current === null && (await call('GET', '/api/glasgow/state')).data.current === null);

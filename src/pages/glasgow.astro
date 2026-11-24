@@ -47,7 +47,19 @@ const set = findSet(ACTIVE_SET)!;
 			<p id="status" role="status"></p>
 		</form>
 
-		<p class="notice">Anonymous answers, shown live in the lecture. <a href="/privacy/#live-lecture-questions">Privacy</a></p>
+		<section id="audience" aria-labelledby="ask-h">
+			<button id="hand" type="button" aria-pressed="false">✋ Hand up</button>
+			<form id="ask" novalidate>
+				<h2 id="ask-h"><label for="ask-text">Ask a question or comment</label></h2>
+				<textarea id="ask-text" rows="3" maxlength="500"></textarea>
+				<p class="count" id="ask-count" aria-live="polite">0 of 500</p>
+				<button id="ask-send" type="submit">Send</button>
+				<p id="ask-status" role="status"></p>
+				<details id="asked-box" hidden><summary>What you have sent from this phone</summary><ul id="asked"></ul></details>
+			</form>
+		</section>
+
+		<p class="notice">Anonymous answers, shown live in the lecture. Questions and comments go to the presenter only. <a href="/privacy/#live-lecture-questions">Privacy</a></p>
 		<noscript><p>This page needs JavaScript to show the questions.</p></noscript>
 	</main>
 
@@ -207,6 +219,59 @@ const set = findSet(ACTIVE_SET)!;
 		}
 		document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); else clearTimeout(timer); });
 		tick();
+
+		// Hand up: shown to the presenter while this phone keeps re-sending it (every minute); after three minutes
+		// without, the server counts it as lowered, so a phone that has gone away does not leave a hand up.
+		const hand = $<HTMLButtonElement>('hand'), handKey = `glasgow-${setId}-hand`;
+		let handUp = false, handTimer = 0;
+		const drawHand = () => { hand.setAttribute('aria-pressed', String(handUp)); hand.textContent = handUp ? '✋ Hand is up, tap to lower' : '✋ Hand up'; hand.classList.toggle('up', handUp); };
+		async function sendHand(up: boolean) {
+			const res = await fetch('/api/glasgow/hand', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ set: setId, device, up }) });
+			if (!res.ok) throw new Error(String(res.status));
+		}
+		function keepHand() {
+			clearInterval(handTimer);
+			if (handUp) handTimer = window.setInterval(() => { sendHand(true).then(() => put(handKey, String(Date.now()))).catch(() => {}); }, 60_000);
+		}
+		hand.addEventListener('click', async () => {
+			const want = !handUp;
+			hand.disabled = true;
+			try {
+				await sendHand(want);
+				handUp = want; put(handKey, want ? String(Date.now()) : '');
+			} catch { $('ask-status').textContent = 'No connection just now: please try again.'; }
+			hand.disabled = false; drawHand(); keepHand();
+		});
+		{ const at = Number(get(handKey) || 0); if (at && Date.now() - at < 170_000) { handUp = true; sendHand(true).catch(() => {}); } drawHand(); keepHand(); }
+
+		// Questions and comments: as many as anyone likes; this phone keeps a list of what it sent.
+		const ask = $<HTMLFormElement>('ask'), askText = $<HTMLTextAreaElement>('ask-text'), askStatus = $('ask-status'), askSend = $<HTMLButtonElement>('ask-send');
+		const askedKey = `glasgow-${setId}-asked`;
+		const asked = (): { text: string; at: string }[] => { try { return JSON.parse(get(askedKey) || '[]'); } catch { return []; } };
+		function drawAsked() {
+			const list = asked();
+			$('asked-box').hidden = !list.length;
+			$('asked').replaceChildren(...list.slice().reverse().map((x) => { const li = document.createElement('li'); li.textContent = x.text; return li; }));
+		}
+		askText.addEventListener('input', () => { $('ask-count').textContent = `${[...askText.value].length} of 500`; });
+		ask.addEventListener('submit', async (e) => {
+			e.preventDefault();
+			const text = askText.value.trim();
+			if (!text) { askStatus.textContent = 'Please type a question or comment.'; askText.focus(); return; }
+			askSend.disabled = true; askStatus.textContent = 'Sending…';
+			try {
+				const res = await fetch('/api/glasgow/question', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ set: setId, device, text }) });
+				const body = await res.json().catch(() => ({}));
+				if (res.ok) {
+					put(askedKey, JSON.stringify([...asked(), { text, at: new Date().toISOString() }]));
+					askText.value = ''; $('ask-count').textContent = '0 of 500';
+					askStatus.textContent = 'Sent to the presenter. Send another any time.';
+					drawAsked();
+				} else askStatus.textContent = body.error || 'That did not go through: please try again.';
+			} catch { askStatus.textContent = 'No connection just now: please try again.'; }
+			askSend.disabled = false;
+		});
+		drawAsked();
 	</script>
 
 	<style is:global>
@@ -228,13 +293,22 @@ const set = findSet(ACTIVE_SET)!;
 		.exact { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; color: var(--muted); font-size: 0.95rem; }
 		.exact input { width: 6.5rem; font: inherit; color: var(--ink); padding: 0.4rem 0.5rem; border: 2px solid #8a8a8a; border-radius: 0.4rem; }
 		#text-input { width: 100%; font: inherit; font-size: 1.2rem; padding: 0.75rem; border: 2px solid #8a8a8a; border-radius: 0.5rem; }
-		input:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+		input:focus-visible, textarea:focus-visible, summary:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 		.count { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.9rem; text-align: right; }
 		#mine { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
 		#mine li { background: #eef6fb; color: var(--blue); border-radius: 1rem; padding: 0.2rem 0.7rem; font-size: 0.95rem; }
 		button { font: inherit; font-size: 1.2rem; min-height: 3.25rem; border: 0; border-radius: 0.6rem; background: var(--blue); color: #fff; cursor: pointer; }
 		button:disabled { opacity: 0.6; }
-		#status { min-height: 1.5em; margin: 0; }
+		#status, #ask-status { min-height: 1.5em; margin: 0; }
+		#audience { display: flex; flex-direction: column; gap: 1rem; border-top: 2px solid #e5e5e5; padding-top: 1.25rem; }
+		#hand { background: #fff; color: var(--blue); border: 2px solid var(--blue); }
+		#hand.up { background: var(--green); border-color: var(--green); color: #111; }
+		#ask { display: flex; flex-direction: column; gap: 0.5rem; }
+		#ask h2 { font-size: 1.2rem; margin: 0; }
+		#ask-text { width: 100%; font: inherit; padding: 0.75rem; border: 2px solid #8a8a8a; border-radius: 0.5rem; resize: vertical; }
+		#asked { margin: 0.5rem 0 0; padding-left: 1.2rem; color: var(--muted); }
+		#asked li { margin: 0.25rem 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+		summary { cursor: pointer; color: var(--blue); }
 		.notice { margin-top: auto; color: var(--muted); font-size: 0.9rem; }
 		.notice a { color: var(--blue); }
 		.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
