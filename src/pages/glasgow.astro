@@ -37,6 +37,7 @@ const set = findSet(ACTIVE_SET)!;
 				<div class="ends" aria-hidden="true"><span id="range-min"></span><span id="range-max"></span></div>
 				<label class="exact" for="number-input">Or type it exactly <input id="number-input" type="number" inputmode="decimal" /><span id="number-unit"></span></label>
 			</div>
+			<div id="choice-box" hidden role="group" aria-labelledby="prompt"></div>
 			<div id="text-box" hidden>
 				<label for="text-input" class="vh">Your answer</label>
 				<input id="text-input" type="text" autocomplete="off" enterkeyhint="send" />
@@ -64,7 +65,7 @@ const set = findSet(ACTIVE_SET)!;
 	</main>
 
 	<script>
-		type Q = { id: string; type: 'number' | 'text'; prompt: string; min?: number; max?: number; step?: number; scale?: 'linear' | 'log'; unit?: string; maxLength?: number; multiple?: boolean };
+		type Q = { id: string; type: 'number' | 'text' | 'choice'; options?: string[]; prompt: string; min?: number; max?: number; step?: number; scale?: 'linear' | 'log'; unit?: string; maxLength?: number; multiple?: boolean };
 		type State = { set: string; current: string | null; pollSeconds: number; questions: Q[] };
 		const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 		const app = $('app'), setId = app.dataset.set || '';
@@ -85,6 +86,7 @@ const set = findSet(ACTIVE_SET)!;
 
 		const form = $<HTMLFormElement>('question'), waiting = $('waiting'), status = $('status'), prompt = $('prompt');
 		const numBox = $('number-box'), range = $<HTMLInputElement>('number-range'), exact = $<HTMLInputElement>('number-input'), out = $<HTMLOutputElement>('number-out');
+		const choiceBox = $('choice-box');
 		const textBox = $('text-box'), text = $<HTMLInputElement>('text-input'), count = $('text-count'), send = $<HTMLButtonElement>('send');
 		let shown: Q | null = null;
 		let sending = false;
@@ -129,14 +131,26 @@ const set = findSet(ACTIVE_SET)!;
 		}
 
 		function show(q: Q | null) {
-			if (shown && q && shown.id === q.id) return;
+			// Redrawn only when the question changes, or the presenter edits it while it is showing.
+			if (shown && q && JSON.stringify(shown) === JSON.stringify(q)) return;
 			shown = q;
 			status.textContent = '';
 			if (!q) { form.hidden = true; waiting.hidden = false; return; }
 			waiting.hidden = true; form.hidden = false;
 			prompt.textContent = q.prompt;
 			const previous = get(sentKey(q.id));
-			numBox.hidden = q.type !== 'number'; textBox.hidden = q.type !== 'text';
+			numBox.hidden = q.type !== 'number'; textBox.hidden = q.type !== 'text'; choiceBox.hidden = q.type !== 'choice';
+			send.hidden = q.type === 'choice';
+			if (q.type === 'choice') {
+				// One big button per option: a tap sends it; the chosen one stays marked, and another tap changes it.
+				choiceBox.replaceChildren(...(q.options || []).map((label, i) => {
+					const b = document.createElement('button');
+					b.type = 'button'; b.className = 'choice'; b.textContent = label;
+					b.setAttribute('aria-pressed', String(previous === String(i)));
+					b.addEventListener('click', () => sendAnswer(q, i));
+					return b;
+				}));
+			}
 			if (q.type === 'number') {
 				const log = q.scale === 'log';
 				range.min = log ? '0' : String(q.min); range.max = log ? String(LOG_STEPS) : String(q.max); range.step = log ? '1' : String(q.step);
@@ -152,7 +166,9 @@ const set = findSet(ACTIVE_SET)!;
 				count.textContent = `${[...text.value].length} of ${text.maxLength}`;
 			}
 			showMine(q);
-			if (q.multiple) {
+			if (q.type === 'choice') {
+				if (previous !== null) status.textContent = 'Your answer is in. Tap another to change it.';
+			} else if (q.multiple) {
 				send.textContent = 'Add';
 				if (added(q).length) status.textContent = 'Add as many as you like, one at a time.';
 			} else {
@@ -169,7 +185,7 @@ const set = findSet(ACTIVE_SET)!;
 		form.addEventListener('submit', async (e) => {
 			e.preventDefault();
 			const q = shown;
-			if (!q || sending) return;
+			if (!q || sending || q.type === 'choice') return;
 			let value: number | string;
 			if (q.type === 'number') {
 				value = numberValue;
@@ -178,6 +194,11 @@ const set = findSet(ACTIVE_SET)!;
 				value = text.value.trim();
 				if (!value) { status.textContent = 'Please type an answer.'; text.focus(); return; }
 			}
+			await sendAnswer(q, value);
+		});
+
+		async function sendAnswer(q: Q, value: number | string) {
+			if (sending) return;
 			sending = true; send.disabled = true; status.textContent = 'Sending…';
 			try {
 				const res = await fetch('/api/glasgow/answer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ set: setId, q: q.id, value, device }) });
@@ -188,6 +209,10 @@ const set = findSet(ACTIVE_SET)!;
 					showMine(q);
 					status.textContent = 'Added. Add another, or wait for the next question.';
 					text.focus();
+				} else if (res.ok && q.type === 'choice') {
+					put(sentKey(q.id), String(value));
+					choiceBox.querySelectorAll('button').forEach((b, i) => b.setAttribute('aria-pressed', String(i === value)));
+					status.textContent = `Thank you: “${q.options?.[value as number]}” is in. Tap another to change it.`;
 				} else if (res.ok) {
 					put(sentKey(q.id), String(body.value ?? value));
 					send.textContent = 'Change my answer';
@@ -199,7 +224,7 @@ const set = findSet(ACTIVE_SET)!;
 			} catch {
 				status.textContent = 'No connection just now: please try again.';
 			} finally { sending = false; send.disabled = false; }
-		});
+		}
 
 		let timer = 0;
 		async function tick() {
@@ -300,6 +325,10 @@ const set = findSet(ACTIVE_SET)!;
 		#mine li { background: #eef6fb; color: var(--blue); border-radius: 1rem; padding: 0.2rem 0.7rem; font-size: 0.95rem; }
 		button { font: inherit; font-size: 1.2rem; min-height: 3.25rem; border: 0; border-radius: 0.6rem; background: var(--blue); color: #fff; cursor: pointer; }
 		button:disabled { opacity: 0.6; }
+		#choice-box { display: flex; flex-direction: column; gap: 0.75rem; }
+		.choice { background: #fff; color: var(--blue); border: 2px solid var(--blue); font-size: 1.3rem; min-height: 3.5rem; }
+		.choice[aria-pressed="true"] { background: var(--blue); color: #fff; }
+		.choice[aria-pressed="true"]::after { content: ' ✓'; }
 		#status, #ask-status { min-height: 1.5em; margin: 0; }
 		#audience { display: flex; flex-direction: column; gap: 1rem; border-top: 2px solid #e5e5e5; padding-top: 1.25rem; }
 		#hand { background: #fff; color: var(--blue); border: 2px solid var(--blue); }

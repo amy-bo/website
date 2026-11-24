@@ -1,5 +1,5 @@
 // Live lecture polling: the D1 side, with its tables (created on first use).
-import { checkAnswer, DEVICE_RE, isBlocked, json, fail, numberResults, rateKey, textResults, tokenMatches } from './core';
+import { checkAnswer, choiceResults, DEVICE_RE, isBlocked, json, fail, numberResults, rateKey, textResults, tokenMatches } from './core';
 import { findSet, type Question, type QuestionSet } from './sets';
 import { checkQuestion, publicQuestion, seedRows } from './questions';
 
@@ -98,9 +98,10 @@ export async function getResults(env: GlasgowEnv, setId: string | null, qId: str
 	const q = await getQuestion(env, set, qId);
 	if (!q) return fail(404, 'No such question.');
 	const base = { set: set.id, q: q.id, updatedAt: now() };
-	if (q.type === 'number') {
+	if (q.type === 'number' || q.type === 'choice') {
 		const rows = (await env.DB.prepare('SELECT value_num FROM glasgow_answers WHERE set_id = ? AND q = ? AND value_num IS NOT NULL').bind(set.id, q.id).all<{ value_num: number }>()).results;
-		return json({ ...base, ...numberResults(q, rows.map((r: { value_num: number }) => r.value_num)) });
+		const values = rows.map((r: { value_num: number }) => r.value_num);
+		return json({ ...base, ...(q.type === 'number' ? numberResults(q, values) : choiceResults(q, values)) });
 	}
 	const rows = (await env.DB.prepare(`SELECT id, value_text AS text, updated_at AS at FROM glasgow_answers
 		WHERE set_id = ? AND q = ? AND value_text IS NOT NULL AND blocked = 0 AND hidden = 0 ORDER BY updated_at DESC, id DESC LIMIT ?`).bind(set.id, q.id, MAX_TEXTS).all<{ id: number; text: string; at: string }>()).results;

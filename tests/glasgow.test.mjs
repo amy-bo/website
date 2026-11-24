@@ -1,7 +1,7 @@
 // Live lecture polling (amybo.org/glasgow): the pure parts. The API itself is checked by tests/glasgow.e2e.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkAnswer, isBlocked, numberResults, textResults, wordCounts, tokenMatches, rateKey, DEVICE_RE } from '../src/glasgow/core.ts';
+import { checkAnswer, choiceResults, isBlocked, numberResults, textResults, wordCounts, tokenMatches, rateKey, DEVICE_RE } from '../src/glasgow/core.ts';
 import { SETS, ACTIVE_SET, findSet, findQuestion } from '../src/glasgow/sets.ts';
 
 const set = findSet(ACTIVE_SET);
@@ -125,4 +125,18 @@ test('questions sent from the slides are checked strictly', async () => {
 	assert.deepEqual(defaultBins({ min: 1, max: 3, step: 1, scale: 'linear' }), [1, 1.5, 2.5, 3], 'a bin per choice');
 	assert.deepEqual(defaultBins({ min: 1, max: 2, step: 1, scale: 'linear' }), [1, 1.5, 2]);
 	for (const id of ['q61', 'q105', 'q106']) { const q = findQuestion(set, id); assert.deepEqual(q.bins, defaultBins(q), `${id}: the seed's bins match what an edit would give`); }
+});
+
+test('choice questions: an option index in, counts per option out', async () => {
+	const { checkQuestion } = await import('../src/glasgow/questions.ts');
+	const c = checkQuestion('nuke', { type: 'choice', prompt: 'Nuclear war by 2100?', options: [' Yes ', 'No', "Don't know"] });
+	assert.equal(c.ok, true);
+	assert.deepEqual(c.question.options, ['Yes', 'No', "Don't know"]);
+	for (const [options, why] of [[['Yes'], 'one option'], [Array.from({ length: 9 }, (_, i) => `o${i}`), 'nine'], [['Yes', ''], 'empty'], [['Yes', 'x'.repeat(41)], 'too long'], [['Yes', 'yes'], 'duplicate'], ['Yes,No', 'not a list']])
+		assert.equal(checkQuestion('nuke', { type: 'choice', prompt: 'x', options }).ok, false, why);
+	const q = c.question;
+	assert.deepEqual(checkAnswer(q, 2), { ok: true, num: 2, text: null });
+	assert.deepEqual(checkAnswer(q, '0'), { ok: true, num: 0, text: null });
+	for (const bad of [3, -1, 1.5, 'Yes', null]) assert.equal(checkAnswer(q, bad).ok, false, String(bad));
+	assert.deepEqual(choiceResults(q, [0, 2, 2, 1, 2]), { type: 'choice', options: ['Yes', 'No', "Don't know"], counts: [1, 1, 3], count: 5 });
 });

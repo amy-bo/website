@@ -4,6 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-11-24
 
+- [x] **Glasgow lecture: choice questions** — A third question type, `choice` (2 to 8 options such as Yes / No / Don't know): one big button per option on the phones, one answer per phone that a tap changes, and `counts` per option in the results for a pie chart. Added from the slides like any other question. The phones also redraw a question the presenter edits while it is showing.
 - [x] **Glasgow lecture: the altProtein Why logo** — The student page shows the lecture's own logo ("altProtein: Why?") right-aligned across from the AMYBO logo, at the same height, set per lecture in `src/glasgow/sets.ts`.
 - [x] **Glasgow lecture: questions edited from the slides** — The poll questions now live in the database, seeded once with the six in `src/glasgow/sets.ts`, so Martin can add, edit and delete questions from the presentation with no deploy: `PUT`/`DELETE /api/glasgow/questions/<id>` with the presenter token, strictly checked, saying how many answers a question already has. The question showing cannot be deleted.
 - [x] **Glasgow lecture: clear after a rehearsal** — `POST /api/glasgow/clear` with the presenter token: `{q}` deletes one question's answers; `{all: true}` deletes every poll answer, lowers every hand and empties the presenter's list of questions. The questions and hand events themselves stay in the record until 25 December.

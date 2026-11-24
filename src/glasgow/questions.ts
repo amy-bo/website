@@ -1,6 +1,6 @@
 // Live lecture polling: the questions themselves, kept in D1 so the presenter can add and edit them from the slides
 // with no deploy. A set's questions are seeded once from src/glasgow/sets.ts; after that the database is the truth.
-import type { NumberQuestion, Question, QuestionSet, TextQuestion } from './sets';
+import type { ChoiceQuestion, NumberQuestion, Question, QuestionSet, TextQuestion } from './sets';
 
 export const QUESTION_ID_RE = /^[a-z0-9_-]{1,24}$/;
 export const MAX_PROMPT = 200;
@@ -67,7 +67,16 @@ export function checkQuestion(id: string, body: any): Checked {
 		}
 		return { ok: true, question: q, order };
 	}
-	return { ok: false, error: '"type" must be "number" or "text".' };
+	if (body?.type === 'choice') {
+		const options = body.options;
+		if (!Array.isArray(options) || options.length < 2 || options.length > 8) return { ok: false, error: 'A choice question needs 2 to 8 "options".' };
+		const tidy = options.map((o: unknown) => (typeof o === 'string' ? o.replace(/\s+/g, ' ').trim() : ''));
+		if (tidy.some((o: string) => !o || [...o].length > 40)) return { ok: false, error: 'Each option must be text of 1 to 40 characters.' };
+		if (new Set(tidy.map((o: string) => o.toLowerCase())).size !== tidy.length) return { ok: false, error: 'The options must all be different.' };
+		const q: ChoiceQuestion = { id, type: 'choice', prompt, options: tidy };
+		return { ok: true, question: q, order };
+	}
+	return { ok: false, error: '"type" must be "number", "text" or "choice".' };
 }
 
 /** What /state shows: the question without its bins. */

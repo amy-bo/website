@@ -191,6 +191,15 @@ try {
 	r = await call('DELETE', '/api/glasgow/questions/q120', undefined, presenter);
 	check('the presenter deletes it, with its answers', r.status === 200 && r.data.answers === 1 && (await call('GET', '/api/glasgow/results?q=q120')).status === 404, JSON.stringify(r));
 	check('deleting an unknown question → 404', (await call('DELETE', '/api/glasgow/questions/q999', undefined, presenter)).status === 404);
+	r = await call('PUT', '/api/glasgow/questions/nuke', { type: 'choice', prompt: 'Nuclear war by 2100?', options: ['Yes', 'No', "Don't know"] }, presenter);
+	check('a choice question', r.status === 200 && r.data.question.options.length === 3, JSON.stringify(r));
+	await call('POST', '/api/glasgow/current', { q: 'nuke' }, presenter);
+	for (const [n, v] of [[1, 0], [2, 2], [3, 2], [1, 1]]) await call('POST', '/api/glasgow/answer', { q: 'nuke', value: v, device: dev(n) });
+	check('an option out of range → 400', (await call('POST', '/api/glasgow/answer', { q: 'nuke', value: 3, device: dev(4) })).status === 400);
+	r = await call('GET', '/api/glasgow/results?q=nuke');
+	check('choice results: counts per option, a changed answer counted once', JSON.stringify(r.data.counts) === '[0,1,2]' && r.data.count === 3 && r.data.type === 'choice' && r.data.options[2] === "Don't know", JSON.stringify(r.data));
+	await call('POST', '/api/glasgow/current', { q: null }, presenter);
+	await call('DELETE', '/api/glasgow/questions/nuke', undefined, presenter);
 	await call('DELETE', '/api/glasgow/questions/q122', undefined, presenter);
 	check('the seeded questions are as they were', (await call('GET', '/api/glasgow/state')).data.questions.map((q) => q.id).join() === 'q00,q42,q61,q93,q105,q106');
 	const pre2 = await fetch(`${BASE}/api/glasgow/questions/q1`, { method: 'OPTIONS', headers: { origin: 'null', 'access-control-request-method': 'PUT' } });

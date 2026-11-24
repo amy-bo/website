@@ -1,5 +1,5 @@
 // Live lecture polling: validation, aggregation and the HTTP helpers, kept free of D1 so they can be unit-tested.
-import type { NumberQuestion, Question, TextQuestion } from './sets';
+import type { ChoiceQuestion, NumberQuestion, Question, TextQuestion } from './sets';
 
 export const CORS = {
 	'access-control-allow-origin': '*',
@@ -36,6 +36,11 @@ export function checkAnswer(q: Question, value: unknown): Checked {
 		const decimals = Math.max(0, -Math.floor(Math.log10(q.step) + 1e-9));
 		return { ok: true, num: Number(n.toFixed(decimals)), text: null };
 	}
+	if (q.type === 'choice') {
+		const i = typeof value === 'number' ? value : typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : NaN;
+		if (!Number.isInteger(i) || i < 0 || i >= q.options.length) return { ok: false, error: 'Please choose one of the options.' };
+		return { ok: true, num: i, text: null };
+	}
 	if (typeof value !== 'string') return { ok: false, error: 'Please type an answer.' };
 	const text = value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
 	if (!text) return { ok: false, error: 'Please type an answer.' };
@@ -57,6 +62,13 @@ export function numberResults(q: NumberQuestion, values: number[]) {
 	}
 	const m = median(sorted);
 	return { type: 'number' as const, count: sorted.length, mean: sorted.length ? round(sorted.reduce((a, b) => a + b, 0) / sorted.length) : null, median: m === null ? null : round(m), values: sorted, bins };
+}
+
+/** Totals for a choice question: how many chose each option, in the options' order. */
+export function choiceResults(q: ChoiceQuestion, values: number[]) {
+	const counts = q.options.map(() => 0);
+	for (const v of values) if (Number.isInteger(v) && v >= 0 && v < counts.length) counts[v]++;
+	return { type: 'choice' as const, options: q.options, counts, count: counts.reduce((a, b) => a + b, 0) };
 }
 
 /** Answers grouped for a word cloud: case-insensitive, spaces collapsed; each shown with its first-sent spelling. */
