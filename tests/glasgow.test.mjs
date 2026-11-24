@@ -8,7 +8,7 @@ const set = findSet(ACTIVE_SET);
 const q42 = findQuestion(set, 'q42'), q61 = findQuestion(set, 'q61'), q93 = findQuestion(set, 'q93');
 
 test('the Why set has the three questions as briefed, deleted 30 days after the lecture', () => {
-	assert.deepEqual(set.questions.map((q) => [q.id, q.type]), [['q42', 'number'], ['q61', 'number'], ['q93', 'text']]);
+	assert.deepEqual(set.questions.map((q) => [q.id, q.type]), [['q42', 'number'], ['q61', 'number'], ['q93', 'text'], ['q105', 'number'], ['q106', 'number']]);
 	assert.deepEqual([q42.min, q42.max, q42.step, q42.scale], [1, 5, 0.1, 'linear']);
 	assert.deepEqual([q61.min, q61.max, q61.scale, q61.unit], [0, 10, 'log', '%']);
 	assert.equal(q93.maxLength, 80);
@@ -58,6 +58,15 @@ test('number totals: sorted values, mean, median and bins, with the top edge in 
 	const empty = numberResults(q42, []);
 	assert.deepEqual([empty.count, empty.mean, empty.median], [0, null, null]);
 	assert.deepEqual(numberResults(q61, [0, 0.005, 0.02, 9.9, 10]).bins.map((b) => b.n), [2, 1, 0, 0, 0, 0, 2]);
+});
+
+test('choice questions: whole numbers only in range, one bin per choice', () => {
+	const q105 = findQuestion(set, 'q105'), q106 = findQuestion(set, 'q106');
+	assert.deepEqual(checkAnswer(q105, 2), { ok: true, num: 2, text: null });
+	assert.deepEqual(checkAnswer(q106, 2.4), { ok: true, num: 2, text: null }, 'rounded to the step');
+	assert.equal(checkAnswer(q106, 4).ok, false);
+	assert.deepEqual(numberResults(q105, [1, 2, 2]).bins.map((b) => b.n), [1, 2]);
+	assert.deepEqual(numberResults(q106, [1, 2, 3, 3]).bins.map((b) => b.n), [1, 1, 2]);
 });
 
 test('text totals: at most 30', () => {

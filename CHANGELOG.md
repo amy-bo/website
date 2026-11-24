@@ -2,6 +2,10 @@
 
 Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
+## 2026-11-24
+
+- [x] **Glasgow lecture: two more questions** — q105 (what we grow in the remote reactor: 1 spirulina, 2 hydrogen-oxidising bacteria) and q106 (where the inoculum comes from, 1 to 3), as number questions with one histogram bin per choice, for the AMYBO-MC lecture slides.
+
 ## 2026-11-22
 
 - [x] **Live lecture questions for Glasgow** — [amybo.org/glasgow](https://amybo.org/glasgow) (and amy.bo/glasgow) for Martin's Glasgow MSc lecture "Why" on 25 November: the phones show the question the slide has opened (warming by 2100, sunlight to steak, the weakest step in the food chain), one anonymous answer per device, changeable. An open-origin API for the slide (state, results with values, mean, median and histogram, or the latest 30 texts), presenter-only switching and hiding with a token kept as a Cloudflare secret, a word filter, rate limits, and deletion 30 days after the lecture by the cron Worker. Privacy notice updated. Question sets for later lectures go in `src/glasgow/sets.ts`.

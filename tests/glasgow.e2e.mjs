@@ -37,7 +37,7 @@ try {
 
 	console.log('State and CORS');
 	let s = await call('GET', '/api/glasgow/state');
-	check('state: no question showing yet, the three questions listed', s.status === 200 && s.data.current === null && s.data.questions.map((q) => q.id).join() === 'q42,q61,q93' && s.data.set === 'why-2026' && s.data.pollSeconds === 2, JSON.stringify(s.data));
+	check('state: no question showing yet, the three questions listed', s.status === 200 && s.data.current === null && s.data.questions.map((q) => q.id).join() === 'q42,q61,q93,q105,q106' && s.data.set === 'why-2026' && s.data.pollSeconds === 2, JSON.stringify(s.data));
 	check('state: open to any origin, never cached', s.headers.get('access-control-allow-origin') === '*' && s.headers.get('cache-control') === 'no-store');
 	check('state: no internal bins in the public question list', !('bins' in s.data.questions[0]));
 	const pre = await fetch(`${BASE}/api/glasgow/current`, { method: 'OPTIONS', headers: { origin: 'null', 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type, x-presenter-token' } });
