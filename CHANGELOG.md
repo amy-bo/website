@@ -2,6 +2,10 @@
 
 Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
+## 2026-11-25
+
+- [x] **Glasgow lecture: a backup results screen** — [amybo.org/glasgow/results](https://amybo.org/glasgow/results) (and amy.bo/glasgow/results) shows the current question's live results, legible from the back of a room: bars with the counts on coloured swatches for choices, dots on an axis with the median for numbers, a word cloud for text. A closed Presenter panel takes the token (kept in that browser only) and then lists the questions to switch between, with Stop voting and Clear this poll behind a confirm. A static page using the existing API only: no server change.
+
 ## 2026-11-24
 
 - [x] **Glasgow lecture: colours chosen per option** — A choice question can carry `colors`, one `#RRGGBB` (or null) per option, set from the slides; the phones colour each button with it, in white or black text, whichever contrasts more, and `/state` and `/results` pass the colours on for the slide's charts. Options without a colour keep the Yes / No / Don't know colours or the plain button. Up to 12 options.
