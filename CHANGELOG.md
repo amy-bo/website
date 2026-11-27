@@ -4,7 +4,7 @@ Done work on amybo.org, newest first. Open work is in [TODO.md](TODO.md).
 
 ## 2026-11-27
 
-- [x] **Glasgow lecture: optional teams** — amybo.org/glasgow asks once for a team name (or "No team"), keeps it on the phone with a Change button, and sends it with every answer as a separate `team` field. The API keeps it in a new `glasgow_answer_teams` table beside the answer (created on first use like the other glasgow tables, so no migration) and `/results` returns `team` beside `id` and `at` on each text answer sent with one. Phones without a team, cached old pages and every existing poll behave exactly as before; an unusable team name (too long, offensive) is dropped, never the answer. For the presenter's team scoreboard (first correct answer scores).
+- [x] **Glasgow lecture: optional teams** — Team membership comes from a choice poll with the reserved id `team` ("Which team are you in?", one option per team, so every phone spells a team the same way). The option a phone chose there is its team: amybo.org/glasgow shows it, keeps it on the phone, follows a renamed option, and sends it with every later answer as a separate `team` field; answering the team poll again changes team. The API keeps it in a new `glasgow_answer_teams` table beside the answer (created on first use like the other glasgow tables, so no migration) and `/results` returns `team` beside `id` and `at` on each text answer sent with one. Phones without a team, cached old pages and every existing poll behave exactly as before; a phone that never answered the team poll has no team; an unusable team name (too long, offensive) is dropped, never the answer. For the presenter's team scoreboard (first correct answer scores).
 
 ## 2026-11-25
 

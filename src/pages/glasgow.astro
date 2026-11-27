@@ -24,15 +24,7 @@ const set = findSet(ACTIVE_SET)!;
 			{set.logo ? <img class="lecture-logo" src={set.logo.src} alt={set.logo.alt} width="440" height="206" /> : <p class="lecture">{set.title}</p>}
 		</header>
 
-		<section id="team" aria-label="Your team">
-			<form id="team-form" novalidate hidden>
-				<label for="team-input" class="team-h">Your team name</label>
-				<p class="hint">Playing in teams? Agree a name with your team and type it here: it is sent with each of your answers.</p>
-				<input id="team-input" type="text" maxlength="30" autocomplete="off" enterkeyhint="done" />
-				<div class="team-btns"><button id="team-join" type="submit">Join this team</button><button id="team-skip" type="button" class="quiet">No team</button></div>
-			</form>
-			<p id="team-line" hidden><span id="team-label"></span> <button id="team-change" type="button" class="link">Change</button></p>
-		</section>
+		<p id="team-line" hidden><span id="team-label"></span></p>
 
 		<section id="waiting" aria-live="polite">
 			<h1>Live questions</h1>
@@ -94,26 +86,23 @@ const set = findSet(ACTIVE_SET)!;
 		}
 		const sentKey = (q: string) => `glasgow-${setId}-${q}`;
 
-		// Team (optional): asked once, kept on this phone, sent with every answer as its own "team" field.
-		// "No team" is remembered too, so the page then works exactly as it did before teams.
-		const teamKey = `glasgow-${setId}-team`, teamForm = $<HTMLFormElement>('team-form'), teamInput = $<HTMLInputElement>('team-input');
-		const team = () => (get(teamKey) || '').replace(/\s+/g, ' ').trim().slice(0, 30);
-		function drawTeam(editing = false) {
-			const asked = get(teamKey) !== null;
-			teamForm.hidden = asked && !editing;
-			$('team-line').hidden = !teamForm.hidden;
-			$('team-label').textContent = team() ? `Team: ${team()}` : 'No team';
-			$('team-change').textContent = team() ? 'Change' : 'Join a team';
-			if (!teamForm.hidden) teamInput.value = team();
+		// Teams (optional): the presenter's choice poll with the reserved id "team" ("Which team are you in?", one option
+		// per team). The option this phone chose there is its team, sent with every later answer as its own "team" field;
+		// answering that poll again changes team. A phone that never answered it has no team and works as before.
+		// The name is read from the poll's current options, so a renamed team follows; the last name seen is kept too.
+		const TEAM_Q = 'team', teamKey = `glasgow-${setId}-team-name`;   // not sentKey(TEAM_Q), which holds the chosen option
+		let teamQ: Q | null = null;
+		const team = (): string => {
+			const i = Number(get(sentKey(TEAM_Q)));
+			const live = teamQ?.type === 'choice' && Number.isInteger(i) && get(sentKey(TEAM_Q)) !== null ? teamQ.options?.[i] : undefined;
+			return (live ?? get(teamKey) ?? '').replace(/\s+/g, ' ').trim().slice(0, 30);
+		};
+		function drawTeam() {
+			const t = team();
+			if (t) put(teamKey, t);
+			$('team-line').hidden = !t;
+			$('team-label').textContent = t ? `Your team: ${t}` : '';
 		}
-		teamForm.addEventListener('submit', (e) => {
-			e.preventDefault();
-			const name = teamInput.value.replace(/\s+/g, ' ').trim().slice(0, 30);
-			if (!name) { teamInput.focus(); return; }
-			put(teamKey, name); drawTeam();
-		});
-		$('team-skip').addEventListener('click', () => { put(teamKey, ''); drawTeam(); });
-		$('team-change').addEventListener('click', () => { drawTeam(true); teamInput.focus(); });
 		drawTeam();
 
 		const form = $<HTMLFormElement>('question'), waiting = $('waiting'), status = $('status'), prompt = $('prompt');
@@ -258,6 +247,7 @@ const set = findSet(ACTIVE_SET)!;
 					text.focus();
 				} else if (res.ok && q.type === 'choice') {
 					put(sentKey(q.id), String(value));
+					if (q.id === TEAM_Q) { teamQ = q; drawTeam(); }
 					choiceBox.querySelectorAll('button').forEach((b, i) => b.setAttribute('aria-pressed', String(i === value)));
 					status.textContent = `Thank you: “${q.options?.[value as number]}” is in. Tap another to change it.`;
 				} else if (res.ok) {
@@ -281,6 +271,7 @@ const set = findSet(ACTIVE_SET)!;
 				if (res.ok) {
 					const s = await res.json() as State;
 					every = Math.max(1, Number(s.pollSeconds) || 2) * 1000;
+					teamQ = s.questions.find((q) => q.id === TEAM_Q) ?? null; drawTeam();
 					show(s.questions.find((q) => q.id === s.current) ?? null);
 					$('waiting-text').textContent = 'Keep this page open: the next question appears here when the lecture reaches it.';
 				}
@@ -398,16 +389,7 @@ const set = findSet(ACTIVE_SET)!;
 		summary { cursor: pointer; color: var(--blue); }
 		.notice { margin-top: auto; color: var(--muted); font-size: 0.9rem; }
 		.notice a { color: var(--blue); }
-		#team .team-h { font-size: 1.2rem; }
-		#team .hint { margin: 0; color: var(--muted); font-size: 0.95rem; }
-		#team-form { gap: 0.6rem; }
-		#team-input { width: 100%; font: inherit; font-size: 1.2rem; padding: 0.75rem; border: 2px solid #8a8a8a; border-radius: 0.5rem; }
-		.team-btns { display: flex; gap: 0.6rem; }
-		.team-btns button { flex: 1; }
-		button.quiet { background: #fff; color: var(--blue); border: 2px solid var(--blue); }
-		#team-line { margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; background: #eef6fb; border-radius: 0.6rem; padding: 0.4rem 0.4rem 0.4rem 0.9rem; color: var(--blue); }
-		#team-label { overflow-wrap: anywhere; }
-		button.link { min-height: 2.75rem; font-size: 1rem; padding: 0 0.9rem; background: #fff; color: var(--blue); border: 2px solid var(--blue); }
+		#team-line { margin: 0; background: #eef6fb; border-radius: 0.6rem; padding: 0.6rem 0.9rem; color: var(--blue); overflow-wrap: anywhere; }
 		.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 		[hidden] { display: none !important; }
 	</style>
