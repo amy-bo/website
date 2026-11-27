@@ -107,6 +107,17 @@ export function textResults(q: TextQuestion, rows: { id: number; text: string; a
 	return { type: 'text' as const, count: tidy.length, texts: q.multiple ? tidy : tidy.slice(0, 30), words: wordCounts(tidy) };
 }
 
+/**
+ * Each choice answer on its own, oldest first, for a quiz (the presenter picks the first correct one): its option index
+ * and words, its time, and "team" only when it was sent with one. rows: shown answers in any order.
+ */
+export function choicePicks(q: ChoiceQuestion, rows: { id: number; value_num: number; at: string; team?: string | null }[]) {
+	return rows
+		.filter((r) => Number.isInteger(r.value_num) && r.value_num >= 0 && r.value_num < q.options.length)
+		.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.id - b.id))
+		.map((r) => ({ id: r.id, option: r.value_num, text: q.options[r.value_num], at: r.at, ...(r.team ? { team: r.team } : {}) }));
+}
+
 /** A presenter token check that takes the same time whatever the guess. */
 export function tokenMatches(given: string | null, expected: string | undefined) {
 	if (!expected || !given) return false;

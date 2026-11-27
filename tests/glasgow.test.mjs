@@ -1,7 +1,7 @@
 // Live lecture polling (amybo.org/glasgow): the pure parts. The API itself is checked by tests/glasgow.e2e.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkAnswer, checkTeam, choiceResults, isBlocked, numberResults, textResults, wordCounts, tokenMatches, rateKey, DEVICE_RE } from '../src/glasgow/core.ts';
+import { checkAnswer, checkTeam, choicePicks, choiceResults, isBlocked, numberResults, textResults, wordCounts, tokenMatches, rateKey, DEVICE_RE } from '../src/glasgow/core.ts';
 import { SETS, ACTIVE_SET, findSet, findQuestion } from '../src/glasgow/sets.ts';
 
 const set = findSet(ACTIVE_SET);
@@ -167,4 +167,19 @@ test('teams: a text answer carries "team" only when it was sent with one', () =>
 	assert.deepEqual(r.texts, [{ id: 2, text: 'yeast', at: '2026-11-27T12:00:02Z', team: 'Reds' }, { id: 1, text: 'mould', at: '2026-11-27T12:00:01Z' }]);
 	assert.ok(!('team' in r.texts[1]));
 	assert.deepEqual(r.words.map((w) => w.text).sort(), ['mould', 'yeast']);
+});
+
+test('choice picks: each answer oldest first with its option words, time and team only when sent', () => {
+	const q = { id: 'day', type: 'choice', prompt: 'What day is it?', options: ['Monday', 'Friday'] };
+	const rows = [
+		{ id: 3, value_num: 1, at: '2026-11-27T12:00:02Z', team: 'Mushrooms' },
+		{ id: 1, value_num: 0, at: '2026-11-27T12:00:01Z', team: null },
+		{ id: 2, value_num: 1, at: '2026-11-27T12:00:02Z', team: 'Microbes' },
+		{ id: 4, value_num: 7, at: '2026-11-27T12:00:03Z', team: 'Microbes' },
+	];
+	assert.deepEqual(choicePicks(q, rows), [
+		{ id: 1, option: 0, text: 'Monday', at: '2026-11-27T12:00:01Z' },
+		{ id: 2, option: 1, text: 'Friday', at: '2026-11-27T12:00:02Z', team: 'Microbes' },
+		{ id: 3, option: 1, text: 'Friday', at: '2026-11-27T12:00:02Z', team: 'Mushrooms' },
+	]);
 });

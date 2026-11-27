@@ -1,5 +1,5 @@
 // Live lecture polling: the D1 side, with its tables (created on first use).
-import { checkAnswer, checkTeam, choiceResults, DEVICE_RE, isBlocked, json, fail, numberResults, rateKey, textResults, tokenMatches } from './core';
+import { checkAnswer, checkTeam, choicePicks, choiceResults, DEVICE_RE, isBlocked, json, fail, numberResults, rateKey, textResults, tokenMatches } from './core';
 import { findSet, type Question, type QuestionSet } from './sets';
 import { checkQuestion, publicQuestion, seedRows } from './questions';
 
@@ -104,7 +104,12 @@ export async function getResults(env: GlasgowEnv, setId: string | null, qId: str
 	if (q.type === 'number' || q.type === 'choice') {
 		const rows = (await env.DB.prepare('SELECT value_num FROM glasgow_answers WHERE set_id = ? AND q = ? AND value_num IS NOT NULL').bind(set.id, q.id).all<{ value_num: number }>()).results;
 		const values = rows.map((r: { value_num: number }) => r.value_num);
-		return json({ ...base, ...(q.type === 'number' ? numberResults(q, values) : choiceResults(q, values)) });
+		if (q.type === 'number') return json({ ...base, ...numberResults(q, values) });
+		// Also each answer with its time and team (additive: "picks"), so a quiz can see which team chose what first.
+		const pickRows = (await env.DB.prepare(`SELECT a.id, a.value_num, a.updated_at AS at, t.team FROM glasgow_answers a
+			LEFT JOIN glasgow_answer_teams t ON t.answer_id = a.id
+			WHERE a.set_id = ? AND a.q = ? AND a.value_num IS NOT NULL AND a.blocked = 0 AND a.hidden = 0 ORDER BY a.updated_at ASC, a.id ASC LIMIT ?`).bind(set.id, q.id, MAX_TEXTS).all<{ id: number; value_num: number; at: string; team: string | null }>()).results;
+		return json({ ...base, ...choiceResults(q, values), picks: choicePicks(q, pickRows) });
 	}
 	const rows = (await env.DB.prepare(`SELECT a.id, a.value_text AS text, a.updated_at AS at, t.team FROM glasgow_answers a
 		LEFT JOIN glasgow_answer_teams t ON t.answer_id = a.id
