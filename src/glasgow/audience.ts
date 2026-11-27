@@ -2,7 +2,7 @@
 // Every question and every hand going up or down is kept with its (anonymous, random) device id and time until the
 // set's deleteAfter, as a record the presenter can go back to.
 import { DEVICE_RE, fail, json, rateKey } from './core';
-import { ensureSchema, getQuestion, now, presenter, underLimit, type GlasgowEnv } from './db';
+import { ensureSchema, frozenFail, frozenOf, getQuestion, isFrozen, now, presenter, underLimit, type GlasgowEnv } from './db';
 import { findSet, type QuestionSet } from './sets';
 
 /** A raised hand counts while its phone re-sends it at least this often (the page re-sends every 60 s). */
@@ -140,7 +140,8 @@ export async function postClearHands(env: GlasgowEnv, request: Request) {
 /**
  * Clear, for wiping a rehearsal. {q}: delete that question's answers. {all: true}: delete every answer in the set,
  * lower every hand, and take every question off the presenter's list. Questions and hand events stay in the record
- * (until deleteAfter), as Martin asked; only answers to the polls are deleted.
+ * (until deleteAfter), as Martin asked; only answers to the polls are deleted. A frozen poll's answers are never
+ * cleared: {all} skips them (and lists them as frozenKept), and {q} for a frozen poll is refused.
  */
 export async function postClear(env: GlasgowEnv, request: Request) {
 	const denied = presenter(env, request);
@@ -153,8 +154,10 @@ export async function postClear(env: GlasgowEnv, request: Request) {
 	if (r.body?.all === true) {
 		const t = now(), fresh = new Date(Date.now() - HAND_STALE_MS).toISOString();
 		const up = (await env.DB.prepare('SELECT device FROM glasgow_hands WHERE set_id = ? AND up = 1 AND seen_at > ?').bind(set.id, fresh).all<{ device: string }>()).results;
+		const frozenKept = [...(await frozenOf(env, set.id)).keys()].sort();
 		const res = await env.DB.batch([
-			env.DB.prepare('DELETE FROM glasgow_answers WHERE set_id = ?').bind(set.id),
+			// In the same statement as the check, so a poll frozen a moment ago is still skipped.
+			env.DB.prepare('DELETE FROM glasgow_answers WHERE set_id = ? AND q NOT IN (SELECT q FROM glasgow_frozen WHERE set_id = ?)').bind(set.id, set.id),
 			env.DB.prepare('DELETE FROM glasgow_answer_teams WHERE answer_id NOT IN (SELECT id FROM glasgow_answers)'),
 			env.DB.prepare(`INSERT INTO glasgow_clears (set_id, questions_after, at) VALUES (?, COALESCE((SELECT MAX(id) FROM glasgow_questions WHERE set_id = ?), 0), ?)
 				ON CONFLICT (set_id) DO UPDATE SET questions_after = excluded.questions_after, at = excluded.at`).bind(set.id, set.id, t),
@@ -163,10 +166,11 @@ export async function postClear(env: GlasgowEnv, request: Request) {
 		]);
 		const answers = res[0].meta.changes ?? 0;
 		const before = await env.DB.prepare('SELECT COUNT(*) AS n FROM glasgow_questions WHERE set_id = ?').bind(set.id).first<{ n: number }>();
-		return json({ ok: true, cleared: answers + up.length, answers, hands: up.length, questionsHidden: before?.n ?? 0 });
+		return json({ ok: true, cleared: answers + up.length, answers, hands: up.length, questionsHidden: before?.n ?? 0, frozenKept });
 	}
 	const q = await getQuestion(env, set, r.body?.q);
 	if (!q) return fail(404, 'No such question: send {"q": "<id>"} or {"all": true}.');
+	if (await isFrozen(env, set.id, q.id)) return frozenFail();
 	const [, res] = await env.DB.batch([
 		env.DB.prepare('DELETE FROM glasgow_answer_teams WHERE answer_id IN (SELECT id FROM glasgow_answers WHERE set_id = ? AND q = ?)').bind(set.id, q.id),
 		env.DB.prepare('DELETE FROM glasgow_answers WHERE set_id = ? AND q = ?').bind(set.id, q.id),

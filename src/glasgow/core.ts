@@ -133,3 +133,15 @@ export async function rateKey(ip: string, secret: string) {
 	const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(ip)));
 	return [...sig.slice(0, 12)].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
+
+/**
+ * A frozen poll's restored totals (glasgow_frozen.counts, a JSON list of counts per option): the counts when they fit
+ * the question (a choice question, one whole number ≥ 0 per option), otherwise null, so the live answers are used.
+ */
+export function snapshotCounts(q: Question, counts: string | null | undefined): number[] | null {
+	if (q.type !== 'choice' || typeof counts !== 'string') return null;
+	let c: unknown;
+	try { c = JSON.parse(counts); } catch { return null; }
+	if (!Array.isArray(c) || c.length !== q.options.length || !c.every((n) => Number.isInteger(n) && n >= 0)) return null;
+	return c as number[];
+}

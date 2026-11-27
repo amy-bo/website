@@ -231,6 +231,20 @@ try {
 	await call('POST', '/api/glasgow/current', { q: null }, presenter);
 	check('a question with teamed answers deletes cleanly', (await call('DELETE', '/api/glasgow/questions/teamq', undefined, presenter)).data?.answers === 3 && (await call('DELETE', '/api/glasgow/questions/teamone', undefined, presenter)).status === 200);
 
+	console.log('Frozen polls (through the Functions routes)');
+	await call('PUT', '/api/glasgow/questions/fz', { type: 'choice', prompt: 'Kept?', options: ['Yes', 'No'] }, presenter);
+	await call('POST', '/api/glasgow/current', { q: 'fz' }, presenter);
+	await call('POST', '/api/glasgow/answer', { q: 'fz', value: 0, device: dev(40) });
+	check('freeze needs the token', (await call('POST', '/api/glasgow/freeze', { q: 'fz' })).status === 401);
+	r = await call('POST', '/api/glasgow/freeze', { q: 'fz' }, presenter);
+	check('the presenter freezes the poll showing: it closes', r.status === 200 && r.data.frozen === true && (await call('GET', '/api/glasgow/state')).data.current === null, JSON.stringify(r));
+	check('/state and /results say frozen', (await call('GET', '/api/glasgow/state')).data.questions.find((q) => q.id === 'fz')?.frozen === true && (await call('GET', '/api/glasgow/results?q=fz')).data.frozen === true);
+	check('a frozen poll cannot be opened', (await call('POST', '/api/glasgow/current', { q: 'fz' }, presenter)).status === 409);
+	r = await call('POST', '/api/glasgow/clear', { all: true }, presenter);
+	check('clear all keeps it', r.status === 200 && JSON.stringify(r.data.frozenKept) === '["fz"]' && (await call('GET', '/api/glasgow/results?q=fz')).data.count === 1, JSON.stringify(r.data));
+	check('clearing or deleting it alone is refused', (await call('POST', '/api/glasgow/clear', { q: 'fz' }, presenter)).status === 409 && (await call('DELETE', '/api/glasgow/questions/fz', undefined, presenter)).status === 409);
+	check('unfreeze, then it deletes', (await call('POST', '/api/glasgow/unfreeze', { q: 'fz' }, presenter)).status === 200 && (await call('DELETE', '/api/glasgow/questions/fz', undefined, presenter)).data?.answers === 1);
+
 	console.log('Closing');
 	r = await call('POST', '/api/glasgow/current', { q: null }, presenter);
 	check('the presenter can show nothing', r.status === 200 && r.data.current === null && (await call('GET', '/api/glasgow/state')).data.current === null);
