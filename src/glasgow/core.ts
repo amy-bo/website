@@ -85,9 +85,26 @@ export function wordCounts(rows: { text: string; at: string }[]) {
 	return [...groups.values()].sort((a, b) => b.n - a.n || a.text.localeCompare(b.text)).map(({ text, n }) => ({ text, n }));
 }
 
-/** rows: every shown answer, newest first. A word-cloud question lists them all; others the latest 30. */
-export function textResults(q: TextQuestion, rows: { id: number; text: string; at: string }[]) {
-	return { type: 'text' as const, count: rows.length, texts: q.multiple ? rows : rows.slice(0, 30), words: wordCounts(rows) };
+/** Longest team name a phone may send. */
+export const TEAM_MAX = 30;
+/**
+ * The team a phone says it is in (optional, chosen by the students). Tidied like an answer; anything that is not a
+ * usable name (missing, empty, too long, on the blocked list) is simply no team, so the answer itself is never refused.
+ */
+export function checkTeam(value: unknown): string | null {
+	if (typeof value !== 'string') return null;
+	const team = value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+	if (!team || [...team].length > TEAM_MAX || isBlocked(team)) return null;
+	return team;
+}
+
+/**
+ * rows: every shown answer, newest first. A word-cloud question lists them all; others the latest 30.
+ * An answer sent with a team carries it as "team"; one without has no "team" key at all (as before teams existed).
+ */
+export function textResults(q: TextQuestion, rows: { id: number; text: string; at: string; team?: string | null }[]) {
+	const tidy = rows.map(({ team, ...r }) => (team ? { ...r, team } : r));
+	return { type: 'text' as const, count: tidy.length, texts: q.multiple ? tidy : tidy.slice(0, 30), words: wordCounts(tidy) };
 }
 
 /** A presenter token check that takes the same time whatever the guess. */

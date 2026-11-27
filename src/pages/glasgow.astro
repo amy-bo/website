@@ -24,6 +24,16 @@ const set = findSet(ACTIVE_SET)!;
 			{set.logo ? <img class="lecture-logo" src={set.logo.src} alt={set.logo.alt} width="440" height="206" /> : <p class="lecture">{set.title}</p>}
 		</header>
 
+		<section id="team" aria-label="Your team">
+			<form id="team-form" novalidate hidden>
+				<label for="team-input" class="team-h">Your team name</label>
+				<p class="hint">Playing in teams? Agree a name with your team and type it here: it is sent with each of your answers.</p>
+				<input id="team-input" type="text" maxlength="30" autocomplete="off" enterkeyhint="done" />
+				<div class="team-btns"><button id="team-join" type="submit">Join this team</button><button id="team-skip" type="button" class="quiet">No team</button></div>
+			</form>
+			<p id="team-line" hidden><span id="team-label"></span> <button id="team-change" type="button" class="link">Change</button></p>
+		</section>
+
 		<section id="waiting" aria-live="polite">
 			<h1>Live questions</h1>
 			<p id="waiting-text">Keep this page open: the next question appears here when the lecture reaches it.</p>
@@ -83,6 +93,28 @@ const set = findSet(ACTIVE_SET)!;
 			put('glasgow-device', device);
 		}
 		const sentKey = (q: string) => `glasgow-${setId}-${q}`;
+
+		// Team (optional): asked once, kept on this phone, sent with every answer as its own "team" field.
+		// "No team" is remembered too, so the page then works exactly as it did before teams.
+		const teamKey = `glasgow-${setId}-team`, teamForm = $<HTMLFormElement>('team-form'), teamInput = $<HTMLInputElement>('team-input');
+		const team = () => (get(teamKey) || '').replace(/\s+/g, ' ').trim().slice(0, 30);
+		function drawTeam(editing = false) {
+			const asked = get(teamKey) !== null;
+			teamForm.hidden = asked && !editing;
+			$('team-line').hidden = !teamForm.hidden;
+			$('team-label').textContent = team() ? `Team: ${team()}` : 'No team';
+			$('team-change').textContent = team() ? 'Change' : 'Join a team';
+			if (!teamForm.hidden) teamInput.value = team();
+		}
+		teamForm.addEventListener('submit', (e) => {
+			e.preventDefault();
+			const name = teamInput.value.replace(/\s+/g, ' ').trim().slice(0, 30);
+			if (!name) { teamInput.focus(); return; }
+			put(teamKey, name); drawTeam();
+		});
+		$('team-skip').addEventListener('click', () => { put(teamKey, ''); drawTeam(); });
+		$('team-change').addEventListener('click', () => { drawTeam(true); teamInput.focus(); });
+		drawTeam();
 
 		const form = $<HTMLFormElement>('question'), waiting = $('waiting'), status = $('status'), prompt = $('prompt');
 		const numBox = $('number-box'), range = $<HTMLInputElement>('number-range'), exact = $<HTMLInputElement>('number-input'), out = $<HTMLOutputElement>('number-out');
@@ -216,7 +248,7 @@ const set = findSet(ACTIVE_SET)!;
 			if (sending) return;
 			sending = true; send.disabled = true; status.textContent = 'Sending…';
 			try {
-				const res = await fetch('/api/glasgow/answer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ set: setId, q: q.id, value, device }) });
+				const res = await fetch('/api/glasgow/answer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ set: setId, q: q.id, value, device, ...(team() ? { team: team() } : {}) }) });
 				const body = await res.json().catch(() => ({}));
 				if (res.ok && q.multiple) {
 					put(sentKey(q.id) + '-list', JSON.stringify([...added(q), String(body.value ?? value)]));
@@ -366,6 +398,16 @@ const set = findSet(ACTIVE_SET)!;
 		summary { cursor: pointer; color: var(--blue); }
 		.notice { margin-top: auto; color: var(--muted); font-size: 0.9rem; }
 		.notice a { color: var(--blue); }
+		#team .team-h { font-size: 1.2rem; }
+		#team .hint { margin: 0; color: var(--muted); font-size: 0.95rem; }
+		#team-form { gap: 0.6rem; }
+		#team-input { width: 100%; font: inherit; font-size: 1.2rem; padding: 0.75rem; border: 2px solid #8a8a8a; border-radius: 0.5rem; }
+		.team-btns { display: flex; gap: 0.6rem; }
+		.team-btns button { flex: 1; }
+		button.quiet { background: #fff; color: var(--blue); border: 2px solid var(--blue); }
+		#team-line { margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; background: #eef6fb; border-radius: 0.6rem; padding: 0.4rem 0.4rem 0.4rem 0.9rem; color: var(--blue); }
+		#team-label { overflow-wrap: anywhere; }
+		button.link { min-height: 2.75rem; font-size: 1rem; padding: 0 0.9rem; background: #fff; color: var(--blue); border: 2px solid var(--blue); }
 		.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 		[hidden] { display: none !important; }
 	</style>

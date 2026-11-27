@@ -1,5 +1,5 @@
 // Live lecture polling: the D1 side, with its tables (created on first use).
-import { checkAnswer, choiceResults, DEVICE_RE, isBlocked, json, fail, numberResults, rateKey, textResults, tokenMatches } from './core';
+import { checkAnswer, checkTeam, choiceResults, DEVICE_RE, isBlocked, json, fail, numberResults, rateKey, textResults, tokenMatches } from './core';
 import { findSet, type Question, type QuestionSet } from './sets';
 import { checkQuestion, publicQuestion, seedRows } from './questions';
 
@@ -46,6 +46,9 @@ const SCHEMA = [
 	`CREATE TABLE IF NOT EXISTS glasgow_seeded (set_id TEXT PRIMARY KEY, at TEXT NOT NULL)`,
 	`CREATE TABLE IF NOT EXISTS glasgow_hand_events (id INTEGER PRIMARY KEY, set_id TEXT NOT NULL, device TEXT NOT NULL, up INTEGER NOT NULL,
 		at TEXT NOT NULL, delete_after TEXT NOT NULL)`,
+	// Teams (optional): the team name a phone sent with an answer, kept beside the answer rather than in a new column of
+	// glasgow_answers, so it needs no migration. Deleted with the answer, or at delete_after.
+	`CREATE TABLE IF NOT EXISTS glasgow_answer_teams (answer_id INTEGER PRIMARY KEY, team TEXT NOT NULL, delete_after TEXT NOT NULL)`,
 ];
 let ready: Promise<unknown> | null = null;
 /** Once per Worker instance; retried if it failed. */
@@ -103,8 +106,9 @@ export async function getResults(env: GlasgowEnv, setId: string | null, qId: str
 		const values = rows.map((r: { value_num: number }) => r.value_num);
 		return json({ ...base, ...(q.type === 'number' ? numberResults(q, values) : choiceResults(q, values)) });
 	}
-	const rows = (await env.DB.prepare(`SELECT id, value_text AS text, updated_at AS at FROM glasgow_answers
-		WHERE set_id = ? AND q = ? AND value_text IS NOT NULL AND blocked = 0 AND hidden = 0 ORDER BY updated_at DESC, id DESC LIMIT ?`).bind(set.id, q.id, MAX_TEXTS).all<{ id: number; text: string; at: string }>()).results;
+	const rows = (await env.DB.prepare(`SELECT a.id, a.value_text AS text, a.updated_at AS at, t.team FROM glasgow_answers a
+		LEFT JOIN glasgow_answer_teams t ON t.answer_id = a.id
+		WHERE a.set_id = ? AND a.q = ? AND a.value_text IS NOT NULL AND a.blocked = 0 AND a.hidden = 0 ORDER BY a.updated_at DESC, a.id DESC LIMIT ?`).bind(set.id, q.id, MAX_TEXTS).all<{ id: number; text: string; at: string; team: string | null }>()).results;
 	return json({ ...base, ...textResults(q, rows) });
 }
 
@@ -134,6 +138,7 @@ export async function postAnswer(env: GlasgowEnv, request: Request) {
 	const addr = await rateKey(ip, env.TOKEN_SECRET || '');
 	if (!(await underLimit(env, 'a:' + addr, PER_ADDRESS_PER_MINUTE)) || !(await underLimit(env, 'd:' + device, PER_DEVICE_PER_MINUTE))) return fail(429, 'Too many answers just now: please wait a minute.');
 	const blocked = checked.text !== null && isBlocked(checked.text) ? 1 : 0;
+	const team = checkTeam(body?.team);
 	const t = now();
 	if (q.type === 'text' && q.multiple) {
 		// Each send is a new row, stored as "<device>#<time>" (a device id never contains "#"), so the one-per-device
@@ -144,14 +149,23 @@ export async function postAnswer(env: GlasgowEnv, request: Request) {
 		if ((mine?.n ?? 0) >= (q.maxPerDevice ?? 30)) return fail(429, "That's the most answers one phone can add.");
 		const row = await env.DB.prepare(`INSERT INTO glasgow_answers (set_id, q, device, value_num, value_text, blocked, hidden, created_at, updated_at, delete_after)
 			VALUES (?, ?, ?, NULL, ?, ?, 0, ?, ?, ?) RETURNING id`).bind(set.id, q.id, `${device}#${Date.now()}${Math.floor(Math.random() * 1000)}`, checked.text, blocked, t, t, set.deleteAfter).first<{ id: number }>();
-		return json({ ok: true, q: q.id, value: checked.text, id: row?.id ?? null });
+		if (row?.id) await setTeam(env, row.id, team, set.deleteAfter);
+		return json({ ok: true, q: q.id, value: checked.text, id: row?.id ?? null, ...(team ? { team } : {}) });
 	}
 	await env.DB.prepare(`INSERT INTO glasgow_answers (set_id, q, device, value_num, value_text, blocked, hidden, created_at, updated_at, delete_after)
 		VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
 		ON CONFLICT (set_id, q, device) DO UPDATE SET value_num = excluded.value_num, value_text = excluded.value_text, blocked = excluded.blocked, hidden = 0, updated_at = excluded.updated_at`)
 		.bind(set.id, q.id, device, checked.num, checked.text, blocked, t, t, set.deleteAfter).run();
 	const row = await env.DB.prepare('SELECT id FROM glasgow_answers WHERE set_id = ? AND q = ? AND device = ?').bind(set.id, q.id, device).first<{ id: number }>();
-	return json({ ok: true, q: q.id, value: checked.num ?? checked.text, id: row?.id ?? null });
+	if (row?.id) await setTeam(env, row.id, team, set.deleteAfter);
+	return json({ ok: true, q: q.id, value: checked.num ?? checked.text, id: row?.id ?? null, ...(team ? { team } : {}) });
+}
+
+/** The answer's team: replaced by the latest send, and removed when an answer is changed from a phone with no team. */
+async function setTeam(env: GlasgowEnv, answerId: number, team: string | null, deleteAfter: string) {
+	if (team) await env.DB.prepare('INSERT INTO glasgow_answer_teams (answer_id, team, delete_after) VALUES (?, ?, ?) ON CONFLICT (answer_id) DO UPDATE SET team = excluded.team')
+		.bind(answerId, team, deleteAfter).run();
+	else await env.DB.prepare('DELETE FROM glasgow_answer_teams WHERE answer_id = ?').bind(answerId).run();
 }
 
 export function presenter(env: GlasgowEnv, request: Request) {
@@ -197,7 +211,7 @@ export async function purge(env: { DB: D1Database }) {
 	const a = await env.DB.prepare('DELETE FROM glasgow_answers WHERE delete_after <= ?').bind(now()).run();
 	const r = await env.DB.prepare('DELETE FROM glasgow_rate WHERE minute < ?').bind(Math.floor(Date.now() / 60000) - 60).run();
 	const t = now();
-	const audience = await env.DB.batch(['glasgow_questions', 'glasgow_hands', 'glasgow_hand_events'].map((table) => env.DB.prepare(`DELETE FROM ${table} WHERE delete_after <= ?`).bind(t)));
+	const audience = await env.DB.batch(['glasgow_questions', 'glasgow_hands', 'glasgow_hand_events', 'glasgow_answer_teams'].map((table) => env.DB.prepare(`DELETE FROM ${table} WHERE delete_after <= ?`).bind(t)));
 	return { answers: a.meta.changes, rate: r.meta.changes, audience: audience.reduce((n, x) => n + (x.meta.changes ?? 0), 0) };
 }
 
@@ -232,7 +246,8 @@ export async function deleteQuestion(env: GlasgowEnv, request: Request, id: stri
 	if ((await current(env, set)).current === id) return fail(409, 'That question is showing: switch to another (or to none) first.');
 	const res = await env.DB.batch([
 		env.DB.prepare('DELETE FROM glasgow_qdefs WHERE set_id = ? AND id = ?').bind(set.id, id),
+		env.DB.prepare('DELETE FROM glasgow_answer_teams WHERE answer_id IN (SELECT id FROM glasgow_answers WHERE set_id = ? AND q = ?)').bind(set.id, id),
 		env.DB.prepare('DELETE FROM glasgow_answers WHERE set_id = ? AND q = ?').bind(set.id, id),
 	]);
-	return json({ ok: true, answers: res[1].meta.changes ?? 0 });
+	return json({ ok: true, answers: res[2].meta.changes ?? 0 });
 }

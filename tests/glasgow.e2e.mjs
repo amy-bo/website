@@ -206,6 +206,31 @@ try {
 	const pre2 = await fetch(`${BASE}/api/glasgow/questions/q1`, { method: 'OPTIONS', headers: { origin: 'null', 'access-control-request-method': 'PUT' } });
 	check('preflight allows PUT and DELETE', /PUT/.test(pre2.headers.get('access-control-allow-methods') || '') && /DELETE/.test(pre2.headers.get('access-control-allow-methods') || ''));
 
+	console.log('Teams (optional, sent by the phone with each answer)');
+	await call('PUT', '/api/glasgow/questions/teamq', { type: 'text', prompt: 'First to answer', multiple: true }, presenter);
+	await call('PUT', '/api/glasgow/questions/teamone', { type: 'text', prompt: 'One each' }, presenter);
+	await call('POST', '/api/glasgow/current', { q: 'teamq' }, presenter);
+	r = await call('POST', '/api/glasgow/answer', { q: 'teamq', value: 'yeast', device: dev(30), team: '  The  Reds ' });
+	check('an answer with a team is taken, the team tidied', r.status === 200 && r.data.team === 'The Reds', JSON.stringify(r));
+	r = await call('POST', '/api/glasgow/answer', { q: 'teamq', value: 'mould', device: dev(31) });
+	check('an answer without a team is taken as before (no "team" in the reply)', r.status === 200 && !('team' in r.data), JSON.stringify(r));
+	r = await call('POST', '/api/glasgow/answer', { q: 'teamq', value: 'koji', device: dev(32), team: 'x'.repeat(31) });
+	check('an unusable team never refuses the answer: it is just no team', r.status === 200 && !('team' in r.data), JSON.stringify(r));
+	r = await call('GET', '/api/glasgow/results?q=teamq');
+	const byText = Object.fromEntries((r.data.texts || []).map((x) => [x.text, x]));
+	check('results: "team" beside id and at, only on answers sent with one', byText.yeast?.team === 'The Reds' && Number.isInteger(byText.yeast?.id) && !!byText.yeast?.at && !('team' in byText.mould) && !('team' in byText.koji), JSON.stringify(r.data));
+	check('results: the word cloud is unchanged by teams', JSON.stringify(r.data.words.map((w) => w.text).sort()) === '["koji","mould","yeast"]', JSON.stringify(r.data.words));
+	await call('POST', '/api/glasgow/current', { q: 'teamone' }, presenter);
+	await call('POST', '/api/glasgow/answer', { q: 'teamone', value: 'first', device: dev(33), team: 'Blues' });
+	await call('POST', '/api/glasgow/answer', { q: 'teamone', value: 'second', device: dev(33), team: 'Greens' });
+	r = await call('GET', '/api/glasgow/results?q=teamone');
+	check('a changed answer carries the latest team', r.data.count === 1 && r.data.texts[0].text === 'second' && r.data.texts[0].team === 'Greens', JSON.stringify(r.data));
+	await call('POST', '/api/glasgow/answer', { q: 'teamone', value: 'third', device: dev(33) });
+	r = await call('GET', '/api/glasgow/results?q=teamone');
+	check('…and changed from a phone with no team, it has none', r.data.texts[0].text === 'third' && !('team' in r.data.texts[0]), JSON.stringify(r.data));
+	await call('POST', '/api/glasgow/current', { q: null }, presenter);
+	check('a question with teamed answers deletes cleanly', (await call('DELETE', '/api/glasgow/questions/teamq', undefined, presenter)).data?.answers === 3 && (await call('DELETE', '/api/glasgow/questions/teamone', undefined, presenter)).status === 200);
+
 	console.log('Closing');
 	r = await call('POST', '/api/glasgow/current', { q: null }, presenter);
 	check('the presenter can show nothing', r.status === 200 && r.data.current === null && (await call('GET', '/api/glasgow/state')).data.current === null);

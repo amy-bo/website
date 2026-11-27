@@ -155,6 +155,7 @@ export async function postClear(env: GlasgowEnv, request: Request) {
 		const up = (await env.DB.prepare('SELECT device FROM glasgow_hands WHERE set_id = ? AND up = 1 AND seen_at > ?').bind(set.id, fresh).all<{ device: string }>()).results;
 		const res = await env.DB.batch([
 			env.DB.prepare('DELETE FROM glasgow_answers WHERE set_id = ?').bind(set.id),
+			env.DB.prepare('DELETE FROM glasgow_answer_teams WHERE answer_id NOT IN (SELECT id FROM glasgow_answers)'),
 			env.DB.prepare(`INSERT INTO glasgow_clears (set_id, questions_after, at) VALUES (?, COALESCE((SELECT MAX(id) FROM glasgow_questions WHERE set_id = ?), 0), ?)
 				ON CONFLICT (set_id) DO UPDATE SET questions_after = excluded.questions_after, at = excluded.at`).bind(set.id, set.id, t),
 			env.DB.prepare('UPDATE glasgow_hands SET up = 0, seen_at = ? WHERE set_id = ? AND up = 1').bind(t, set.id),
@@ -166,6 +167,9 @@ export async function postClear(env: GlasgowEnv, request: Request) {
 	}
 	const q = await getQuestion(env, set, r.body?.q);
 	if (!q) return fail(404, 'No such question: send {"q": "<id>"} or {"all": true}.');
-	const res = await env.DB.prepare('DELETE FROM glasgow_answers WHERE set_id = ? AND q = ?').bind(set.id, q.id).run();
+	const [, res] = await env.DB.batch([
+		env.DB.prepare('DELETE FROM glasgow_answer_teams WHERE answer_id IN (SELECT id FROM glasgow_answers WHERE set_id = ? AND q = ?)').bind(set.id, q.id),
+		env.DB.prepare('DELETE FROM glasgow_answers WHERE set_id = ? AND q = ?').bind(set.id, q.id),
+	]);
 	return json({ ok: true, cleared: res.meta.changes ?? 0 });
 }

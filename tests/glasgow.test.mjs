@@ -1,7 +1,7 @@
 // Live lecture polling (amybo.org/glasgow): the pure parts. The API itself is checked by tests/glasgow.e2e.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkAnswer, choiceResults, isBlocked, numberResults, textResults, wordCounts, tokenMatches, rateKey, DEVICE_RE } from '../src/glasgow/core.ts';
+import { checkAnswer, checkTeam, choiceResults, isBlocked, numberResults, textResults, wordCounts, tokenMatches, rateKey, DEVICE_RE } from '../src/glasgow/core.ts';
 import { SETS, ACTIVE_SET, findSet, findQuestion } from '../src/glasgow/sets.ts';
 
 const set = findSet(ACTIVE_SET);
@@ -153,4 +153,18 @@ test('choice colours: one per option, hex or null; a wrong count is dropped', as
 	assert.equal(checkQuestion('c', { ...base, options: Array.from({ length: 13 }, (_, i) => `o${i}`) }).ok, false, 'thirteen');
 	const q = checkQuestion('c', { ...base, colors: ['#E8590C', null, null] }).question;
 	assert.deepEqual(choiceResults(q, [0]).colors, ['#E8590C', null, null], 'the results carry the colours for the chart');
+});
+
+test('teams: an optional name, tidied; anything unusable is no team (never a refused answer)', () => {
+	assert.equal(checkTeam('  The   Yeasties \n'), 'The Yeasties');
+	for (const bad of [undefined, null, '', '   ', 42, {}, 'x'.repeat(31), 'sh1t team']) assert.equal(checkTeam(bad), null, String(bad));
+	assert.equal(checkTeam('x'.repeat(30)), 'x'.repeat(30));
+});
+
+test('teams: a text answer carries "team" only when it was sent with one', () => {
+	const rows = [{ id: 2, text: 'yeast', at: '2026-11-27T12:00:02Z', team: 'Reds' }, { id: 1, text: 'mould', at: '2026-11-27T12:00:01Z', team: null }];
+	const r = textResults(q93, rows);
+	assert.deepEqual(r.texts, [{ id: 2, text: 'yeast', at: '2026-11-27T12:00:02Z', team: 'Reds' }, { id: 1, text: 'mould', at: '2026-11-27T12:00:01Z' }]);
+	assert.ok(!('team' in r.texts[1]));
+	assert.deepEqual(r.words.map((w) => w.text).sort(), ['mould', 'yeast']);
 });
