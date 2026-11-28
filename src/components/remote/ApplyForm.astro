@@ -1,0 +1,130 @@
+---
+// The amybo.org/remote application form. Spam protection as on the registration form: a honeypot field, Cloudflare
+// Turnstile (its own action, so a token solved for another form is refused) and a floor on the reply time.
+interface Props { contactHref: string; privacyHref?: string }
+const { contactHref, privacyHref = '/privacy/' } = Astro.props;
+// As in eventsandeye/astro/RsvpForm.astro: a test build takes Cloudflare's test key, a production build needs the real one.
+const TEST_KEY = '1x00000000000000000000AA';
+if (import.meta.env.PUBLIC_TURNSTILE_ALLOW_TEST_KEY === 'true' && typeof process !== 'undefined' && process.env.CF_PAGES === '1') throw new Error('PUBLIC_TURNSTILE_ALLOW_TEST_KEY is for local test builds only: remove it from this Cloudflare Pages build.');
+const siteKey = import.meta.env.PUBLIC_TURNSTILE_ALLOW_TEST_KEY === 'true' ? TEST_KEY : import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || (import.meta.env.DEV ? TEST_KEY : undefined);
+if (!siteKey) throw new Error('Set PUBLIC_TURNSTILE_SITE_KEY for production builds (or PUBLIC_TURNSTILE_ALLOW_TEST_KEY=true for local test builds).');
+---
+<form class="apply not-content" id="remote-form" data-contact={contactHref} method="post" novalidate>
+	<noscript><p class="help">Applying needs JavaScript. Please turn it on, or <a href={contactHref}>contact us</a>.</p></noscript>
+	<div class="field">
+		<label for="remote-name">Name <span aria-hidden="true">*</span></label>
+		<input id="remote-name" name="name" type="text" autocomplete="name" required maxlength="120" />
+	</div>
+	<div class="field">
+		<label for="remote-email">Email <span aria-hidden="true">*</span></label>
+		<input id="remote-email" name="email" type="email" autocomplete="email" required maxlength="254" aria-describedby="remote-email-help" />
+		<p class="help" id="remote-email-help">You will sign in to the bioreactor with this address, so use one you can read during the course.</p>
+	</div>
+	<div class="field">
+		<label for="remote-institution">Institution and course <span aria-hidden="true">*</span></label>
+		<input id="remote-institution" name="institution" type="text" autocomplete="organization" required maxlength="200" placeholder="e.g. University of Glasgow, Alternative Protein lecture series" />
+	</div>
+	<div class="field">
+		<label for="remote-experiment">Which experiment <span aria-hidden="true">*</span></label>
+		<select id="remote-experiment" name="experiment" required>
+			<option value="other">Other, or not sure (say below)</option>
+		</select>
+		<p class="help" id="remote-experiments-status" aria-live="polite"></p>
+	</div>
+	<div class="field">
+		<label for="remote-experiment-other">Experiment or course, if it is not listed (optional)</label>
+		<input id="remote-experiment-other" name="experiment_other" type="text" maxlength="200" />
+	</div>
+	<div class="field">
+		<label for="remote-reason">Why would you like access? <span aria-hidden="true">*</span></label>
+		<textarea id="remote-reason" name="reason" rows="4" required maxlength="1500"></textarea>
+	</div>
+	<div class="hp" aria-hidden="true">
+		<label for="remote-website">Leave this field empty</label>
+		<input id="remote-website" name="website" type="text" tabindex="-1" autocomplete="off" />
+	</div>
+	<div class="field">
+		<label class="choice">
+			<input type="checkbox" name="consent" id="remote-consent" required />
+			<span>I agree that AMYBO (andeye Ltd) may use these details to decide on my application, give me access to the experiment I am assigned to and email me about it, and that Cloudflare checks my email address each time I sign in, as in the <a href={privacyHref}>privacy notice</a>. <span aria-hidden="true">*</span></span>
+		</label>
+	</div>
+	<div class="cf-turnstile" data-sitekey={siteKey} data-action="amybo-remote-apply" data-response-field-name="cf-turnstile-response"></div>
+	<p class="help"><span aria-hidden="true">*</span> Required</p>
+	<button type="submit" class="submit" disabled>Apply</button>
+	<div id="remote-result" role="status" aria-live="polite" tabindex="-1"></div>
+</form>
+
+<script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<script>
+	const form = document.getElementById('remote-form') as HTMLFormElement;
+	const btn = form.querySelector('button[type=submit]') as HTMLButtonElement;
+	const result = document.getElementById('remote-result')!;
+	const select = document.getElementById('remote-experiment') as HTMLSelectElement;
+	const status = document.getElementById('remote-experiments-status')!;
+	btn.disabled = false;
+	fetch('/api/remote/experiments')
+		.then((r) => r.json())
+		.then((d: { experiments?: { id: number; name: string; status: string }[] }) => {
+			const list = d.experiments ?? [];
+			for (const e of list.reverse()) {
+				const o = document.createElement('option');
+				o.value = String(e.id);
+				o.textContent = e.status === 'planned' ? `${e.name} (starting soon)` : e.name;
+				select.prepend(o);
+			}
+			select.selectedIndex = 0;
+		})
+		.catch(() => { status.textContent = 'Could not load the list of experiments: choose "Other" and name it below.'; });
+
+	form.addEventListener('submit', async (e) => {
+		e.preventDefault();
+		result.textContent = '';
+		result.classList.remove('error');
+		for (const el of form.querySelectorAll('[aria-invalid]')) el.removeAttribute('aria-invalid');
+		for (const id of ['remote-name', 'remote-institution', 'remote-reason']) {
+			const el = document.getElementById(id) as HTMLInputElement;
+			el.value = el.value.trim();
+		}
+		if (!form.reportValidity()) return;
+		const body: Record<string, unknown> = Object.fromEntries(new FormData(form).entries());
+		body.consent = (document.getElementById('remote-consent') as HTMLInputElement).checked;
+		btn.disabled = true;
+		try {
+			const res = await fetch('/api/remote/apply', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+			const data = (await res.json()) as { ok: boolean; error?: string; field?: string };
+			if (!data.ok) throw Object.assign(new Error(data.error || 'Applying failed.'), { field: data.field });
+			form.querySelectorAll('.field, .cf-turnstile, .help, .submit').forEach((el) => ((el as HTMLElement).hidden = true));
+			result.innerHTML = '<p class="notice"><strong>Nearly done: check your email.</strong> We have sent you a link to confirm your address. Your application reaches us once you click it.</p>';
+			result.focus();
+		} catch (err) {
+			result.textContent = (err as Error).message;
+			result.classList.add('error');
+			(window as unknown as { turnstile?: { reset: () => void } }).turnstile?.reset();
+			btn.disabled = false;
+			const field = (err as { field?: string }).field;
+			const bad = field ? form.querySelector<HTMLElement>(`[name="${CSS.escape(field)}"]`) : null;
+			bad?.setAttribute('aria-invalid', 'true');
+			(bad ?? result).focus();
+		}
+	});
+</script>
+
+<style>
+	.apply { display: grid; gap: 1rem; max-width: 40rem; margin-block: 1.5rem; }
+	.apply :global([hidden]) { display: none !important; }
+	.field { display: grid; gap: 0.35rem; }
+	.field label:not(.choice) { font-weight: 600; }
+	.choice { display: flex; gap: 0.5rem; align-items: flex-start; min-height: 1.5rem; }
+	.choice input { margin-top: 0.3rem; }
+	input[type='text'], input[type='email'], textarea, select {
+		padding: 0.5rem; border: 1px solid var(--sl-color-gray-3, #8b8f98); border-radius: 0.3rem; background: var(--sl-color-bg, Canvas); color: var(--sl-color-text, CanvasText); font: inherit;
+	}
+	.help { font-size: var(--sl-text-sm, 0.875rem); color: #4b5563; color: light-dark(#4b5563, #b0b5bd); margin: 0; }
+	:global([data-theme]) .help { color: var(--sl-color-gray-2); }
+	.hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+	.submit { justify-self: start; background: #0069a0; color: #fff; border: 2px solid transparent; border-radius: 999px; padding: 0.7rem 1.6rem; font-weight: 700; font-size: var(--sl-text-base, 1rem); cursor: pointer; }
+	.submit:disabled { opacity: 0.6; cursor: wait; }
+	#remote-result.error { color: #b3261e; color: light-dark(#b3261e, #ff8a80); font-weight: 600; }
+	#remote-result :global(.notice) { padding: 1rem; border: 2px solid var(--sl-color-accent, #0069a0); border-radius: 0.5rem; }
+</style>

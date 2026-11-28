@@ -1,0 +1,51 @@
+---
+// Landing page for the links in remote-access emails: confirm an application, or withdraw it. The change is a POST behind a
+// button, so link scanners that open emailed links cannot confirm or delete anything.
+interface Props { purpose: 'confirm' | 'withdraw'; contactHref: string }
+const { purpose, contactHref } = Astro.props;
+const text = purpose === 'confirm'
+	? { intro: 'Click the button to confirm your email address and send us your application.', button: 'Confirm my application' }
+	: { intro: 'Click the button to withdraw your application. This deletes it, and you can no longer sign in to the bioreactor.', button: 'Withdraw and delete my application' };
+---
+<div class="not-content panel" id="remote-panel" data-purpose={purpose}>
+	<p id="remote-intro">{text.intro}</p>
+	<button type="button" id="remote-btn" class="big" hidden>{text.button}</button>
+	<noscript><p>This needs JavaScript. Please turn it on, or <a href={contactHref}>contact us</a>.</p></noscript>
+	<div id="remote-out" role="status" aria-live="polite" tabindex="-1"></div>
+	<p class="help"><a href={contactHref}>Contact us</a> if something is not right.</p>
+</div>
+<script>
+	const panel = document.getElementById('remote-panel')!;
+	const purpose = panel.dataset.purpose;
+	const t = new URLSearchParams(location.search).get('t');
+	if (t) history.replaceState(null, '', location.pathname);
+	const btn = document.getElementById('remote-btn') as HTMLButtonElement;
+	const out = document.getElementById('remote-out')!;
+	const intro = document.getElementById('remote-intro')!;
+	if (!t) intro.textContent = 'This page needs the link from your email. Please open it from the email again.';
+	btn.hidden = !t;
+	btn.addEventListener('click', async () => {
+		btn.disabled = true;
+		try {
+			const res = await fetch(`/api/remote/${purpose}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ t }) });
+			const d = (await res.json()) as { ok: boolean; error?: string; already?: boolean };
+			if (!d.ok) throw new Error(d.error);
+			btn.hidden = true;
+			intro.hidden = true;
+			out.innerHTML = purpose === 'confirm'
+				? `<p><strong>${d.already ? 'Already confirmed.' : 'Thank you: your application has reached us.'}</strong> We will email you when you have been given access to an experiment.</p>`
+				: '<p><strong>Withdrawn.</strong> Your application has been deleted, and you can no longer sign in to the bioreactor.</p>';
+			out.focus();
+		} catch (e) {
+			out.textContent = (e as Error).message || 'Something went wrong. Please contact us using the link below.';
+			btn.disabled = false;
+		}
+	});
+</script>
+<style>
+	.panel { margin-block: 1.5rem; }
+	.panel :global([hidden]) { display: none !important; }
+	.big { background: #0069a0; color: #fff; border: 2px solid transparent; border-radius: 0.4rem; padding: 0.9rem 1.8rem; font-size: var(--sl-text-lg, 1.125rem); font-weight: 700; cursor: pointer; }
+	.big:disabled { opacity: 0.6; }
+	.help { font-size: var(--sl-text-sm, 0.875rem); }
+</style>

@@ -10,7 +10,7 @@ Every page carries `source:` in its frontmatter:
 
 `provenance:` explains pages that mix sources. To see exactly what changed on a Hugo page, compare it with the Hugo original in git history of [amy-bo/pages](https://github.com/amy-bo/pages).
 
-Totals: 9 amy, 22 new, 22 hugo.
+Totals: 9 amy, 26 new, 22 hugo.
 
 ## Pages
 
@@ -28,6 +28,7 @@ Totals: 9 amy, 22 new, 22 hugo.
 | [`/collaborate/safety-and-legal/risk-management/`](/collaborate/safety-and-legal/risk-management/) | Risk management | hugo | `/docs/risk-assessments/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/collaborate/volunteer/`](/collaborate/volunteer/) | Get involved | amy | – | Title by Amy; her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch; the list of skills is from the Hugo homepage. |
 | [`/contact/`](/contact/) | Contact AMYBO | amy | – | Title by Amy (capitalised as AMYBO); her description rewritten for search results. Body written by Martin Currie with Claude for the 2026 relaunch; the legal details are from Companies House. |
+| [`/event/saturday14/`](/event/saturday14/) | Saturday 14 November | new | – |  |
 | [`/events/`](/events/) | Events | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
 | [`/events/2026-11-13-london/`](/events/2026-11-13-london/) | AMYBO Event, London – Friday 13 November 2026 | new | – |  |
 | [`/events/check-email/`](/events/check-email/) | Nearly there: check your email | new | – |  |
@@ -49,8 +50,8 @@ Totals: 9 amy, 22 new, 22 hugo.
 | [`/projects/other-hardware/`](/projects/other-hardware/) | Other hardware | new | – | Written by Martin Currie with Claude for the 2026 relaunch, from the repository's Components and PastResearch folders. |
 | [`/projects/other-hardware/openvalve/`](/projects/other-hardware/openvalve/) | OpenValve | hugo | `/docs/openvalve/` | Moved from the old Docs section in the 2026 relaunch. Team named as Harvey Mudd College's with AMYBO, and dated 2023. |
 | [`/projects/past/`](/projects/past/) | Past projects and early notes | new | – | Written by Martin Currie with Claude for the 2026 relaunch. |
-| [`/projects/past/electropioreactor-2024/`](/projects/past/electropioreactor-2024/) | electroPioreactor (2024 notes) | hugo | `/docs/electropioreactor/` | Verbatim from Hugo, plus a note at the top pointing to the current project page. Moved from the old Docs section in the 2026 relaunch; text unchanged. |
-| [`/projects/past/electropioreactor-v0-02/`](/projects/past/electropioreactor-v0-02/) | electroPioreactor v0.02 (2024) | hugo | `/docs/electropioreactor/electropioreactor-v0.02/` | Title had a stray '.md' on the Hugo site; corrected. Moved from the old Docs section in the 2026 relaunch; text unchanged apart from first person singular made impersonal. |
+| [`/projects/past/electropioreactor-2024/`](/projects/past/electropioreactor-2024/) | electroPioreactor (2024 notes) | hugo | `/docs/electropioreactor/` | Verbatim from Hugo, plus a note at the top pointing to the current project page and electropioreactor.org. Moved from the old Docs section in the 2026 relaunch; text unchanged. |
+| [`/projects/past/electropioreactor-v0-02/`](/projects/past/electropioreactor-v0-02/) | electroPioreactor v0.02 (2024) | hugo | `/docs/electropioreactor/electropioreactor-v0.02/` | Title had a stray '.md' on the Hugo site; corrected. Moved from the old Docs section in the 2026 relaunch; text unchanged apart from first person singular made impersonal, plus a note at the top pointing to the current project page and electropioreactor.org. |
 | [`/projects/past/equipment/`](/projects/past/equipment/) | Equipment notes (2023) | hugo | `/docs/equipment/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/past/equipment/autoclaves/`](/projects/past/equipment/autoclaves/) | Autoclaves | hugo | `/docs/equipment/autoclaves/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
 | [`/projects/past/equipment/bioreactors/`](/projects/past/equipment/bioreactors/) | Bioreactors: why we chose the Pioreactor | hugo | `/docs/equipment/bioreactors/` | Moved from the old Docs section in the 2026 relaunch; text unchanged. |
@@ -64,6 +65,9 @@ Totals: 9 amy, 22 new, 22 hugo.
 | [`/projects/past/experiments/spirulina-batch/`](/projects/past/experiments/spirulina-batch/) | Spirulina Batch | hugo | `/docs/experiments/spirulina-batch/` | Moved from the old Docs section in the 2026 relaunch; text unchanged apart from first person singular made impersonal, plus a link to the raw data of the later turbidostat run. Presentation: an absolute link to the old /docs/ URL made relative to its new page. |
 | [`/projects/pioflo/`](/projects/pioflo/) | PioFlo | hugo | `/docs/pioflo/` | Moved from the old Docs section in the 2026 relaunch; text unchanged apart from one typo. |
 | [`/projects/pioflo/pioflo-v0-01/`](/projects/pioflo/pioflo-v0-01/) | Pioflo v0.01 | hugo | `/docs/pioflo/pioflo-v0.01/` | Moved from the old Docs section in the 2026 relaunch; text unchanged apart from first person singular made impersonal, plus a link to the trial's raw data. |
+| [`/remote/`](/remote/) | Remote access to an electroPioreactor | new | – |  |
+| [`/remote/confirm/`](/remote/confirm/) | Confirm your application | new | – |  |
+| [`/remote/withdraw/`](/remote/withdraw/) | Withdraw your application | new | – |  |
 | [`/sustainable-protein/`](/sustainable-protein/) | What is sustainable protein? | new | – | Written by Martin Currie with Claude in October 2026, replacing the 2023 Proteins page (its plants, plant-based meat and closed-source points are carried over). Facts checked against the sources linked, October 2026. |
 | [`/sustainable-protein/cultivated-meat/`](/sustainable-protein/cultivated-meat/) | Cultivated meat | new | – | Rewritten by Martin Currie with Claude in October 2026 from the 2023 Cultivated Meat page, updated and sourced. |
 | [`/sustainable-protein/plants/`](/sustainable-protein/plants/) | Plants | new | – | Written by Martin Currie with Claude in October 2026 from the 2023 Proteins page's Meat & Plant Protein and Plant Based Meat sections, updated and sourced. |

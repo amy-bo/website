@@ -98,6 +98,7 @@ export default defineConfig({
 						{ label: 'Community experiments', slug: 'experiments/community_experiments' },
 						{ label: 'Experimental protocols', slug: 'experiments/protocols' },
 						{ label: 'Hardware', slug: 'experiments/hardware' },
+						{ label: 'Remote access', slug: 'remote' },
 						{ label: 'Submit an experiment', slug: 'experiments/submit' },
 					],
 				},

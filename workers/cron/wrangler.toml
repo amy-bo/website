@@ -25,3 +25,5 @@ migrations_dir = "../../eventsandeye/migrations"
 
 # Secrets (set with `npx wrangler secret put <NAME> --config workers/cron/wrangler.toml`):
 #   RESEND_API_KEY, TOKEN_SECRET (must match the Pages project's value)
+# Optional: CF_ACCESS_API_TOKEN and CF_ACCOUNT_ID (as on the Pages project), so people are taken off a Pi's Access policy
+# when their course ends, without anyone opening the admin page.

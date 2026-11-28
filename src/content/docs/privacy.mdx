@@ -1,12 +1,12 @@
 ---
 title: Privacy notice
-description: How AMYBO uses personal data, including event registrations.
+description: How AMYBO uses personal data, including event registrations and remote access to electroPioreactors.
 source: new
 sidebar:
   order: 99
 ---
 
-This notice explains how AMYBO uses your personal data when you register for an event on this website.
+This notice explains how AMYBO uses your personal data when you register for an event on this website, or apply for remote access to one of our electroPioreactors.
 
 ## Who we are
 
@@ -35,6 +35,16 @@ If you have a link page, we also keep your email address (to send you sign-in li
 
 Lectures can ask the audience live questions at [amybo.org/glasgow](/glasgow). Answers are anonymous: we store the answer, the time, and a random number your browser makes up so that you answer each question once and can change your answer. If you answer a lecture's team poll, the team you chose is kept on your phone and stored with each answer you send after that, and is shown with the answer. We do not store your name, email or IP address; to stop abuse we keep a scrambled (keyed hash) form of the address for up to an hour. Answers are shown on the lecture slides and deleted 30 days after the lecture. Free-text answers with offensive words are never shown, and the presenter can hide any other. You can also raise your hand or send the presenter questions and comments from the same page: these go to the presenter only, never on the slides, and are kept as sent, with that random number and the time, so the presenter has a record (for example, to report abuse to the course team). They are deleted 30 days after the lecture too.
 
+## Remote access to electroPioreactors
+
+When you apply for remote access at [amybo.org/remote](/remote/) we collect your name and email address, your institution and course, which experiment you asked for, why you would like access, and when you gave consent and confirmed your email address. We then record our decision (which experiment we assigned you to, or that we turned the application down) and when we emailed you the link. We use these details **only to decide on your application, give you access to the experiment you are assigned to, and email you about it**. Our lawful basis is your **consent**, which you give by ticking the box on the form. We do not use your details for marketing.
+
+The organisers receive an email when you confirm your application (your name, institution and course, and why you would like access). If we assign you to an experiment, your email address is added to the list of people allowed to sign in to that bioreactor, in **Cloudflare Access**, which guards it: when you sign in, Cloudflare emails you a one-time code and records the sign-in (your email address, the time, your IP address and approximate location) in our Cloudflare account, where only the organisers can see it. Cloudflare also sets a strictly necessary cookie on the bioreactor's address that keeps you signed in for the session. The bioreactor's own software records in its experiment log what was changed and when, but not who changed it. Its camera points at the bioreactor; live video is not recorded, and the bioreactor may save still pictures of the culture with the experiment's data.
+
+**How long we keep it.** An application whose email address is not confirmed is deleted after 3 days. Every other application, including turned-down ones, is **deleted 30 days after the course it is for ends** (or 180 days after you applied, if no end date has been set), and from the day after the course ends nobody but the organisers can sign in to its bioreactor. The database backup described below keeps a deleted application for up to 30 days more. Cloudflare keeps its sign-in records under its own retention policy.
+
+**Withdrawing.** Every email we send about your access has a link to withdraw your application, which deletes it straight away and stops you signing in. You can also [contact us](https://contact.andeye.com/?source=amybo.org&subject=Withdrawing%20a%20remote%20access%20application).
+
 ## Why we use it and our lawful basis
 
 We use your data **only to organise the event you registered for and to email you about it**: confirming your registration, sending joining instructions and updates, managing places and waiting lists, and planning catering and access.
@@ -56,6 +66,8 @@ Only the AMYBO organisers can see the full registrations. The host of each sessi
 - **Google Meet** streams the talks. If you join remotely, Google processes your name and email address under its own terms when you join the call.
 - Registrations are handled by **Events&I**, open source registration software that runs on our own Cloudflare account; no other organisation receives your data through it.
 
+For remote access, **Cloudflare** also runs Cloudflare Access, which checks who may sign in to a bioreactor (above), and the encrypted tunnel that connects the bioreactor to the internet without exposing it directly.
+
 Cloudflare, Resend and Google act as data processors on our behalf. Where they process data outside the UK (the EU for the registration database and email sending; Google and Cloudflare's support and security operations may involve the United States), transfers rely on the UK adequacy regulations for the EU and on the UK International Data Transfer Addendum to each provider's standard contractual clauses elsewhere. We do not sell or share your data with anyone else. If we name speakers on an event page, it is only with their agreement; attendees are never listed publicly.
 
 ## How long we keep it
@@ -72,4 +84,4 @@ You have the right to access, correct or delete your data, to restrict or object
 
 This website does not use tracking or advertising cookies. If you edit a link page, signing in sets one strictly necessary cookie that keeps you signed in for up to 60 days, until you sign out. Cloudflare Turnstile, which protects the registration form from spam, may set a strictly necessary cookie to do that job. Videos from YouTube and Vimeo load only when you click play (YouTube) or with Vimeo's do-not-track setting, so their cookies are not set just by visiting a page. Video thumbnails are loaded from YouTube's image server, which receives your IP address.
 
-*Last updated 10 November 2026 (asking us not to share images); before that 2 October 2026 (link-page counts); before that 25 September 2026 (EU database, Google Workspace, Imperial, recordings, backups and what session hosts see).*
+*Last updated 28 November 2026 (remote access to electroPioreactors); before that 10 November 2026 (asking us not to share images); before that 2 October 2026 (link-page counts); before that 25 September 2026 (EU database, Google Workspace, Imperial, recordings, backups and what session hosts see).*

@@ -46,3 +46,10 @@ test('amy.bo/event is the next event, temporarily', async () => {
 	assert.equal(r.status, 302);
 	assert.equal(r.headers.get('location'), 'https://amybo.org/events/2026-11-13-london/');
 });
+test('amy.bo/remote goes to the application page on the main site', async () => {
+	for (const p of ['/remote', '/remote/']) {
+		const r = await get(p);
+		assert.equal(r.status, 302);
+		assert.equal(r.headers.get('location'), `https://amybo.org${p}`);
+	}
+});
